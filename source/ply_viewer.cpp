@@ -1,0 +1,46 @@
+#include <boost/filesystem.hpp>
+#include <fstream>
+
+#include "common_types.h"
+#include "viewer3d.h"
+#include "widget3d.h"
+#include "vars.h"
+#include "read_ply.h"
+#include "colored_points.h"
+#include "map_widgets.h"
+
+#include "gl_utils.tpp"
+
+using namespace indoor_context;
+using namespace std;
+
+int main(int argc, char **argv) {
+	InitVars(argc, argv);
+	if (argc != 2 && argc != 3) {
+		cerr << "Usage: "<<argv[0]<<" file.ply [map.xml]\n";
+		return -1;
+	}
+
+	CHECK_PRED(exists, fs::path(argv[1]));
+
+	// Read the .ply file
+	ColoredPoints points;
+	ReadPly(argv[1], points.vs);
+
+	// Initialize the viewer
+	Viewer3D viewer;
+	viewer.Add(points, 'p');
+
+	// Create the map
+	scoped_ptr<Map> map;
+	if (argc == 3) {
+		map.reset(new Map);
+		map->LoadXml(argv[2]);
+		viewer.AddOwned(new MapWidget(map.get()), 'm');
+	}
+
+	// Run the view
+	viewer.Run();
+
+	return 0;
+}

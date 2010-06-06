@@ -1,0 +1,61 @@
+package indoor_context.proto;
+
+message Vec2 {
+				required double x1 = 1;
+				required double x2 = 2;
+}
+
+message Vec3 {
+				required double x1 = 1;
+				required double x2 = 2;
+				required double x3 = 3;
+}
+
+message Vec4 {
+				required double x1 = 1;
+				required double x2 = 2;
+				required double x3 = 3;
+				required double x4 = 4;
+}
+
+message Vec5 {
+				required double x1 = 1;
+				required double x2 = 2;
+				required double x3 = 3;
+				required double x4 = 4;
+				required double x5 = 5;
+}
+
+message Vec6 {
+				required double x1 = 1;
+				required double x2 = 2;
+				required double x3 = 3;
+				required double x4 = 4;
+				required double x5 = 5;
+				required double x6 = 6;
+}
+
+message FloorPlan {
+				required double zfloor = 1;
+				required double zceil = 2;
+				repeated Vec2 vertices = 3;
+}
+
+message ImagePng {
+				required int32 nx = 1;
+				required int32 ny = 2;
+				required string data = 3;  // image contents compressed in PNG format
+}
+
+message TruthedFrame {
+				required int32 id = 1;  // index of the frame in the map
+				optional ImagePng orient_map = 2;
+				optional string orient_map_file = 3;
+}
+
+message TruthedMap {
+				optional Vec3 ln_scene_from_slam = 1;
+				optional string spec_file = 2;
+				repeated TruthedFrame frame = 3; 
+				optional FloorPlan floorplan = 4;
+}
