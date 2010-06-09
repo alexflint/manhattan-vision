@@ -55,6 +55,9 @@ namespace indoor_context {
 		static inline const PixelRGB<byte>& comp(int i) {
 			return i == 0 ? aqua() : (i == 1 ? fuchsia() : yellow());
 		}
+		static inline PixelRGB<byte> alpha(double a, const PixelRGB<byte>& in) {
+			return PixelRGB<byte>(in.r, in.g, in.b, (1-a)*255);
+		}
 	};
 
 	// Iterate through colors with full Saturation and Value --

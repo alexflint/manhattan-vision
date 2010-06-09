@@ -69,24 +69,33 @@ namespace indoor_context {
 		double ms[n], cs[n], ys[n];  // slopes, intercepts, y-coords
 		bool ishoriz[n];
 		for (int i = 0; i < n; i++) {
-			ys[i] = poly[i][1] / poly[i][2];
-			toon::Vector<3> line = poly[i] ^ poly[(i+1)%n];
-			ishoriz[i] = abs(line[0]) < 1e-6*abs(line[1]);
-			if (!ishoriz[i]) {
-				ms[i] = -line[1]/line[0];
-				cs[i] = -line[2]/line[0];
-			}
+			const Vec3& u = poly[i];
+			const Vec3& v = poly[(i+1)%n];
 
-			if (ceili(ys[i]) < ymin) {
-				ymin = ceili(ys[i]);
-				imin = i;
-			}
-			if (floori(ys[i]) > ymax) {
-				ymax = floori(ys[i]);
-				imax = i;
+			ys[i] = u[1] / u[2];
+
+			// check if two vertices are coincident
+			if (norm(project(u)-project(v)) < 1e-9) {
+				ishoriz[i] = true;
+			} else {
+
+				toon::Vector<3> line = u ^ v;
+				ishoriz[i] = abs(line[0]) < 1e-6*abs(line[1]);
+				if (!ishoriz[i]) {
+					ms[i] = -line[1]/line[0];
+					cs[i] = -line[2]/line[0];
+				}
+
+				if (ceili(ys[i]) < ymin) {
+					ymin = ceili(ys[i]);
+					imin = i;
+				}
+				if (floori(ys[i]) > ymax) {
+					ymax = floori(ys[i]);
+					imax = i;
+				}
 			}
 		}
-
 
 		int count = 0;
 		int left = (imin+n-1)%n;  // ring decrement
@@ -101,8 +110,16 @@ namespace indoor_context {
 				right = (right+1)%n;  // ring increment
 			}
 
-			int xa = Clamp(ms[left]*y + cs[left], 0, nx-1);
-			int xb = Clamp(ms[right]*y + cs[right], 0, nx-1);
+			double xxa = ms[left]*y + cs[left];
+			double xxb = ms[right]*y + cs[right];
+			if (isnan(xxa) || isnan(xxb)) {
+				DLOG << "Warning: NaN coordinates at y=" << y << " in FillPolygonFast";
+				// ignore and move to next row
+				continue;
+			}
+
+			int xa = Clamp(xxa, 0, nx-1);
+			int xb = Clamp(xxb, 0, nx-1);
 
 			fill(image[y]+min(xa,xb), image[y]+max(xa,xb), v);
 			count += abs(xa-xb);

@@ -44,6 +44,8 @@ public:
 	void Load(const char* filename);
 	// Unload all images
 	void Unload();
+	// Returns true iff image is loaded
+	bool loaded() const;
 	// Read an image file into this->rgb  -- commented for compile speed
 	//void Load(const fs::path& filename);
 	// Convert this->rgb to mono and store in this->m

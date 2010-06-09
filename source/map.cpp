@@ -31,9 +31,8 @@ void Frame::Configure(Map* m, int i, const string& im_file, const SE3<>& pose) {
 }
 
 void Frame::LoadImage(bool undistort) {
-	if (!image_loaded) {
+	if (!image.loaded()) {
 		image.Load(image_file);
-		image_loaded = true;
 		if (undistort) {
 			UndistortImage();
 		}
@@ -41,7 +40,7 @@ void Frame::LoadImage(bool undistort) {
 }
 
 void Frame::UnloadImage() {
-	if (image_loaded) {
+	if (image.loaded()) {
 		image.Unload();
 	}
 }

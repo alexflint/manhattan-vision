@@ -55,6 +55,10 @@ namespace indoor_context {
 		if (mono.IsAlloced()) mono.FreeImageData();
 	}
 
+	bool ImageBundle::loaded() const {
+		return rgb.IsAlloced();
+	}
+
 	void ImageBundle::BuildMono() const {
 		if (monodirty) {
 			ImageCopy(rgb, mono);

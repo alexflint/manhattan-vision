@@ -313,7 +313,7 @@ SET( EXECUTABLES
 #	frame_line_sweeper
 #	map_viewer
 
-#	frame_structure_recovery
+	frame_structure_recovery
 #	multiframe_bnb
 #	canonical_image
 
@@ -351,7 +351,10 @@ SET( EXECUTABLES
 	
 	toon_speed_test
 	include_test
+
 	poster_lines
+	poster_vpts
+	poster_sweeps
 )
 
 

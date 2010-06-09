@@ -215,12 +215,10 @@ namespace indoor_context {
 		for (int i = 0; i < max_corners; i++) {
 			TITLED("Branch " + lexical_cast<string>(i)) {
 				int end = hypotheses.size();
-				int nhoriz = 0;
-				int nvert = 0;
 				WITHOUT_DLOG 
 				for (int j = start; j < end; j++) {
-					nvert += VertBranchFrom(hypotheses[j], hypotheses);
-					nhoriz += HorizBranchFrom(hypotheses[j], hypotheses);
+					VertBranchFrom(hypotheses[j], hypotheses);
+					HorizBranchFrom(hypotheses[j], hypotheses);
 				}
 				DLOG << "Produced " << (hypotheses.size()-end) << " new structures";
 				start = end;
@@ -233,9 +231,10 @@ namespace indoor_context {
 		scores.resize(hypotheses.size());
 		fill_all(scores, 0);
 		ProgressReporter score_pro(hypotheses.size(), "Scoring buildings");
+		//EvaluateHypotheses(est_orients, 0, hypotheses.size()-1, score_pro);
 		ParallelPartition(hypotheses.size(),
 											bind(&ManhattanRecovery::EvaluateHypotheses,
-													 this, ref(est_orients), _1, _2, ref(score_pro)));
+											this, ref(est_orients), _1, _2, ref(score_pro)));
 
 		// Find the best building
 		soln_index = max_index(scores.begin(), scores.end());
@@ -544,9 +543,10 @@ namespace indoor_context {
 					// case 1: change the stripe on the left
 					if (!StripeContains(l_cnr->div_eqn, new_div, vpts[e->axis])) {
 						DLOG << "Adding with change to left";
-						ManhattanBuilding* new_bld = new ManhattanBuilding(bld);
+						// Use auto_ptr here so we have the option to release it
+						auto_ptr<ManhattanBuilding> new_bld(new ManhattanBuilding(bld));
 						if (AddCorner(*new_bld, e->id, new_div, e->axis, true)) {
-							out.push_back(new_bld);
+							out.push_back(new_bld.release());
 							count++;
 						}
 					} else {
@@ -556,9 +556,9 @@ namespace indoor_context {
 					// case 2: change the stripe on the right
 					if (!StripeContains(new_div, r_cnr->div_eqn, vpts[e->axis])) {
 						DLOG << "Adding with change to right";
-						ManhattanBuilding* new_bld = new ManhattanBuilding(bld);
+						auto_ptr<ManhattanBuilding> new_bld(new ManhattanBuilding(bld));
 						if (AddCorner(*new_bld, e->id, new_div, e->axis, false)) {
-							out.push_back(new_bld);
+							out.push_back(new_bld.release());
 							count++;
 						}
 					} else {
@@ -619,9 +619,10 @@ namespace indoor_context {
 				DLOG << "culled left due to vpt";
 			} else {
 				DLOG << "Adding with change to left";
-				ManhattanBuilding* new_bld = new ManhattanBuilding(bld);
+				// Use auto_ptr here so we have the option to release it
+				auto_ptr<ManhattanBuilding> new_bld(new ManhattanBuilding(bld));
 				if (AddCorner(*new_bld, e->id, new_div, new_axis, true)) {
-					out.push_back(new_bld);
+					out.push_back(new_bld.release());
 					count++;
 				}
 			}
@@ -631,9 +632,10 @@ namespace indoor_context {
 				DLOG << "culled right due to vpt";
 			} else {
 				DLOG << "Adding with change to right";
-				ManhattanBuilding* new_bld = new ManhattanBuilding(bld);
+				// Use auto_ptr here so we have the option to release it
+				auto_ptr<ManhattanBuilding> new_bld(new ManhattanBuilding(bld));
 				if (AddCorner(*new_bld, e->id, new_div, new_axis, false)) {
-					out.push_back(new_bld);
+					out.push_back(new_bld.release());
 					count++;
 				}
 			}
@@ -726,8 +728,8 @@ namespace indoor_context {
 																					 const SE3<>& orig_pose,
 																					 const SE3<>& new_pose,
 																					 double floor_z,
-																					 MatI& orients,
-																					 const Map& map) {
+																					 MatI& orients) {
+																					 /*const Map& map*/
 		// Compute scaling (TODO: actually use this)
 		DiagonalMatrix<3> Mscale(makeVector(1.0*orients.Cols()/pc->im_size().x,
 																				1.0*orients.Rows()/pc->im_size().y,
@@ -745,7 +747,7 @@ namespace indoor_context {
 				 left_cnr++) {
 			ManhattanBuilding::ConstCnrIt right_cnr = successor(left_cnr);
 
-			TITLE("Next corner");
+			//TITLE("Next corner");
 			int axis = OtherHorizAxis(left_cnr->right_axis);
 
 			// Compute vertices in the 3D camera frame
@@ -759,8 +761,8 @@ namespace indoor_context {
 				tl = -tl;
 				tr = -tr;
 			}
-			DREPORT(project(left_cnr->right_ceil));
-			DREPORT(bl,br,tl,tr);
+			//DREPORT(project(left_cnr->right_ceil));
+			//DREPORT(bl,br,tl,tr);
 
 			// Compute vertices in the 3D global frame
 			Vector<3> world_tl = orig_inv * tl;

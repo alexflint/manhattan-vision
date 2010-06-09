@@ -23,7 +23,6 @@ namespace indoor_context {
 		return !(clipped_start && clipped_end);
 	}
 
-
 	int PointSign(const Vector<3>& point, const Vector<3>& line) {
 		return Sign(line*point) * HalfSign(point[2]);
 	}

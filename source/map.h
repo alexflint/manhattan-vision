@@ -37,8 +37,6 @@ namespace indoor_context {
 		string image_hash;
 		// The unwarped image
 		UnwarpedImage unwarped;
-		// True iff the image is loaded
-		bool image_loaded;
 
 		// Pose of this keyframe, or null if the camera was lost
 		scoped_ptr<PosedCamera> pc;
@@ -48,7 +46,7 @@ namespace indoor_context {
 		// True iff the camera was initializing at this frame
 		bool initializing;
 
-		Frame() : image_loaded(false), id(-1) { }
+		Frame() : id(-1) { }
 		// Configure this keyframe with specified image file and pose
 		void Configure(Map* map,
 		               int id,

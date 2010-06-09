@@ -10,7 +10,6 @@
 #include "map.h"  // TODO: remove when debugging done
 
 namespace indoor_context {
-
 	struct ManhattanEdge {
 		toon::Vector<3> start, end, eqn;
 		int axis;
@@ -22,8 +21,6 @@ namespace indoor_context {
 									int id);
 		bool Contains(const toon::Vector<3>& p) const;
 	};
-
-
 
 	struct ManhattanCorner {
 		toon::Vector<3> div_eqn;  // homogeneous line equation of this edge,
@@ -41,7 +38,6 @@ namespace indoor_context {
 		}
 	};
 
-
 	struct ManhattanBuilding {
 		typedef list<ManhattanCorner>::iterator CnrIt;
 		typedef list<ManhattanCorner>::const_iterator ConstCnrIt;
@@ -51,9 +47,7 @@ namespace indoor_context {
 		bool ContainsEdge(int id) const;
 	};
 
-
-	// We only use retina coordinates here (except when generating
-	// visualizations, obviously)
+	// We only use retina coordinates here
 	class ManhattanRecovery {
 	public:
 		// input params, set to gvar values in constructor
@@ -127,9 +121,8 @@ namespace indoor_context {
 													const toon::SE3<>& orig_pose,
 													const toon::SE3<>& new_pose,
 													double floor_z,
-													MatI& predicted,
-													const Map& map);  // TODO: remove map after debugging
-
+													MatI& predicted);
+													/*const Map& map*/  // TODO: remove map after debugging
 
 		// Vizualization
 		void DrawBuilding(const ManhattanBuilding& bld, ImageRGB<byte>& canvas);
