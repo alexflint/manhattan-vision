@@ -91,16 +91,21 @@ namespace indoor_context {
 	}
 
 	double GetAccuracy(const MatI& estimated, const MatI& truth) {
-		CHECK_EQ(estimated.Rows(), truth.Rows());
-		CHECK_EQ(estimated.Cols(), truth.Cols());
-		int correct = 0;
-		for (int y = 0; y < estimated.Rows(); y++) {
-			const int* est_row = estimated[y];
-			const int* tru_row = truth[y];
-			for (int x = 0; x < estimated.Cols(); x++) {
-				if (est_row[x] == tru_row[x]) correct++;
+		int correct = GetAgreement(estimated, truth);
+		return 1.0*correct / (estimated.Rows()*estimated.Cols());
+	}
+
+	int GetAgreement(const MatI& a, const MatI& b) {
+		CHECK_EQ(a.Rows(), b.Rows());
+		CHECK_EQ(a.Cols(), a.Cols());
+		int n = 0;
+		for (int y = 0; y < a.Rows(); y++) {
+			const int* arow = a[y];
+			const int* brow = b[y];
+			for (int x = 0; x < a.Cols(); x++) {
+				if (arow[x] == brow[x]) n++;
 			}
 		}
-		return 1.0*correct / (estimated.Rows()*estimated.Cols());
+		return n;
 	}
 }

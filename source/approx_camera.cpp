@@ -7,7 +7,7 @@ using namespace toon;
 
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
-	ImageRef sz(640,480);
+	ImageRef sz(640, 480);
 
 	Camera cam(sz);
 	scoped_ptr<LinearCamera> lincam(LinearCamera::Approximate(cam));

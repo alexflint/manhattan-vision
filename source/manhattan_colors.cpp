@@ -1,4 +1,4 @@
-#include "common_types.h"
+#include "common_types_entry.h"
 #include "guided_line_detector.h"
 #include "manhattan_dp.h"
 #include "vars.h"
@@ -9,12 +9,13 @@
 #include "clipping.h"
 #include "bld_helpers.h"
 #include "safe_stream.h"
+
+#include "histogram.tpp"
 #include "io_utils.tpp"
 
 using namespace indoor_context;
 using namespace toon;
 
-const int kNumHistBins = 10;
 const int kNumColorBins = 10;
 
 int main(int argc, char **argv) {
@@ -36,7 +37,7 @@ int main(int argc, char **argv) {
 	// TODO: load the relevant images
 
 	// Initialize the histograms
-	VectorBinLayout layout;
+	RgbLayout layout(kNumColorBins);
 	Histogram<Vec6, RgbLayout> map_hist[3];
 	for (int i = 0; i < 3; i++) {
 		map_hist[i].Configure(layout);
@@ -96,7 +97,7 @@ int main(int argc, char **argv) {
 			PixelRGB<byte>* imagerow = kf->image.rgb[y];
 			for (int x = 0; x < sz.x; x++) {
 				binrow[x] = layout.GetBinIndex(imagerow[x]);
-				map_hist[surfrow[x]].Add(binrow[x]);
+				map_hist[surfrow[x]].IncrementBin(binrow[x]);
 			}
 		}
 	}

@@ -4,9 +4,9 @@ CMAKE_MINIMUM_REQUIRED( VERSION 2.6 )
 
 # Eclipse settings
 # Set the message length to help Eclipse parse compiler messages
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmessage-length=0")
+SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmessage-length=0" )
 # Uncomment this to help Eclipse discover include paths 
-SET(CMAKE_VERBOSE_MAKEFILE OFF)
+SET( CMAKE_VERBOSE_MAKEFILE OFF )
 
 # Set the local version first
 SET( CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake_modules" )
@@ -40,9 +40,6 @@ SET( Boost_FIND_QUIETLY OFF )
 FIND_PACKAGE( Boost 1.42.0
 	COMPONENTS date_time filesystem iostreams thread
 	REQUIRED )
-
-MESSAGE( STATUS "Boost_INCLUDE_DIRS: " ${Boost_INCLUDE_DIRS} )
-MESSAGE( STATUS "Boost_LIBRARIES: " ${Boost_LIBRARIES} )
 
 # Find CUDA if it's enabled
 IF( USE_CUDA )
@@ -348,6 +345,7 @@ SET( EXECUTABLES
 	manhattan_colors
 	draw_top_view
 	predict_orientations
+	multiframe_bnb
 	
 	toon_speed_test
 	include_test

@@ -4,6 +4,7 @@
 
 #include "math_utils.tpp"
 #include "canvas.tpp"
+#include "vector_utils.tpp"
 
 using namespace indoor_context;
 

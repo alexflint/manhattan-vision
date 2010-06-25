@@ -8,11 +8,6 @@
 #include "bld_helpers.h"
 #include "timer.h"
 
-// TODO: remove these when debugging done
-#include "viewer3d.h"
-#include "widget3d.h"
-#include "map_widgets.h"
-
 #include "range_utils.tpp"
 #include "image_utils.tpp"
 #include "io_utils.tpp"
@@ -31,41 +26,37 @@ namespace indoor_context {
 		const double kClipDist = 0.1;
 		if (b[2] < 0 && a[2] > 0) {
 			double t = (a[2] - kClipDist) / (a[2] - b[2]);
-			b = t*b + (1-t)*a;
+			b = t * b + (1 - t) * a;
 		} else if (a[2] < 0 && b[2] > 0) {
 			double t = (b[2] - kClipDist) / (b[2] - a[2]);
-			a = t*a + (1-t)*b;
+			a = t * a + (1 - t) * b;
 		}
 	}
 
-	ManhattanEdge::ManhattanEdge() : id(-1) {
+	ManhattanEdge::ManhattanEdge() :
+		id(-1) {
 	}
 
 	ManhattanEdge::ManhattanEdge(const Vector<3>& a,
 															 const Vector<3>& b,
 															 int ax,
-															 int i)
-		: start(pve_unit(a)), end(pve_unit(b)), eqn(start^end), axis(ax), id(i) {
+															 int i) :
+		start(pve_unit(a)), end(pve_unit(b)), eqn(start ^ end), axis(ax), id(i) {
 	}
-
 
 	bool ManhattanEdge::Contains(const Vector<3>& p) const {
 		// This notion of distance only makes sense for homogeneous
 		// coordinates when z coordinates are positive
-		Vector<3> x = pve_unit(p);
-		return min(x*start, x*end) > start*end;
+		Vector < 3 > x = pve_unit(p);
+		return min(x * start, x * end) > start * end;
 	}
 
 	bool ManhattanBuilding::ContainsEdge(int id) const {
 		return edge_ids.find(id) != edge_ids.end();
 	}
 
-
-
-
-
-	ManhattanRecovery::ManhattanRecovery()
-		:	max_corners(*gvMaxCorners) {
+	ManhattanRecovery::ManhattanRecovery() :
+		max_corners(*gvMaxCorners) {
 	}
 
 	void ManhattanRecovery::Compute(const PosedCamera& pcam,
@@ -73,28 +64,22 @@ namespace indoor_context {
 																	const MatI& orients) {
 		pc = &pcam;
 		success = true;
-		
+
 		int res = *gvOrientRes;
-		MatI est_orients;
 		DownsampleOrients(orients, est_orients, makeVector(res, res));
 
-		TIMED("Initialize hypotheses") WITHOUT_DLOG Initialize(edges);
-		if (hypotheses.empty()) {
+		TIMED("Initialize hypotheses") Initialize(edges);
+		if (init_hypotheses.empty()) {
 			DLOG << "Failed to generate initial hypotheses, aborting.";
 			success = false;
 			return;
 		}
 
 		TIMED("Enumerate hypotheses") INDENTED Enumerate();
-		DLOG << "Generated " << hypotheses.size() << " hypotheses";
-
-		TIMED("Evaluate hypotheses") EvaluateHypotheses(est_orients);
 	}
 
-
-
 	void ManhattanRecovery::Initialize(const vector<ManhattanEdge> edges[]) {
-		hypotheses.clear();
+		init_hypotheses.clear();
 
 		// Compute size of a pixel
 		Vector<2> im_c = pc->RetToIm(makeVector(0.0, 0.0));
@@ -110,7 +95,6 @@ namespace indoor_context {
 				vert_axis = i;
 			}
 		}
-		DREPORT(vert_axis);
 
 		h1_axis = (vert_axis+1)%3;
 		h2_axis = (vert_axis+2)%3;
@@ -124,7 +108,6 @@ namespace indoor_context {
 		} else {
 			init_axis = h2_axis;
 		}
-		DREPORT(init_axis);
 
 		// Ensure the horizon line has its positive side at the top of the image
 		horizon = h1_vpt ^ h2_vpt;
@@ -169,8 +152,8 @@ namespace indoor_context {
 		}
 
 		// Enumerate initial candidates. We have already decided which axis they will come from
-		DREPORT(ceil_edges[init_axis].size());
-		DREPORT(floor_edges[init_axis].size());
+		//DREPORT(ceil_edges[init_axis].size());
+		//DREPORT(floor_edges[init_axis].size());
 		COUNTED_FOREACH(int ii, const ManhattanEdge* ceil_e, ceil_edges[init_axis]) {
 			Vector<3> div1 = ceil_e->start ^ vert_vpt;
 			Vector<3> div2 = ceil_e->end ^ vert_vpt;
@@ -181,7 +164,7 @@ namespace indoor_context {
 				Vector<3> p2 = div2 ^ floor_e->eqn;
 				Vector<3> p3 = div3 ^ ceil_e->eqn;
 				Vector<3> p4 = div4 ^ ceil_e->eqn;
-				if (ceil_e->Contains(p3) ||	ceil_e->Contains(p4) ||
+				if (ceil_e->Contains(p3) || ceil_e->Contains(p4) ||
 						floor_e->Contains(p1) || floor_e->Contains(p2)) {
 					// There is overlap, we can create an initial hypothesis
 					ManhattanCorner left;
@@ -201,32 +184,255 @@ namespace indoor_context {
 					ManhattanBuilding* bld = new ManhattanBuilding;
 					bld->cnrs.push_back(left);
 					bld->cnrs.push_back(right);
-					hypotheses.push_back(bld);  // memory now managed by the ptr_vector
+					init_hypotheses.push_back(bld); // memory now managed by the ptr_vector
 				}
 			}
 		}
 	}
 
-
 	void ManhattanRecovery::Enumerate() {
-		CHECK(!hypotheses.empty());
-		DLOG << "Initialized with " << hypotheses.size() << " hypotheses";
-		int start = 0;
+		CHECK(!init_hypotheses.empty());
+		DREPORT(init_hypotheses.size());
+
+		soln_score = -1;
+		hypothesis_count = 0;
+		BOOST_FOREACH(const ManhattanBuilding& bld, init_hypotheses) {
+			BranchFrom(bld);
+		}
+
+		/*int start = 0;
 		for (int i = 0; i < max_corners; i++) {
 			TITLED("Branch " + lexical_cast<string>(i)) {
 				int end = hypotheses.size();
-				WITHOUT_DLOG 
-				for (int j = start; j < end; j++) {
-					VertBranchFrom(hypotheses[j], hypotheses);
-					HorizBranchFrom(hypotheses[j], hypotheses);
-				}
+				WITHOUT_DLOG
+					for (int j = start; j < end; j++) {
+						VertBranchFrom(hypotheses[j], hypotheses);
+						HorizBranchFrom(hypotheses[j], hypotheses);
+					}
 				DLOG << "Produced " << (hypotheses.size()-end) << " new structures";
 				start = end;
 			}
+			}*/
+
+		PredictImOrientations(soln, soln_orients);
+		DLOG << "Searched " << hypothesis_count << " hypotheses";
+	}
+
+	void ManhattanRecovery::BranchFrom(const ManhattanBuilding& bld) {
+		//DLOG << "Creating building " << hypothesis_count;
+		hypothesis_count++;
+
+		// Evaluate this building
+		int score = ScoreHypothesis(bld);
+		if (score > soln_score) {
+			soln = bld;
+			soln_score = score;
+		}
+
+		// Branch from here
+		if (bld.cnrs.size() < max_corners+2) {  // +2 is for the initial two corners
+			VertBranchFrom(bld);
+			HorizBranchFrom(bld);
 		}
 	}
 
-	void ManhattanRecovery::EvaluateHypotheses(const MatI& est_orients) {
+
+	// Generate all building cnrss reachable by adding a single
+	// horizontal edge to the specified building
+	int ManhattanRecovery::HorizBranchFrom(const ManhattanBuilding& bld) {
+		//ptr_vector<ManhattanBuilding>& out) {
+		int count = 0;
+
+		for (int a = 1; a <= 2; a++) {
+			int new_axis = (vert_axis + a) % 3;
+			for (int surf = 0; surf <= 1; surf++) {
+				const vector<const ManhattanEdge*>& es = surf ?
+					ceil_edges[new_axis] : floor_edges[new_axis];
+
+				BOOST_FOREACH(const ManhattanEdge* e, es) {
+					// Don't add the same edge twice
+					if (bld.ContainsEdge(e->id)) {
+						//DLOG << "culled because edge already present";
+						continue;
+					}
+
+					ManhattanBuilding::ConstCnrIt l_cnr, r_cnr;
+					LocateStripe(bld, e->start, l_cnr, r_cnr);
+
+					// Check that the stripe fully contains the edge
+					if (!StripeContains(l_cnr->div_eqn, r_cnr->div_eqn, e->end)) {
+						// Horizontal segment spans multiple stripes
+						// TODO: make this a threshold rather than a hard rule
+						// TODO: maybe even remove this rule?
+						//DLOG << "culled because end point outside stripe";
+						continue;
+					}
+
+					// Check that the stripe is generated from the opposite axis
+					if (l_cnr->right_axis == e->axis) {
+						//DLOG << "culled because axis already matches";
+						continue;
+					}
+
+					Vector<3> seg = surf ? l_cnr->right_ceil ^ r_cnr->left_ceil
+						: l_cnr->right_floor ^ r_cnr->left_floor;
+					Vector<3> isct = e->eqn ^ seg;
+					Vector<3> new_div = DivVec(isct ^ vert_vpt);
+
+					// Check that the intersection is within the stripe
+					if (!StripeContains(l_cnr->div_eqn, r_cnr->div_eqn, isct)) {
+						//DLOG << "culled because intersection outside stripe";
+						continue;
+					}
+
+					// Don't add the div if too close to an existing edge
+					double margin = GetStripeMargin(*l_cnr, *r_cnr, isct);
+					if (margin < *gvMinCornerMargin*px_diam) {
+						//DLOG << "culled because margin is " << margin;
+						continue;
+					}
+
+					// case 1: change the stripe on the left
+					if (!StripeContains(l_cnr->div_eqn, new_div, vpts[e->axis])) {
+						//DLOG << "Adding with change to left";
+						// TODO: avoid all this copying by adding the corner and then removing it
+						ManhattanBuilding new_bld = bld;
+						if (AddCorner(new_bld, e->id, new_div, e->axis, true)) {
+							BranchFrom(new_bld);
+							count++;
+						}
+					} else {
+						//DLOG << "culled left due to vpt";
+					}
+
+					// case 2: change the stripe on the right
+					if (!StripeContains(new_div, r_cnr->div_eqn, vpts[e->axis])) {
+						//DLOG << "Adding with change to right";
+						// TODO: avoid all this copying by adding the corner and then removing it
+						ManhattanBuilding new_bld = bld;
+						if (AddCorner(new_bld, e->id, new_div, e->axis, false)) {
+							BranchFrom(new_bld);
+							count++;
+						}
+					} else {
+						//DLOG << "culled right due to vpt";
+					}
+				}
+			}
+		}
+		return count;
+	}
+
+	// Generate all building cnrss reachable by adding a single
+	// vertical edge to the specified building
+	int ManhattanRecovery::VertBranchFrom(const ManhattanBuilding& bld) {
+																				//ptr_vector<ManhattanBuilding>& out) {
+		int count = 0;
+
+		BOOST_FOREACH(const ManhattanEdge* e, vert_edges) {
+			//DLOG << "Considering adding vert edge";
+
+			// Don't add the same edge twice
+			if (bld.ContainsEdge(e->id)) {
+				//DLOG << "culled because edge already present";
+				continue;
+			}
+
+			Vector<3> midp = HMidpoint(e->start, e->end);
+			Vector<3> new_div = DivVec(midp ^ vert_vpt);
+
+			// Find the stripe this edge is in
+			ManhattanBuilding::ConstCnrIt l_cnr, r_cnr;
+			LocateStripe(bld, midp, l_cnr, r_cnr);
+
+			// Don't add the div if too close to an existing edge
+			double margin = GetStripeMargin(*l_cnr, *r_cnr, midp);
+			if (margin < *gvMinCornerMargin*px_diam) {
+				//DLOG << "culled because margin is " << margin;
+				continue;
+			}
+
+			// Configure the new corner
+			Vector<3> ceil = l_cnr->right_ceil ^ r_cnr->left_ceil;
+			Vector<3> floor = l_cnr->right_floor ^ r_cnr->left_floor;
+
+			// Don't add the corner if it crosses the existing floor or ceiling lines
+			if ((Sign(ceil*e->start) == Sign(floor*e->start)) ||
+					(Sign(ceil*e->end) == Sign(floor*e->end))) {
+				//DLOG << "culled because it crosses the floor or ceiling";
+				continue;
+			}
+
+			int axis = l_cnr->right_axis;
+			int new_axis = (axis == h1_axis) ? h2_axis : h1_axis;
+
+			// case 1: change the stripe on the left
+			if (StripeContains(l_cnr->div_eqn, new_div, vpts[new_axis])) {
+				//DLOG << "culled left due to vpt";
+			} else {
+				//DLOG << "Adding with change to left";
+				// TODO: avoid all this copying by adding the corner and then removing it
+				ManhattanBuilding new_bld = bld;
+				if (AddCorner(new_bld, e->id, new_div, new_axis, true)) {
+					BranchFrom(new_bld);
+					count++;
+				}
+			}
+
+			// case 2: change the stripe on the right
+			if (StripeContains(new_div, r_cnr->div_eqn, vpts[new_axis])) {
+				//DLOG << "culled right due to vpt";
+			} else {
+				//DLOG << "Adding with change to right";
+				// TODO: avoid all this copying by adding the corner and then removing it
+				ManhattanBuilding new_bld = bld;
+				if (AddCorner(new_bld, e->id, new_div, new_axis, false)) {
+					BranchFrom(new_bld);
+					count++;
+				}
+			}
+		}
+		return count;
+	}
+
+
+	// Add a corner to bld. Return true if the corner is valid
+	bool ManhattanRecovery::AddCorner(ManhattanBuilding& bld,
+																		int edge_id,
+																		const Vector<3>& div_eqn,
+																		int new_axis,
+																		bool update_left) {
+		ManhattanBuilding::CnrIt l_cnr, r_cnr;
+		Vector<3> horizon_pt = DivVec(horizon ^ div_eqn);
+		LocateStripe(bld, horizon_pt, l_cnr, r_cnr);
+
+		// Create the new corner
+		ManhattanCorner new_cnr;
+		new_cnr.div_eqn = DivVec(div_eqn);
+
+		// Check that it doesn't contain the vpt
+		Vector<3> ceil = l_cnr->right_ceil ^ r_cnr->left_ceil;
+		Vector<3> floor = l_cnr->right_floor ^ r_cnr->left_floor;
+		new_cnr.left_ceil = new_cnr.right_ceil = new_cnr.div_eqn^ceil;
+		new_cnr.left_floor = new_cnr.right_floor = new_cnr.div_eqn^floor;
+		new_cnr.left_axis = new_cnr.right_axis = l_cnr->right_axis;
+
+		bld.edge_ids.insert(edge_id);
+
+		ManhattanBuilding::CnrIt new_cnr_it = bld.cnrs.insert(r_cnr, new_cnr);
+		Vector<3> new_floor = vpts[new_axis] ^ new_cnr.left_floor;
+		Vector<3> new_ceil = vpts[new_axis] ^ new_cnr.left_ceil;
+
+		//DLOG << "updating " << (update_left ? "left" : "right") << " stripe";
+
+		if (update_left) {
+			return UpdateStripe(*l_cnr, *new_cnr_it, new_floor, new_ceil, new_axis);
+		} else {
+			return UpdateStripe(*new_cnr_it, *r_cnr, new_floor, new_ceil, new_axis);
+		}
+	}
+
+	/*void ManhattanRecovery::EvaluateHypotheses(const MatI& est_orients) {
 		// Compute scores for each hypothesis
 		scores.resize(hypotheses.size());
 		fill_all(scores, 0);
@@ -234,7 +440,7 @@ namespace indoor_context {
 		//EvaluateHypotheses(est_orients, 0, hypotheses.size()-1, score_pro);
 		ParallelPartition(hypotheses.size(),
 											bind(&ManhattanRecovery::EvaluateHypotheses,
-											this, ref(est_orients), _1, _2, ref(score_pro)));
+													 this, ref(est_orients), _1, _2, ref(score_pro)));
 
 		// Find the best building
 		soln_index = max_index(scores.begin(), scores.end());
@@ -243,20 +449,17 @@ namespace indoor_context {
 
 		// Predict orientations
 		PredictImOrientations(*soln, soln_orients);
-	}
+		}*/
 
-	void ManhattanRecovery::EvaluateHypotheses(const MatI& est_orients, int first, int last,
+	/*void ManhattanRecovery::EvaluateHypotheses(const MatI& est_orients, int first, int last,
 																						 ProgressReporter& pr) {
 		MatI predicted(est_orients.Rows(), est_orients.Cols());
 		for (int i = first; i <= last; i++) {
 			PredictOrientations(hypotheses[i], predicted);
 			scores[i] = ScorePrediction(predicted, est_orients);
-			pr.Increment();  // ProgressReporter is thread-safe
+			pr.Increment(); // ProgressReporter is thread-safe
 		}
-	}
-
-
-
+		}*/
 
 	int ManhattanRecovery::OtherHorizAxis(int a) const {
 		return a == h1_axis ? h2_axis : h1_axis;
@@ -273,7 +476,7 @@ namespace indoor_context {
 	}
 
 	bool ManhattanRecovery::OcclusionValid(ManhattanCorner& cnr) {
-		CHECK_LE(abs(cnr.occl_side), 1);  // check for uninitialized
+		CHECK_LE(abs(cnr.occl_side), 1); // check for uninitialized
 
 		if (cnr.occl_side == 0) {
 			// No occlusion, nothing to check
@@ -286,8 +489,8 @@ namespace indoor_context {
 		// the other horizontal axis (irrespective of cnr.left_axis, cnr.right_axis!)
 		int opp_axis = (occl_axis == h1_axis) ? h2_axis : h1_axis;
 
-		CHECK(abs(norm_sq(vpts[occl_axis]) - 1.0) < 1e-5);  // should be guaranteed of this
-		CHECK(abs(norm_sq(vpts[opp_axis]) - 1.0) < 1e-5);  // should be guaranteed of this
+		CHECK(abs(norm_sq(vpts[occl_axis]) - 1.0) < 1e-5); // should be guaranteed of this
+		CHECK(abs(norm_sq(vpts[opp_axis]) - 1.0) < 1e-5); // should be guaranteed of this
 
 		// which side is the associated vpt on?
 		// -1 for left, 1 for right since div_eqn[0]>0
@@ -295,17 +498,15 @@ namespace indoor_context {
 
 		// is the vpt on the same side as the occluding segment?
 		bool vpt_behind = vpt_side == cnr.occl_side;
-		
+
 		// is the other vpt between the div and the vpt
 		bool opp_vpt_between =
 			PointSign(vpts[opp_axis], cnr.div_eqn) == vpt_side &&
 			abs(cnr.div_eqn*vpts[opp_axis]) < abs(cnr.div_eqn*vpts[occl_axis]);
-		
+
 		// the occlusion is valid iff vpt_behind <=> opp_vpt_between
 		return vpt_behind == opp_vpt_between;
 	}
-	
-		
 
 	// Update the occlusion member
 	bool ManhattanRecovery::UpdateOcclusion(ManhattanCorner& cnr) {
@@ -319,10 +520,9 @@ namespace indoor_context {
 
 		if (!BelowHorizon(cnr.left_floor) || !BelowHorizon(cnr.right_floor) ||
 				!AboveHorizon(cnr.left_ceil) || !AboveHorizon(cnr.right_ceil)) {
-			DLOG << "culled because intersection on wrong side of horizon";
+			//DLOG << "culled because intersection on wrong side of horizon";
 			return false;
 		}
-			
 
 		const double kThresh = *gvOcclThresh * px_diam;
 		const double kThreshSq = kThresh*kThresh;
@@ -344,7 +544,7 @@ namespace indoor_context {
 			// inequality will be swapped
 			double l_dp = unit(cnr.left_floor) * horizon;
 			double r_dp = unit(cnr.right_floor) * horizon;
-			cnr.occl_side = l_dp > r_dp ? -1 : 1;  // -1 means left occludes right
+			cnr.occl_side = l_dp > r_dp ? -1 : 1; // -1 means left occludes right
 		}
 
 		return true;
@@ -372,7 +572,7 @@ namespace indoor_context {
 		}
 
 		if (!OcclusionValid(left_cnr) || !OcclusionValid(right_cnr)) {
-			DLOG << "culling due to invalid occlusion";
+			//DLOG << "culling due to invalid occlusion";
 			return false;
 		}
 
@@ -418,7 +618,7 @@ namespace indoor_context {
 	}
 
 	bool ManhattanRecovery::StripeContains(const Vector<3>& left_div,
-																				 const Vector<3>& right_div, 
+																				 const Vector<3>& right_div,
 																				 const Vector<3>& p) {
 		CHECK_GE(left_div[0], 0);
 		CHECK_GE(right_div[0], 0);
@@ -427,7 +627,7 @@ namespace indoor_context {
 
 	// Determine whether p is between left and right corners
 	bool ManhattanRecovery::StripeContains(const ManhattanCorner& left,
-																				 const ManhattanCorner& right, 
+																				 const ManhattanCorner& right,
 																				 const Vector<3>& p) {
 		return StripeContains(left.div_eqn, right.div_eqn, p);
 	}
@@ -446,205 +646,10 @@ namespace indoor_context {
 		return v[0] > 0 ? v : -v;
 	}
 
-	// Add a corner to bld. Return true if the corner is valid
-	bool ManhattanRecovery::AddCorner(ManhattanBuilding& bld,
-																		int edge_id,
-																		const Vector<3>& div_eqn,
-																		int new_axis,
-																		bool update_left) {
-		ManhattanBuilding::CnrIt l_cnr, r_cnr;
-		Vector<3> horizon_pt = DivVec(horizon ^ div_eqn);
-		LocateStripe(bld, horizon_pt, l_cnr, r_cnr);
-
-		// Create the new corner
-		ManhattanCorner new_cnr;
-		new_cnr.div_eqn = DivVec(div_eqn);
-
-		// Check that it doesn't contain the vpt
-		Vector<3> ceil = l_cnr->right_ceil ^ r_cnr->left_ceil;
-		Vector<3> floor = l_cnr->right_floor ^ r_cnr->left_floor;
-		new_cnr.left_ceil = new_cnr.right_ceil = new_cnr.div_eqn^ceil;
-		new_cnr.left_floor = new_cnr.right_floor = new_cnr.div_eqn^floor;
-		new_cnr.left_axis = new_cnr.right_axis = l_cnr->right_axis;
-
-		bld.edge_ids.insert(edge_id);
-
-		ManhattanBuilding::CnrIt new_cnr_it = bld.cnrs.insert(r_cnr, new_cnr);
-		Vector<3> new_floor = vpts[new_axis] ^ new_cnr.left_floor;
-		Vector<3> new_ceil = vpts[new_axis] ^ new_cnr.left_ceil;
-		
-		DLOG << "updating " << (update_left ? "left" : "right") << " stripe";
-
-		if (update_left) {
-			return UpdateStripe(*l_cnr, *new_cnr_it, new_floor, new_ceil, new_axis);
-		} else {
-			return UpdateStripe(*new_cnr_it, *r_cnr, new_floor, new_ceil, new_axis);
-		}
+	int ManhattanRecovery::ScoreHypothesis(const ManhattanBuilding& bld) const {
+		PredictGridOrientations(bld, predict_buffer);
+		return GetAgreement(predict_buffer, est_orients);
 	}
-
-	// Generate all building cnrss reachable by adding a single
-	// horizontal edge to the specified building
-	int ManhattanRecovery::HorizBranchFrom(const ManhattanBuilding& bld,
-																				 ptr_vector<ManhattanBuilding>& out) {
-		int count = 0;
-
-		for (int a = 1; a <= 2; a++) {
-			int new_axis = (vert_axis + a) % 3;
-			for (int surf = 0; surf <= 1; surf++) {
-				const vector<const ManhattanEdge*>& es = surf ?
-					ceil_edges[new_axis] : floor_edges[new_axis];
-
-				BOOST_FOREACH(const ManhattanEdge* e, es) {
-					TITLE("Creating building " + lexical_cast<string>(out.size()));
-					DLOG << "Considering adding horiz edge";
-
-					// Don't add the same edge twice
-					if (bld.ContainsEdge(e->id)) {
-						DLOG << "culled because edge already present";
-						continue;
-					}
-
-					ManhattanBuilding::ConstCnrIt l_cnr, r_cnr;
-					LocateStripe(bld, e->start, l_cnr, r_cnr);
-
-					// Check that the stripe fully contains the edge
-					if (!StripeContains(l_cnr->div_eqn, r_cnr->div_eqn, e->end)) {
-						// Horizontal segment spans multiple stripes
-						// TODO: make this a threshold rather than a hard rule
-						// TODO: maybe even remove this rule?
-						DLOG << "culled because end point outside stripe";
-						continue;
-					}
-
-					// Check that the stripe is generated from the opposite axis
-					if (l_cnr->right_axis == e->axis) {
-						DLOG << "culled because axis already matches";
-						continue;
-					}
-
-					Vector<3> seg = surf ? l_cnr->right_ceil ^ r_cnr->left_ceil
-						: l_cnr->right_floor ^ r_cnr->left_floor;
-					Vector<3> isct = e->eqn ^ seg;
-					Vector<3> new_div = DivVec(isct ^ vert_vpt);
-
-					// Check that the intersection is within the stripe
-					if (!StripeContains(l_cnr->div_eqn, r_cnr->div_eqn, isct)) {
-						DLOG << "culled because intersection outside stripe";
-						continue;
-					}
-
-					// Don't add the div if too close to an existing edge
-					double margin = GetStripeMargin(*l_cnr, *r_cnr, isct);
-					if (margin < *gvMinCornerMargin*px_diam) {
-						DLOG << "culled because margin is " << margin;
-						continue;
-					}
-
-					// case 1: change the stripe on the left
-					if (!StripeContains(l_cnr->div_eqn, new_div, vpts[e->axis])) {
-						DLOG << "Adding with change to left";
-						// Use auto_ptr here so we have the option to release it
-						auto_ptr<ManhattanBuilding> new_bld(new ManhattanBuilding(bld));
-						if (AddCorner(*new_bld, e->id, new_div, e->axis, true)) {
-							out.push_back(new_bld.release());
-							count++;
-						}
-					} else {
-						DLOG << "culled left due to vpt";
-					}
-
-					// case 2: change the stripe on the right
-					if (!StripeContains(new_div, r_cnr->div_eqn, vpts[e->axis])) {
-						DLOG << "Adding with change to right";
-						auto_ptr<ManhattanBuilding> new_bld(new ManhattanBuilding(bld));
-						if (AddCorner(*new_bld, e->id, new_div, e->axis, false)) {
-							out.push_back(new_bld.release());
-							count++;
-						}
-					} else {
-						DLOG << "culled right due to vpt";
-					}
-				}
-			}
-		}
-		return count;
-	}
-
-	// Generate all building cnrss reachable by adding a single
-	// vertical edge to the specified building
-	int ManhattanRecovery::VertBranchFrom(const ManhattanBuilding& bld,
-																				ptr_vector<ManhattanBuilding>& out) {
-		int count = 0;
-
-		BOOST_FOREACH(const ManhattanEdge* e, vert_edges) {
-			TITLE("Creating building " + lexical_cast<string>(out.size()));
-			DLOG << "Considering adding vert edge";
-
-			// Don't add the same edge twice
-			if (bld.ContainsEdge(e->id)) {
-				DLOG << "culled because edge already present";
-				continue;
-			}
-
-			Vector<3> midp = HMidpoint(e->start, e->end);
-			Vector<3> new_div = DivVec(midp ^ vert_vpt);
-
-			// Find the stripe this edge is in
-			ManhattanBuilding::ConstCnrIt l_cnr, r_cnr;
-			LocateStripe(bld, midp, l_cnr, r_cnr);
-
-			// Don't add the div if too close to an existing edge
-			double margin = GetStripeMargin(*l_cnr, *r_cnr, midp);
-			if (margin < *gvMinCornerMargin*px_diam) {
-				DLOG << "culled because margin is " << margin;
-				continue;
-			}
-
-			// Configure the new corner
-			Vector<3> ceil = l_cnr->right_ceil ^ r_cnr->left_ceil;
-			Vector<3> floor = l_cnr->right_floor ^ r_cnr->left_floor;
-
-			// Don't add the corner if it crosses the existing floor or ceiling lines
-			if ((Sign(ceil*e->start) == Sign(floor*e->start)) ||
-					(Sign(ceil*e->end) == Sign(floor*e->end))) {
-				DLOG << "culled because it crosses the floor or ceiling";
-				continue;
-			}
-
-			int axis = l_cnr->right_axis;
-			int new_axis = (axis == h1_axis) ? h2_axis : h1_axis;
-
-			// case 1: change the stripe on the left
-			if (StripeContains(l_cnr->div_eqn, new_div, vpts[new_axis])) {
-				DLOG << "culled left due to vpt";
-			} else {
-				DLOG << "Adding with change to left";
-				// Use auto_ptr here so we have the option to release it
-				auto_ptr<ManhattanBuilding> new_bld(new ManhattanBuilding(bld));
-				if (AddCorner(*new_bld, e->id, new_div, new_axis, true)) {
-					out.push_back(new_bld.release());
-					count++;
-				}
-			}
-
-			// case 2: change the stripe on the right
-			if (StripeContains(new_div, r_cnr->div_eqn, vpts[new_axis])) {
-				DLOG << "culled right due to vpt";
-			} else {
-				DLOG << "Adding with change to right";
-				// Use auto_ptr here so we have the option to release it
-				auto_ptr<ManhattanBuilding> new_bld(new ManhattanBuilding(bld));
-				if (AddCorner(*new_bld, e->id, new_div, new_axis, false)) {
-					out.push_back(new_bld.release());
-					count++;
-				}
-			}
-		}
-		return count;
-	}
-
-
-
 
 	void ManhattanRecovery::PredictOrientations(const ManhattanBuilding& bld,
 																							MatI& orients) const {
@@ -680,31 +685,12 @@ namespace indoor_context {
 		PredictOrientations(bld, orients);
 	}
 
-
-
-	int ManhattanRecovery::ScorePrediction(const MatI& prediction,
-																				 const MatI& orient_est) const {
-		CHECK_EQ(prediction.Rows(), orient_est.Rows());
-		CHECK_EQ(prediction.Cols(), orient_est.Cols());
-		int score = 0;
-		for (int y = 0; y < prediction.Rows(); y++) {
-			for (int x = 0; x < prediction.Cols(); x++) {
-				if (prediction[y][x] == orient_est[y][x]) {
-					score++;
-				}
-			}
-		}
-		return score;
-	}
-
-	int ManhattanRecovery::ScoreBuilding(const ManhattanBuilding& bld,
+	/*int ManhattanRecovery::ScoreBuilding(const ManhattanBuilding& bld,
 																			 const MatI& orient_est) const {
 		MatI predicted(orient_est.Cols(), orient_est.Rows());
 		PredictOrientations(bld, predicted);
 		return ScorePrediction(predicted, orient_est);
-	}
-
-
+		}*/
 
 	Vector<3> ManhattanRecovery::FloorPoint(const Vector<3>& p, double z) {
 		// Note that p appear in the numerator _and_ the denominator
@@ -729,7 +715,7 @@ namespace indoor_context {
 																					 const SE3<>& new_pose,
 																					 double floor_z,
 																					 MatI& orients) {
-																					 /*const Map& map*/
+		/*const Map& map*/
 		// Compute scaling (TODO: actually use this)
 		DiagonalMatrix<3> Mscale(makeVector(1.0*orients.Cols()/pc->im_size().x,
 																				1.0*orients.Rows()/pc->im_size().y,
@@ -772,17 +758,17 @@ namespace indoor_context {
 
 			// Project into the viewer
 			/*Vector<3> floor_c = orig_inv.get_translation();
-			Vector<3> ceil_c = orig_inv.get_translation();
-			floor_c[2] = floor_z;
-			ceil_c[2] = world_tl[2];
-			QuadWidget* w;
-			v.AddOwned(w = new QuadWidget(world_tl, world_tr, world_br, world_bl));
-			w->color = Colors::primary(axis);
-			v.AddOwned(w = new QuadWidget(world_bl, world_br, floor_c, floor_c));
-			w->color = Colors::blue();
-			v.AddOwned(w = new QuadWidget(world_tl, world_tr, ceil_c, ceil_c));
-			w->color = Colors::white();
-			v.AddOwned(new MapWidget(&map));*/
+				Vector<3> ceil_c = orig_inv.get_translation();
+				floor_c[2] = floor_z;
+				ceil_c[2] = world_tl[2];
+				QuadWidget* w;
+				v.AddOwned(w = new QuadWidget(world_tl, world_tr, world_br, world_bl));
+				w->color = Colors::primary(axis);
+				v.AddOwned(w = new QuadWidget(world_bl, world_br, floor_c, floor_c));
+				w->color = Colors::blue();
+				v.AddOwned(w = new QuadWidget(world_tl, world_tr, ceil_c, ceil_c));
+				w->color = Colors::white();
+				v.AddOwned(new MapWidget(&map));*/
 
 			// Compute the wall corners in the other camera
 			Vector<3> ret_tl = new_pose * world_tl;
@@ -876,7 +862,7 @@ namespace indoor_context {
 			output << "  right_ceil: " << pc->RetToIm(cnr.right_ceil) << endl;
 		}
 		output.close();
-	}			
+	}
 
 	void ManhattanRecovery::OutputBuildingViz(const ImageRGB<byte>& image,
 																						const ManhattanBuilding& bld,

@@ -7,7 +7,7 @@
 
 #include <VW/Image/imagecopy.tpp>
 
-#include "common_types.h"
+#include "common_types_entry.h"
 #include "vars.h"
 #include "map.pb.h"
 #include "mean_shift.h"
@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
 		fs::path frame_file = base_dir / str(format("visualize/%08d.jpg") % i);
 		CHECK_PRED(fs::exists, frame_file) << "Pose file exists but not "
 							        << frame_file;
-		frames.push_back(new ImageBundle(frame_file));
+		frames.push_back(new ImageBundle(frame_file.string()));
 	}
 	DLOG	<< "Loaded " << cameras.size() << " cameras";
 

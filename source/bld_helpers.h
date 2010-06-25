@@ -20,6 +20,9 @@ namespace indoor_context {
 	// Get percentage of correct pixels
 	double GetAccuracy(const MatI& estimated, const MatI& truth);
 
+	// Get the number of agreeing pixels
+	int GetAgreement(const MatI& a, const MatI& b);
+
 	// Downsample the orientation map to the specified size
 	void DownsampleOrients(const MatI& in, MatI& out, const toon::Vector<2,int>& size);
 	// Downsample the orientation map by a factor k

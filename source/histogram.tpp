@@ -149,7 +149,12 @@ namespace indoor_context {
 
 		// Add a value to the histogram (exits if out of range)
 		void Add(const T& x) {
-			bins_[layout_.GetBinIndex(x)]++;
+			IncrementBin(layout_.GetBinIndex(x));
+		}
+
+		// Add a value to a specific bin by its index
+		inline void IncrementBin(int bin) {
+			bins_[bin]++;
 		}
 
 		// Reset all histogram bins to zero

@@ -5,7 +5,7 @@
 
 #include <SVD.h>
 
-#include "common_types.h"
+#include "common_types_entry.h"
 #include "map.h"
 #include "vars.h"
 #include "line_sweeper.h"
@@ -177,11 +177,6 @@ int main(int argc, char **argv) {
 
 	// Load the map
 	Map map;
-	map.auto_undistort = false;
-	map.kf_ids_to_load.clear();
-	BOOST_FOREACH(const proto::TruthedFrame& cur, tru_map.frame()) {
-		map.kf_ids_to_load.push_back(cur.id());
-	}
 	map.LoadXml(tru_map.spec_file());
 	map.RotateToSceneFrame(SO3<>::exp(asToon(tru_map.ln_scene_from_slam())));
 

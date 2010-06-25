@@ -1,7 +1,8 @@
 // Provides a convenient set of includes for files with a main()
-// method. We usually avoid including all of these features in .cpp
+// function (i.e. entry points for binaries). We avoid including all of these features in .cpp
 // files because they contain complicated templates that increase
-// compilation time.
+// compilation time, but including them in entry-point files is okay because they
+// will only be included once per binary.
 
 #pragma once
 
@@ -13,4 +14,5 @@
 #include "common_types.h"
 #include "vars.h"
 
+#include "vector_utils.tpp"
 

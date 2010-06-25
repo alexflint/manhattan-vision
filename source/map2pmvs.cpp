@@ -1,6 +1,6 @@
 #include <boost/filesystem.hpp>
 
-#include "common_types.h"
+#include "common_types_entry.h"
 #include "map.h"
 #include "vars.h"
 #include "canvas.h"
@@ -162,7 +162,6 @@ int main(int argc, char **argv) {
 	}
 
 	Map map;
-	map.kf_ids_to_load = kf_ids;  // empty indicates load all keyframes
 	map.LoadXml(spec_file.string());
 
 	PmvsFormat::WriteMap(map, out_dir);

@@ -4,7 +4,7 @@
 // Look at shapes.png, it should consist of a grid of squares,
 // diamonds, and octagons
 
-#include "common_types.h"
+#include "common_types_entry.h"
 #include "clipping.h"
 #include "image_utils.h"
 

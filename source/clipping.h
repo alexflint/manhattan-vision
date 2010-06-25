@@ -4,6 +4,7 @@
 
 #include "common_types.h"
 #include "math_utils.tpp"
+#include "image_utils.tpp"
 
 namespace indoor_context {
 	// Return the sign of the dot product between two vectors

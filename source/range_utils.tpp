@@ -3,6 +3,9 @@
 
 #pragma once
 
+#include <algorithm>
+#include <numeric>
+
 #include <boost/iterator.hpp>
 #include <boost/range.hpp>
 #include <boost/function.hpp>

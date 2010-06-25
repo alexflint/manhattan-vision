@@ -7,7 +7,7 @@
 
 #include <TooN/sl.h>
 
-#include "common_types.h"
+#include "common_types_entry.h"
 #include "map.h"
 #include "map.pb.h"
 #include "canvas.h"

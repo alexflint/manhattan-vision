@@ -74,15 +74,25 @@ namespace indoor_context {
 		// False only if we failed to find an initialization pair
 		bool success;
 
-		// The generated hypotheses
-		ptr_vector<ManhattanBuilding> hypotheses;
+		// The set of starting hypotheses
+		ptr_vector<ManhattanBuilding> init_hypotheses;
+
 		// Scores for the above
-		vector<int> scores;
+		//vector<int> scores;
 		// The best hypothesis
-		ManhattanBuilding* soln;
-		int soln_index;
+		//ManhattanBuilding* soln;
+		ManhattanBuilding soln;
+		//int soln_index;
 		int soln_score;
 		MatI soln_orients;
+
+		// The estimated orientations (from line sweep etc)
+		MatI est_orients;
+
+		// The number of hypotheses enumerated so far
+		int hypothesis_count;
+		// The buffer used to compute predictions (makes Compute() not parallelizable!)
+		mutable MatI predict_buffer;
 
 		// Inirialize the reconstructor with the given pose and camera
 		ManhattanRecovery();
@@ -91,58 +101,44 @@ namespace indoor_context {
 		// estimated orientations. Calls Initialize, Enumerate, and FindBest
 		void Compute(const PosedCamera& pcam,
 								 const vector<ManhattanEdge> edges[],
-								 const MatI& est_orients);
+								 const MatI& orients);
+
+		////////////////////////////////////////////
+		// Hypothesis generation
+		////////////////////////////////////////////
 
 		// Initialize the list of buildings
 		void Initialize(const vector<ManhattanEdge> edges[]);
 		// Enumerate all buildings up to the specified depth
 		void Enumerate();
+
 		// Compute scores for each hypotheses and select the best
-		void EvaluateHypotheses(const MatI& est_orients);
+		//void EvaluateHypotheses(const MatI& est_orients);
 
 		// As above but for a sub-range (used for parallelization)
-		void EvaluateHypotheses(const MatI& est_orients, int first, int last,
-														ProgressReporter& pr);
+		/*void EvaluateHypotheses(const MatI& est_orients, int first, int last,
+			ProgressReporter& pr);*/
 
 
-		// Predict the orientation map for a model. Will scale the
-		// orientations to fit in the supplied matrix.
-		void PredictOrientations(const ManhattanBuilding& bld, MatI& orients) const;
-		void PredictGridOrientations(const ManhattanBuilding& bld, MatI& orients) const;
-		void PredictImOrientations(const ManhattanBuilding& bld, MatI& orients) const;
+		// Add a corner to bld. Return true if the corner is valid
+		bool AddCorner(ManhattanBuilding& bld,
+									 int edge_id,
+									 const toon::Vector<3>& div_eqn,
+									 int new_axis,
+									 bool update_left);
 
-		// Score a model according to its agreement with an orientation estimate
-		int ScorePrediction(const MatI& prediction, const MatI& orient_est) const;
-		int ScoreBuilding(const ManhattanBuilding& bld, const MatI& orient_est) const;
+		// Explore the search tree rooted at a given node
+		void BranchFrom(const ManhattanBuilding& bld);
 
-		// Transfer a building between frames. PredictOrientations is a
-		// special case of this for orig_pose = new_pose.
-		void TransferBuilding(const ManhattanBuilding& bld,
-													const toon::SE3<>& orig_pose,
-													const toon::SE3<>& new_pose,
-													double floor_z,
-													MatI& predicted);
-													/*const Map& map*/  // TODO: remove map after debugging
+		// Generate all building corners reachable by adding a single
+		// horizontal edge to the specified building
+		int HorizBranchFrom(const ManhattanBuilding& bld);
+		//												ptr_vector<ManhattanBuilding>& out);
 
-		// Vizualization
-		void DrawBuilding(const ManhattanBuilding& bld, ImageRGB<byte>& canvas);
-		void DrawPrediction(const ManhattanBuilding& bld, ImageRGB<byte>& canvas);
-		void DrawOrientations(const MatI& orients, ImageRGB<byte>& canvas);
-
-		// Output
-		void OutputBuildingViz(const ImageRGB<byte>& image,
-													 const ManhattanBuilding& bld,
-													 const string& filename);
-		void OutputPredictionViz(const ManhattanBuilding& bld, const string& filename);
-		void OutputAllViz(const ImageRGB<byte>& image,
-											const ManhattanBuilding& bld,
-											const string& basename);
-
-		// Output a text description of a model
-		void WriteBuilding(const ManhattanBuilding& bld, const string& filename);
-
-
-
+		// Generate all building corners reachable by adding a single
+		// vertical edge to the specified building
+		int VertBranchFrom(const ManhattanBuilding& bld);
+		//											 ptr_vector<ManhattanBuilding>& out);
 
 		// Returns either v or -v, whichver is a valid div_eqn (i.e. has v[0] > 0)
 		toon::Vector<3> DivVec(const toon::Vector<3>& v);
@@ -163,10 +159,6 @@ namespace indoor_context {
 											const toon::Vector<3>& ceil_line,
 											int new_axis);
 
-
-		// Project points into the world
-		toon::Vector<3> FloorPoint(const toon::Vector<3>& p, double z);
-		toon::Vector<3> CeilPoint(const toon::Vector<3>& p, const toon::Vector<3>& floor_pt);
 
 		// Determine the stripe containing the point p, set l_cnr and r_cnr
 		// to the corners to the point's left and right respectively, and
@@ -193,20 +185,61 @@ namespace indoor_context {
 													 const ManhattanCorner& right,
 													 const toon::Vector<3>& p);
 
-		// Add a corner to bld. Return true if the corner is valid
-		bool AddCorner(ManhattanBuilding& bld,
-									 int edge_id,
-									 const toon::Vector<3>& div_eqn,
-									 int new_axis,
-									 bool update_left);
 
-		// Generate all building corners reachable by adding a single
-		// horizontal edge to the specified building
-		int HorizBranchFrom(const ManhattanBuilding& bld,
-												ptr_vector<ManhattanBuilding>& out);
-		// Generate all building corners reachable by adding a single
-		// vertical edge to the specified building
-		int VertBranchFrom(const ManhattanBuilding& bld,
-											 ptr_vector<ManhattanBuilding>& out);
+
+
+
+		////////////////////////////////////////////
+		// Hypothesis evaluation
+		////////////////////////////////////////////
+
+
+		// Score a model according to its agreement with an orientation estimate
+		int ScoreHypothesis(const ManhattanBuilding& bld) const;
+		int ScorePrediction(const MatI& prediction, const MatI& orient_est) const;
+
+		// Predict the orientation map for a model. Will scale the
+		// orientations to fit in the supplied matrix.
+		void PredictOrientations(const ManhattanBuilding& bld, MatI& orients) const;
+		void PredictGridOrientations(const ManhattanBuilding& bld, MatI& orients) const;
+		void PredictImOrientations(const ManhattanBuilding& bld, MatI& orients) const;
+
+		// Transfer a building between frames. PredictOrientations is a
+		// special case of this for orig_pose = new_pose.
+		void TransferBuilding(const ManhattanBuilding& bld,
+													const toon::SE3<>& orig_pose,
+													const toon::SE3<>& new_pose,
+													double floor_z,
+													MatI& predicted);
+													/*const Map& map*/  // TODO: remove map after debugging
+
+		// Project points into the world
+		toon::Vector<3> FloorPoint(const toon::Vector<3>& p, double z);
+		toon::Vector<3> CeilPoint(const toon::Vector<3>& p, const toon::Vector<3>& floor_pt);
+
+
+
+
+
+
+		////////////////////////////////////////////
+		// Vizualization
+		////////////////////////////////////////////
+
+		void DrawBuilding(const ManhattanBuilding& bld, ImageRGB<byte>& canvas);
+		void DrawPrediction(const ManhattanBuilding& bld, ImageRGB<byte>& canvas);
+		void DrawOrientations(const MatI& orients, ImageRGB<byte>& canvas);
+
+		// Output
+		void OutputBuildingViz(const ImageRGB<byte>& image,
+													 const ManhattanBuilding& bld,
+													 const string& filename);
+		void OutputPredictionViz(const ManhattanBuilding& bld, const string& filename);
+		void OutputAllViz(const ImageRGB<byte>& image,
+											const ManhattanBuilding& bld,
+											const string& basename);
+
+		// Output a text description of a model
+		void WriteBuilding(const ManhattanBuilding& bld, const string& filename);
 	};
 }

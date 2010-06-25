@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
 	int tmpfd = mkstemp(tmppath);
 
 	std::string s = inmsg.DebugString();
-	write(tmpfd, s.c_str(), s.length());
+	size_t n = write(tmpfd, s.c_str(), s.length());
 	close(tmpfd);
 
 	std::string cmd = std::string("emacs -nw ")+tmppath;

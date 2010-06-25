@@ -148,7 +148,7 @@ void ProcessFrame(int index,
 			DLOG << "Drawing neighbour: frame " << nbr_id;
 			KeyFrame& nbr = map.kfs[nbr_id];
 			nbr.LoadImage();
-			recovery.TransferBuilding(*recovery.soln, kf.pc->pose, nbr.pc->pose,
+			recovery.TransferBuilding(recovery.soln, kf.pc->pose, nbr.pc->pose,
 																tru_map.floorplan().zfloor(), nbr_prediction);
 			ImageCopy(nbr.image.rgb, nbr_canvas);
 			DrawOrientations(nbr_prediction, nbr_canvas, 0.35);
@@ -156,7 +156,7 @@ void ProcessFrame(int index,
 			WriteImage(str(filepat % id % file_label), nbr_canvas);
 			nbr.UnloadImage();
 		}
-		}
+	}
 
 	kf.UnloadImage();
 }

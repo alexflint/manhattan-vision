@@ -3,7 +3,7 @@
 
 #include <fstream>
 
-#include "common_types.h"
+#include "common_types_entry.h"
 #include "floorplan_editor.h"
 #include "map_widgets.h"
 #include "map.h"
@@ -120,7 +120,6 @@ int main(int argc, char **argv) {
 
 		// Load the map linked from the truthed map
 		DLOG << "Loaded a Truthed Map for " << tru_map.spec_file();
-		slam_map->auto_undistort = false;
 		slam_map->LoadXml(tru_map.spec_file());
 		slam_map->RotateToSceneFrame(SO3<>::exp(asToon(tru_map.ln_scene_from_slam())));
 
