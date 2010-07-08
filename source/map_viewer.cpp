@@ -3,12 +3,14 @@
 #include <LU.h>
 #include <so3.h>
 
-#include "common_types.h"
+#include "entrypoint_types.h"
 #include "map_widgets.h"
 #include "map.h"
 #include "map.pb.h"
 #include "textons.h"
 #include "vars.h"
+
+#include "widget3d.h"
 #include "viewer3d.h"
 
 #include "math_utils.tpp"
@@ -21,7 +23,6 @@ using namespace toon;
 
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
-	Viewer3D::Init(&argc, argv);
 
 	proto::TruthedMap tru_map;
 	ifstream tru_in(argv[1], ios::binary);
@@ -35,16 +36,18 @@ int main(int argc, char **argv) {
 	}
 
 	// Load the map
-	MapViz mapviz;
+	Map map;
+	map.LoadXml(tru_map.spec_file());
 	if (argc == 2) {
-		mapviz.map.RotateToSceneFrame(scene_from_slam);
+		map.RotateToSceneFrame(scene_from_slam);
 	} else {
-		mapviz.map.RotateToSceneFrame(RandomVector<3>());
+		map.RotateToSceneFrame(RandomVector<3>());
 	}
-	//mapviz.map.RunGuidedLineDetectors();
 
 	// Enter the event loop
-	mapviz.Run();
+	Viewer3D v;
+	//v.AddOwned(new MapWidget(&map));
+	v.Run();
 
 	return 0;
 }

@@ -356,13 +356,12 @@ void MapWidget::ToggleLines() {
 
 ///////////////////// MapViz /////////////////////////////
 void MapViz::Run() {
-	viewer.Create();
 	viewer.Run();
 }
 
 MapViz::MapViz() {
 	map.Load();
-	widget.Configure(&map);
-	viewer.Add(widget);
+	//widget.Configure(&map);
+	//viewer.Add(widget);
 }
 }

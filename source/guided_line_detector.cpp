@@ -37,12 +37,12 @@ namespace indoor_context {
 		image.BuildMono();
 
 		ComputeUndist(image.sz(), image.pc.camera);
-		TIMED("Compute gradients") ComputeGradients();
+		ComputeGradients();
 		ComputeVptProjs();
-		TIMED("Compute assocs") ComputeAssocs();
+		ComputeAssocs();
 		//TIMED("Compute vpt windows") ComputeVptWindows();
-		TIMED("Build histograms") ComputeHistograms();
-		TIMED("Identify line segments") ComputeSegments();
+		ComputeHistograms();
+		ComputeSegments();
 	}
 
 	void GuidedLineDetector::ComputeUndist(const ImageRef& sz, const CameraBase& cam) {

@@ -129,10 +129,9 @@ namespace indoor_context {
 		}
 
 		// Construct bounds from any two opposing corners, in any order
-		static Bounds2D<T> FromCorners(const toon::Vector<2>& a,
-																	 const toon::Vector<2>& b) {
+		static Bounds2D<T> FromCorners(const Vec2& a, const Vec2& b) {
 			return Bounds2D(min(a[0], b[0]), max(a[0], b[0]),
-											min(a[1], b[1]), max(a[1], b[1]));
+					min(a[1], b[1]), max(a[1], b[1]));
 		}
 
 		// Construct bounds from a size. Top-left corner is assumed to be at the origin.
@@ -141,8 +140,17 @@ namespace indoor_context {
 		}
 
 		// Construct bounds from a size. Top-left corner is assumed to be at the origin.
+		static Bounds2D<T> FromSize(const Vec2I& sz) {
+			return Bounds2D(0, sz[0], 0, sz[1]);
+		}
+
+		// Construct bounds from a size. Top-left corner is assumed to be at the origin.
 		static Bounds2D<T> FromTightSize(const ImageRef& sz) {
 			return Bounds2D(0, sz.x-1, 0, sz.y-1);
+		}
+		// Construct bounds from a size. Top-left corner is assumed to be at the origin.
+		static Bounds2D<T> FromTightSize(const Vec2I& sz) {
+			return Bounds2D(0, sz[0]-1, 0, sz[1]-1);
 		}
 	};
 }

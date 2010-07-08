@@ -150,8 +150,8 @@ toon::Vector<M+N,T> concat(const toon::Vector<M,T>& u, const toon::Vector<N,T>& 
 }
 
 // Append a scalar to the end of a vector
-template <typename T, int N>
-toon::Vector<N+1,T> concat(const toon::Vector<N,T>& v, const T& x) {
+template <typename U, typename T, int N>
+toon::Vector<N+1,T> concat(const toon::Vector<N,T>& v, const U& x) {
 	toon::Vector<N+1,T> r;
 	r.template slice<0,N>() = v;
 	r[N] = x;
@@ -159,8 +159,8 @@ toon::Vector<N+1,T> concat(const toon::Vector<N,T>& v, const T& x) {
 }
 
 // Append a scalar to the beginning of a vector
-template <typename T, int N>
-toon::Vector<N+1,T> concat(const T& x, const toon::Vector<N,T>& v) {
+template <typename U, typename T, int N>
+toon::Vector<N+1,T> concat(const U& x, const toon::Vector<N,T>& v) {
 	toon::Vector<N+1,T> r;
 	r.template slice<1,N>() = v;
 	r[0] = x;

@@ -1,6 +1,6 @@
 #include <fstream>
 
-#include "common_types_entry.h"
+#include "entrypoint_types.h"
 #include "canvas.tpp"
 #include "vars.h"
 #include "map.h"

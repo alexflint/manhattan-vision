@@ -7,21 +7,85 @@
 
 #include "floorplan_renderer.h"
 
-#include <boost/foreach.hpp>
-
 #include "common_types.h"
 #include "map.pb.h"
 #include "camera.h"
-#include "colored_points.h"
-#include "viewer3d.h"
+#include "simple_renderer.h"
 
-#include "math_utils.tpp"
 #include "image_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
 using namespace toon;
 
+FloorPlanRenderer::FloorPlanRenderer() {
+}
+
+void FloorPlanRenderer::RenderInternal(const proto::FloorPlan& fp,
+                                       const Matrix<3,4>& cam,
+                                       const Vec2I& viewport) {
+	renderer_.Configure(cam, viewport);
+	renderer_.Clear(2);  // initialize with the vertical label
+	for (int i = 0; i < fp.vertices_size(); i++) {
+		Vec2 u = asToon(fp.vertices(i));
+		Vec2 v = asToon(fp.vertices((i+1)%fp.vertices_size()));
+		if (isnan(u) || isnan(v)) continue;
+
+		Vec3 p = concat(u, fp.zceil());
+		Vec3 q = concat(v, fp.zceil());
+		Vec3 r = concat(v, fp.zfloor());
+		Vec3 s = concat(u, fp.zfloor());
+
+		// label surfaces by their normal direction...
+		int label = abs(u[0]-v[0]) > abs(u[1]-v[1]) ? 1 : 0;
+		renderer_.Render(p, q, r, label);
+		renderer_.Render(p, r, s, label);
+	}
+}
+
+// Render from a particular view
+void FloorPlanRenderer::Render(const proto::FloorPlan& floorplan,
+                               const Matrix<3,4>& cam,
+                               const Vec2I& viewport,
+                               ImageRGB<byte>& canvas) {
+	RenderInternal(floorplan, cam, viewport);
+	DrawOrientations(renderer_.framebuffer(), canvas);
+}
+
+void FloorPlanRenderer::Render(const proto::FloorPlan& floorplan,
+                               const PosedCamera& cam,
+                               ImageRGB<byte>& canvas) {
+	Render(floorplan,
+			cam.GetLinearApproximation(),
+			asToon(cam.im_size()),
+			canvas);
+}
+
+// Render orientations
+void FloorPlanRenderer::RenderOrients(const proto::FloorPlan& floorplan,
+                                      const Matrix<3,4>& cam,
+                                      const Vec2I& viewport,
+                                      MatI& orients) {
+	RenderInternal(floorplan, cam, viewport);
+	orients = renderer_.framebuffer();  // keep it simple: just copy everything
+}
+
+void FloorPlanRenderer::RenderOrients(const proto::FloorPlan& floorplan,
+                                      const PosedCamera& cam,
+                                      MatI& orients) {
+	RenderOrients(floorplan,
+			cam.GetLinearApproximation(),
+			asToon(cam.im_size()),
+			orients);
+}
+
+
+
+
+
+
+
+/*
 FloorplanRenderer::FloorplanRenderer() {
 }
 
@@ -79,8 +143,6 @@ void FloorplanRenderer::PredictOrients(const PosedCamera& pc, MatI& orients) {
 				double depth = 1.0/(depth_eqns[i]*ret);
 				if (x%5==0 && y%5==0) {
 					pts.Add(IntersectRay(ret, cam, planes[i]), Colors::grey(depth));// BrightColors::Get(i));
-					/*CHECK_TOL(depth, GetPlaneDepth(ret, cam, planes[i]), 1e-5)
-							<< "x="<<x<<" y="<<y<<" ret="<<ret<<" planes[i]="<<planes[i]<<" i="<<i;*/
 				}
 				if (depth > 1e-6 && depth < mindepth) {
 					mindepth = depth;
@@ -99,6 +161,5 @@ void FloorplanRenderer::PredictOrients(const PosedCamera& pc, MatI& orients) {
 
 	WriteMatrixImageRescaled("out/depth.png", depth);
 }
-
-
+*/
 }

@@ -1,14 +1,14 @@
-#include "clipping3d.h"
 #include "canvas.h"
 #include "colors.h"
 
+#include "viewer3d.h"
+#include "widget3d.h"
+
+#include "clipping3d.tpp"
 #include "canvas.tpp"
 #include "range_utils.tpp"
 #include "io_utils.tpp"
 #include "gl_utils.tpp"
-
-#include "viewer3d.h"
-#include "widget3d.h"
 
 using namespace std;
 using namespace indoor_context;
@@ -19,6 +19,27 @@ void RenderPoly(const vector<Vec3>& poly, const PixelRGB<byte>& color) {
 	GL_PRIMITIVE(GL_POLYGON) {
 		BOOST_FOREACH(const Vec3& v, poly) {
 			glVertexV(v);
+		}
+	}
+}
+
+void DrawFrustrum(const PosedCamera& pc) {
+	double znear = 1e-6, zfar = 1e+6;
+	Polygon<4> poly = pc.ret_bounds().GetPolygon();
+	GL_PRIMITIVE(GL_LINE_LOOP) {
+		for (int i = 0; i < 4; i++) {
+			glVertexV(poly.verts[i]*znear);
+		}
+	}
+	GL_PRIMITIVE(GL_LINE_LOOP) {
+		for (int i = 0; i < 4; i++) {
+			glVertexV(poly.verts[i]*zfar);
+		}
+	}
+	GL_PRIMITIVE(GL_LINES) {
+		for (int i = 0; i < 4; i++) {
+			glVertexV(poly.verts[i]*znear);
+			glVertexV(poly.verts[i]*zfar);
 		}
 	}
 }
@@ -41,50 +62,38 @@ int main(int argc, char **argv) {
 	DREPORT(a,b,m,p,w);
 	DREPORT(project(p));*/
 
-	Polygon<4> square;
-	square.verts[0] = makeVector(5, 0, 1);
-	square.verts[1] = makeVector(10, 6, 1);
-	square.verts[2] = makeVector(9, 10, 1);
-	square.verts[3] = makeVector(0, 4, 1);
+	vector<Vec3> verts;
+	verts.push_back(makeVector(0, -4, 1));
+	verts.push_back(makeVector(4, 1, 1));
+	verts.push_back(makeVector(4, 4, -1.0));
 
-	Vec4 clip = makeVector(1.0, 1, 0, -10);
-
-	vector<Vec3> clipped1;
-	vector<Vec3> clipped2;
-	ClipAgainstPlane(square.verts, clip, back_inserter(clipped1));
-	ClipAgainstPlane(square.verts, -clip, back_inserter(clipped2));
-
-
-	// Construct the camera
+	// Camera intrinisics
 	Mat3 mcam = Identity;
 	Vec2 tr = makeVector(5.0, 5.0);
 	mcam.slice<0,2,2,1>() = tr.as_col();
-	DREPORT(mcam * makeVector(0.0,0,1));
-	DREPORT(mcam * makeVector(10.0,10,1));
 
-	LinearCamera cam(mcam, ImageRef(10,10));
-
+	// Camera extrinsics
 	SE3<> pose;
-	//pose.get_rotation() = SO3<>(Identity);
-	//pose.get_translation() = Zeros;
-	DREPORT(pose);
-
+	LinearCamera cam(mcam, ImageRef(10,10));
 	PosedCamera pc(pose, cam);
 
+	// Do the clipping
 	vector<Vec3> fclipped;
-	ClipAgainstFrustrum(square.verts, pc, back_inserter(fclipped));
+	ClipAgainstFrustrum(verts, pc, back_inserter(fclipped));
 	DREPORT(fclipped.size());
 	DREPORT(iowrap(fclipped));
 
+	// Hack to help with drawing
+	BOOST_FOREACH(Vec3& v, verts) {
+		v[2] -= 0.1;
+	}
+
+	// Fire up the viewer
 	Viewer3D v;
 	v.AddOwned(new GroundPlaneWidget);
-	v.Add(bind(&RenderPoly, fclipped, Colors::red()));
+	v.Add(bind(&RenderPoly, ref(verts), Colors::blue()));
+	v.Add(bind(&RenderPoly, ref(fclipped), Colors::red()));
+	v.Add(bind(&DrawFrustrum, ref(pc)));
 	v.Run();
-
-	FileCanvas canvas("clipped.png", makeVector(250, 250));
-	canvas.Scale(25);
-	canvas.FillPolygon(clipped1, Colors::red());
-	canvas.FillPolygon(clipped2, Colors::blue());
-
 	return 0;
 }

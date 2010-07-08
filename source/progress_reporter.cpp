@@ -1,8 +1,10 @@
 #include <time.h>
 #include <iostream>
 #include <iomanip>
+
 #include "progress_reporter.h"
-#include "common_types_vw.h"
+
+#include "common_types.h"
 #include "log.h"
 
 namespace indoor_context {

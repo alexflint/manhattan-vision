@@ -1,4 +1,4 @@
-#include "common_types_entry.h"
+#include "entrypoint_types.h"
 #include "manhattan_dp.h"
 #include "vars.h"
 #include "map.pb.h"
@@ -109,51 +109,51 @@ void DoViz(const Map& map, const KeyFrame& kf, const PosedImage& pim,
            const proto::TruthedMap& tru_map,
            const proto::TruthedFrame& tru_frame, const MatI& gt_orients) {
 	int id = tru_frame.id();
-INDENTED	TIMED("Reconstruction time") recon->Compute(pim, tru_map);
-		double accuracy = GetAccuracy(recon->dp.soln_orients, gt_orients);
-		sum_accuracy += accuracy;
-		num_frames++;
-		DLOG << format("Accuracy: %.2f%%") % (accuracy*100);
+	INDENTED TIMED("Reconstruction time") recon->Compute(pim, tru_map);
+	double accuracy = GetAccuracy(recon->dp.soln_orients, gt_orients);
+	sum_accuracy += accuracy;
+	num_frames++;
+	DLOG << format("Accuracy: %.2f%%") % (accuracy*100);
 
-		// Assemble the filepath
-		format filepat("out/frame%03d_%s");
+	// Assemble the filepath
+	format filepat("out/frame%03d_%s");
 
-		// Write accuracy
-		sofstream acc_out(str(filepat % id % "dp_accuracy.txt"));
-		acc_out << static_cast<int>(accuracy*100) << endl;
+	// Write accuracy
+	sofstream acc_out(str(filepat % id % "dp_accuracy.txt"));
+	acc_out << static_cast<int>(accuracy*100) << endl;
 
-		// Draw the floorplan estimated orientations
-		ImageRGB<byte> initial_canvas;
-		ImageCopy(kf.image.rgb, initial_canvas);
-		DrawOrientations(recon->labeller.orient_map, initial_canvas, 0.5);
-		WriteImage(str(filepat % id % "dp_initial.png"), initial_canvas);
+	// Draw the floorplan estimated orientations
+	ImageRGB<byte> initial_canvas;
+	ImageCopy(kf.image.rgb, initial_canvas);
+	DrawOrientations(recon->labeller.orient_map, initial_canvas, 0.5);
+	WriteImage(str(filepat % id % "dp_initial.png"), initial_canvas);
 
-		// Draw the predicted orientations
-		ImageRGB<byte> soln_canvas;
-		ImageCopy(kf.image.rgb, soln_canvas);
-		DrawOrientations(recon->dp.soln_orients, soln_canvas, 0.5);
-		WriteImage(str(filepat % id % "dp_soln.png"), soln_canvas);
+	// Draw the predicted orientations
+	ImageRGB<byte> soln_canvas;
+	ImageCopy(kf.image.rgb, soln_canvas);
+	DrawOrientations(recon->dp.soln_orients, soln_canvas, 0.5);
+	WriteImage(str(filepat % id % "dp_soln.png"), soln_canvas);
 
-		// Draw the solution in grid coordinates
-		ImageRGB<byte> grid_canvas;
-		recon->dp.DrawGridSolution(grid_canvas);
-		WriteImage(str(filepat % id % "dp_grid.png"), grid_canvas);
+	// Draw the solution in grid coordinates
+	ImageRGB<byte> grid_canvas;
+	recon->dp.DrawGridSolution(grid_canvas);
+	WriteImage(str(filepat % id % "dp_grid.png"), grid_canvas);
 
-		// Draw the ground truth orientations
-		ImageRGB<byte> gt_canvas;
-		ImageCopy(kf.image.rgb, gt_canvas);
-		DrawOrientations(gt_orients, gt_canvas, 0.5);
-		WriteImage(str(filepat % id % "gt.png"), gt_canvas);
+	// Draw the ground truth orientations
+	ImageRGB<byte> gt_canvas;
+	ImageCopy(kf.image.rgb, gt_canvas);
+	DrawOrientations(gt_orients, gt_canvas, 0.5);
+	WriteImage(str(filepat % id % "gt.png"), gt_canvas);
 
-		// Draw the original image
-		WriteImage(str(filepat % id % "orig.png"), kf.image.rgb);
-	}
+	// Draw the original image
+	WriteImage(str(filepat % id % "orig.png"), kf.image.rgb);
+}
 
 void ProcessFrame(int index, const Map& map, const proto::TruthedMap& tru_map) {
 	// Pull out the truthed frame
 	const proto::TruthedFrame& tru_frame = tru_map.frame(index);
-	DLOG	<< format("Processing frame %d (index=%d of %d)") % tru_frame.id()
-			        % index % tru_map.frame_size();
+	DLOG << format("Processing frame %d (index=%d of %d)") % tru_frame.id()
+			        		% index % tru_map.frame_size();
 	SCOPED_INDENT;
 
 	// Pull out the frame
@@ -171,6 +171,7 @@ void ProcessFrame(int index, const Map& map, const proto::TruthedMap& tru_map) {
 	// Get ground truth orientations
 	MatI gt_orients;
 	LoadTrueOrients(tru_frame, gt_orients);
+	InterchangeLabels(gt_orients, 0, 1);  // here we use a different convention for orient labels
 
 	// Process
 	DoViz(map, kf, pim, tru_map, tru_frame, gt_orients);

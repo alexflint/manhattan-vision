@@ -1,5 +1,5 @@
 #include "hw_convolver.h"
-#include "common_types_vw.h"
+#include "common_types.h"
 #include "misc.h"
 #include "cuda_conv.h"
 

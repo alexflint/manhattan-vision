@@ -8,7 +8,7 @@
 #include <boost/range.hpp>
 #include <boost/thread.hpp>
 
-#include "common_types_vw.h"
+#include "common_types.h"
 #include "fhsegmenter.h"
 #include "union_find.h"
 #include "timer.h"

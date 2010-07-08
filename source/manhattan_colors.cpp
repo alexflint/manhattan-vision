@@ -1,4 +1,4 @@
-#include "common_types_entry.h"
+#include "entrypoint_types.h"
 #include "guided_line_detector.h"
 #include "manhattan_dp.h"
 #include "vars.h"

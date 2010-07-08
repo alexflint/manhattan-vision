@@ -43,9 +43,12 @@ void GlutWindow::Create() {
 	if (!InGlutThread()) {
 		// Note that this is okay because LoopInternal calls
 		// invoker_.Process() _before_ calling glutMainLoop().
+		DLOG << "creating a window (delegating)";
 		RunInGlutThread(bind(&GlutWindow::Create, this));
 		return;
 	}
+
+	DLOG << "creating a window for real";
 
 	// Ensure GLUT is initialized
 	Init();

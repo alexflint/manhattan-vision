@@ -123,7 +123,7 @@ namespace indoor_context {
 		// 3D. Mouse coords should be as passed to glutMouseMotion
 		// etc. Returns a 3D point on the plane specified by planeEqn.
 		toon::Vector<3> MouseToPlane(const toon::Vector<2> mousePt,
-													 const toon::Vector<4>& planeEqn);
+				const toon::Vector<4>& planeEqn);
 
 		// Handlers for GLUT callbacks
 		void Window_Display();

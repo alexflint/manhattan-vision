@@ -1,6 +1,7 @@
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 
+#include <so3.h>
 #include <LU.h>
 #include <determinant.h>
 
@@ -50,26 +51,7 @@ void Frame::UndistortImage() {
 		map->undistorter.Compute(image.sz());
 	}
 	unwarped.Compute(image, map->undistorter);
-
-	// Compute homography with plane-at-infinity
-	/*vpt_homog = pc->pose.get_rotation().inverse() * unwarped.image_to_retina;
-		TooN::LU<3> lu(vpt_homog);
-		vpt_homog_inv = lu.get_inverse();
-		vpt_homog_dual = vpt_homog_inv.T();
-		vpt_homog_dual_inv = vpt_homog.T();*/
 }
-
-/*void KeyFrame::Load(const string& image_file, const string& pose_file) {
-		// Load world-to-camera xform
-		ifstream input(pose_file.c_str());
-		Matrix<3,4> x;
-		input >> x;
-		SO3<> rpart(x.slice<0,0,3,3>());
-		Vector<3> tpart = x.slice<0,3,3,1>().T()[0];
-
-		// Configure the keyframe
-		Configure(image_file, SE3<>(rpart, tpart));
-	}*/
 
 void KeyFrame::RunGuidedLineDetector() {
 	pim.reset(new PosedImage(*pc));
@@ -95,46 +77,7 @@ Map::Map() {
 	}
 }
 
-void Map::Load() {
-	string format = GV3::get<string>("Map.Format");
-	if (format == "xml") {
-		string xml_file = GV3::get<string>("Map.SpecFile");
-		LoadXml(xml_file);
-		/*} else if (format == "dump") {
-			string dir_name = GV3::get<string>("Map.Dir");
-			string image_pattern = GV3::get<string>("Map.ImagePattern");
-			string info_pattern = GV3::get<string>("Map.InfoPattern");
-			LoadMapDump(dir_name, image_pattern, info_pattern);*/
-	} else {
-		CHECK(false) << "Unrecognised map format: " << format;
-	}
-}
-
-
-/*void Map::LoadMapDump(const string& dirname,
-												const string& impat,
-												const string& infopat) {
-		// Read the keyframe files one-by-one
-		fs::path basedir(dirname);
-		BOOST_FOREACH(int id, kf_ids_to_load) {
-			fs::path imfile = basedir/str( format(impat)%id );
-			fs::path infofile = basedir/str( format(infopat)%id );
-			kfs.push_back(new KeyFrame(this, id));
-			kfs.back().Load(imfile.string(), infofile.string());
-		}
-
-		// Read the point cloud
-		ifstream ptinput((dir+"map.dump").c_str());
-		Vector<3> v;
-		int level;
-		while (ptinput >> v) {
-			ptinput >> level;
-			pts.push_back(v);
-		}
-	}*/
-
-
-void Map::LoadXml(const string& xml_file) {
+void Map::Load(const string& path) {
 	// Read the keyframe files one-by-one
 	TiXmlDocument doc;
 	CHECK(doc.LoadFile(xml_file.c_str()))
@@ -178,7 +121,6 @@ void Map::LoadXml(const string& xml_file) {
 	CHECK(kfs_elem) << "There was no <KeyFrames> element in the map spec.";
 
 	// Create an ID-to-XMLElement map
-	map<int, const TiXmlElement*> kf_elems;
 	for (const TiXmlElement* kf_elem = kfs_elem->FirstChildElement("KeyFrame");
 			kf_elem != NULL;
 			kf_elem = kf_elem->NextSiblingElement("KeyFrame")) {
@@ -231,8 +173,17 @@ void Map::LoadXml(const string& xml_file) {
 		kfs_by_id[id] = kf;
 	}
 
-	DLOG << "Loaded " << pts.size() << " map points and "
-			<< kfs.size() << " (of " << kf_elems.size() << ") keyframes";
+	DLOG << "Loaded " << pts.size() << " map points and " << kfs.size() << " keyframes";
+}
+
+void Map::LoadWithGroundTruth(const string& path, proto::TruthedMap& tru_map) {
+	ReadProto(path, tru_map);
+	Load(tru_map.spec_file());
+	RotateToSceneFrame(SO3<>::exp(asToon(tru_map.ln_scene_from_slam())));
+}
+
+void Map::LoadXml(const string& xml_file) {
+	Load(xml_file);
 }
 
 void Map::LoadImages(bool undistort) {
@@ -302,7 +253,7 @@ void Map::DetectLines() {
 	COUNTED_FOREACH(int i, KeyFrame& kf, kfs) {
 		// TODO: check that this still works, or go back to kf.vpt_homog_dual
 		Matrix<3> vpt_homog = kf.pc->pose.get_rotation().inverse() * kf.unwarped.image_to_retina;
-		TooN::LU<3> lu(vpt_homog);
+		LU<3> lu(vpt_homog);
 		Matrix<3> vpt_homog_inv = lu.get_inverse();
 		Matrix<3> vpt_homog_dual = vpt_homog_inv.T();
 

@@ -17,7 +17,7 @@
 #include <VNL/Algo/determinant.h>
 #include <VNL/Algo/cholesky.h>
 
-#include "common_types_vw.h"
+#include "common_types.h"
 #include "kmeans.h"
 #include "misc.h"
 #include "math_utils.h"
@@ -65,7 +65,7 @@ VecD GaussianSampler::GaussianSampler::Sample() const {
 
 // Static
 double GaussianSampler::SampleStdNormal() {
-	return SampleNormal(0.0, 1.0);
+	return VNL::SampleNormal(0.0, 1.0);
 }
 
 GaussMixture::GaussMixture(int ncomps_, int dim_)

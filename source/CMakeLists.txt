@@ -6,7 +6,7 @@ CMAKE_MINIMUM_REQUIRED( VERSION 2.6 )
 # Set the message length to help Eclipse parse compiler messages
 SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmessage-length=0" )
 # Uncomment this to help Eclipse discover include paths 
-SET( CMAKE_VERBOSE_MAKEFILE OFF )
+# SET( CMAKE_VERBOSE_MAKEFILE OFF )
 
 # Set the local version first
 SET( CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake_modules" )
@@ -149,10 +149,12 @@ SET( CORE_HEADERS
 	line_detector.h
 	guided_line_detector.h
 	camera.h
-	building_estimator.h
+	
 	event.h
 	floorplan_editor.h
 	floor_ceil_map.h
+	
+	manhattan_bnb.h
 	manhattan_dp.h
 	bld_helpers.h
 
@@ -165,6 +167,7 @@ SET( CORE_HEADERS
 	table.tpp
 	integral_col_image.tpp
 	histogram.tpp
+	fill_polygon.tpp
 
 	ATANCamera.h
 	
@@ -225,12 +228,14 @@ SET( CORE_SOURCES
 
 	line_detector.cpp
 	guided_line_detector.cpp
+	
+	manhattan_bnb.cpp
+	manhattan_dp.cpp
+	
 	camera.cpp
-	building_estimator.cpp
 	glut_window.cpp
 	floorplan_editor.cpp
 	floor_ceil_map.cpp
-	manhattan_dp.cpp
 	bld_helpers.cpp
 	histogram.cpp
 	
@@ -239,6 +244,7 @@ SET( CORE_SOURCES
 	colored_points.cpp
 	read_ply.cpp
 	
+	simple_renderer.cpp
 	floorplan_renderer.cpp
 )
 
@@ -308,19 +314,7 @@ SET( EXECUTABLES
 #	multi_horiz_vpts
 #	keyframe_line_sweeper
 #	frame_line_sweeper
-#	map_viewer
-
-	frame_structure_recovery
-#	multiframe_bnb
-#	canonical_image
-
-#	vpt_comparison
-#	peakline_experiment
-
-#	structure_recovery
-#	cvpr_video
-
-	unconstrained_dp
+	map_viewer
 
 	edit_floorplan
 	edit_map
@@ -345,14 +339,23 @@ SET( EXECUTABLES
 	manhattan_colors
 	draw_top_view
 	predict_orientations
-	multiframe_bnb
+	
+	render_floorplan
 	
 	toon_speed_test
 	include_test
+	render_test
 
 	poster_lines
 	poster_vpts
 	poster_sweeps
+	
+	draw_gt
+
+	monocular_bnb
+	multiview_bnb
+	monocular_dp
+	multiview_dp
 )
 
 

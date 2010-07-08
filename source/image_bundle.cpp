@@ -6,7 +6,7 @@
 #include <VW/Image/imagecopy.tpp>
 
 #include "image_bundle.h"
-#include "common_types_vw.h"
+#include "common_types.h"
 #include "gl_utils.tpp"
 #include "glut_window.h"
 

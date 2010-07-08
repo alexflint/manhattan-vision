@@ -7,7 +7,7 @@
 
 #include <VW/Image/imageio.h>
 
-#include "common_types_entry.h"
+#include "entrypoint_types.h"
 #include "map.h"
 #include "map.pb.h"
 #include "vars.h"

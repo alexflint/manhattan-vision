@@ -32,11 +32,11 @@ namespace indoor_context {
 		Polygon<4> poly;
 		int axis;
 		inline ManhattanWall() { }
-		inline ManhattanWall(const toon::Vector<3>& tl,
-												 const toon::Vector<3>& tr,
-												 const toon::Vector<3>& br,
-												 const toon::Vector<3>& bl,
-												 int a)
+		inline ManhattanWall(const Vec3& tl,
+		                     const Vec3& tr,
+		                     const Vec3& br,
+		                     const Vec3& bl,
+		                     int a)
 			: poly(tl, tr, br, bl), axis(a) {
 		}
 	};
@@ -71,8 +71,8 @@ namespace indoor_context {
 		DPSolution(double s);
 		DPSolution(double s, const DPState& state);
 		void ReplaceIfSuperior(const DPSolution& other,
-													 const DPState& state,
-													 double delta=0);
+		                       const DPState& state,
+		                       double delta=0);
 	};
 
 	// Output operators
@@ -84,7 +84,7 @@ namespace indoor_context {
 	public:
 		typedef DPSolution* iterator;
 		Table<5, DPSolution> table;
-		void reset(const toon::Vector<2,int>& grid_size, int max_corners);
+		void reset(const Vec2I& grid_size, int max_corners);
 		void clear();
 		iterator begin();
 		iterator end();
@@ -98,7 +98,6 @@ namespace indoor_context {
 	class ManhattanDP {
 	public:
 		typedef	DPCache Cache;
-		//typedef	tr1::unordered_map<DPState, DPSolution, DPStateHasher> Cache;
 
 		const MatI* input_orients;
 
@@ -116,19 +115,19 @@ namespace indoor_context {
 		IntegralColImage<3> integ_orients;
 
 		int grid_scaling;  // actually the reciprocal of the scaling
-		toon::Vector<2,int> grid_offset;  // the extra padding in the orientation map
-		toon::Vector<2,int> grid_size;  // size of orient_map
-		toon::Vector<2,int> input_size;  // size of input_orients
+		Vec2I grid_offset;  // the extra padding in the orientation map
+		Vec2I grid_size;  // size of orient_map
+		Vec2I input_size;  // size of input_orients
 
-		toon::Matrix<3> H_canon;  // homography to make vertical lines vertical in the image
-		toon::Matrix<3> H_canon_inv;  // inverse of above, cached for efficiency
+		Mat3 H_canon;  // homography to make vertical lines vertical in the image
+		Mat3 H_canon_inv;  // inverse of above, cached for efficiency
 
 		FloorCeilMap fcmap;  // homography from floor to ceiling
 
 		MatI opp_rows;  // cache of opposite (floor<->ceil) rows as passed through fcmap, H_canon, etc
 
 		const PosedCamera* pc;
-		toon::Vector<2> horiz_vpts[2];
+		Vec2 horiz_vpts[2];
 		int horiz_vpt_cols[2];
 		int horizon_row;
 
@@ -164,8 +163,8 @@ namespace indoor_context {
 		void ComputeBacktrack();
 
 		// Convert between image and grid coordinates
-		toon::Vector<3> GridToImage(const toon::Vector<2>& x);
-		toon::Vector<2,int> ImageToGrid(const toon::Vector<3>& x);
+		toon::Vector<3> GridToImage(const Vec2& x);
+		toon::Vector<2,int> ImageToGrid(const Vec3& x);
 
 		// The caching wrapper for the DP
 		const DPSolution& Solve(const DPState& state);
@@ -191,7 +190,7 @@ namespace indoor_context {
 
 
 
-	class ManhattanReconstruction {
+	class ManhattanDPReconstruction {
 	public:
 		ManhattanDP dp;
 		GuidedLineDetector line_detector;

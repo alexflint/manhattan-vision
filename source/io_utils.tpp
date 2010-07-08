@@ -222,6 +222,13 @@ namespace indoor_context {
 		return eof;
 	}
 
+	// Read a protocol buffer
+	template <typename Proto>
+	void ReadProto(const string& path, Proto& p) {
+		ifstream s(path.c_str(), ios::binary);
+		CHECK(p.ParseFromIstream(&s)) << "Failed to read from " << path;
+	}
+
 	// Represents a container wrapper that outputs each element in the
 	// container to a stream
 	template <typename Range>

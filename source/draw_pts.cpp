@@ -1,6 +1,6 @@
 #include <boost/filesystem.hpp>
 
-#include "common_types_entry.h"
+#include "entrypoint_types.h"
 #include "map.h"
 #include "vars.h"
 #include "canvas.h"

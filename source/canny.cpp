@@ -7,7 +7,7 @@
 #include <VW/Improc/smooth.h>
 #include <VW/Image/imagecopy.tpp>
 
-#include "common_types_vw.h"
+#include "common_types.h"
 #include "misc.h"
 #include "fast_sobel.h"
 #include "canny.h"
@@ -26,7 +26,7 @@ const lazyvar<int> gvNumThreads("Canny.NumThreads");
 // Clamp the position (r,c) to the matrix bounds and return the value
 // at that point.
 template <typename T>
-inline T GetClamped(const Matrix<T>& mat, const int& r, const int& c) {
+inline T GetClamped(const VNL::Matrix<T>& mat, const int& r, const int& c) {
 	return mat[Clamp(r, 0, mat.Rows()-1)][Clamp(c, 0, mat.Cols()-1)];
 }
 
@@ -139,7 +139,7 @@ void Gradients::ComputeSobel(const ImageF& rawinput) {
 	// Smooth the image
 	if (*gvSmoothingSigma > 0.0) {
 		ImageCopy(rawinput, smoothed);
-		SmoothUniform(smoothed, ceili(*gvSmoothingSigma)*2+1);
+		VW::SmoothUniform(smoothed, ceili(*gvSmoothingSigma)*2+1);
 	}
 	const ImageF& input = *gvSmoothingSigma > 0 ? smoothed : rawinput;
 

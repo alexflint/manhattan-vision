@@ -3,7 +3,7 @@
 
 #include <fstream>
 
-#include "common_types_entry.h"
+#include "entrypoint_types.h"
 #include "floorplan_editor.h"
 #include "map_widgets.h"
 #include "map.h"

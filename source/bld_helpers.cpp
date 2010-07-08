@@ -10,6 +10,8 @@
 #include "map.h"
 #include "camera.h"
 #include "clipping.h"
+#include "camera.h"
+#include "floorplan_renderer.h"
 
 namespace indoor_context {
 	using namespace toon;
@@ -28,30 +30,12 @@ namespace indoor_context {
 		}
 	}
 
-	void LoadTrueOrients(const proto::TruthedFrame& tru_frame,
-											 MatI& gt_orients,
-											 bool label_by_tangents) {
-		CHECK(tru_frame.has_orient_map_file());
-		CHECK(fs::exists(tru_frame.orient_map_file()));
-		ImageBundle gt_orient_image(tru_frame.orient_map_file());
-		gt_orients.Resize(gt_orient_image.ny(), gt_orient_image.nx());
-		for (int y = 0; y < gt_orients.Rows(); y++) {
-			PixelRGB<byte>* inrow = gt_orient_image.rgb[y];
-			int* outrow = gt_orients[y];
-			for (int x = 0; x < gt_orients.Cols(); x++) {
-				const PixelRGB<byte>& pixel = inrow[x];
-				if (pixel.r > 0) {
-					outrow[x] = label_by_tangents ? 0 : 1;
-				} else if (pixel.g > 0) {
-					outrow[x] = label_by_tangents ? 1 : 0;
-				} else {
-					outrow[x] = 2;
-				}
-			}
-		}
+	void GetTrueOrients(const proto::FloorPlan& floorplan,
+	                    const PosedCamera& pc,
+	                    MatI& gt_orients) {
+		FloorPlanRenderer re;
+		re.RenderOrients(floorplan, pc, gt_orients);
 	}
-
-
 
 	void DownsampleOrients(const MatI& in, MatI& out, const toon::Vector<2,int>& res) {
 		MatI votes[3];
@@ -90,12 +74,11 @@ namespace indoor_context {
 		DownsampleOrients(in, out, makeVector(in.Cols()/k, in.Rows()/k));
 	}
 
-	double GetAccuracy(const MatI& estimated, const MatI& truth) {
-		int correct = GetAgreement(estimated, truth);
-		return 1.0*correct / (estimated.Rows()*estimated.Cols());
+	double ComputeAgreementPct(const MatI& a, const MatI& b) {
+		return 1.0*ComputeAgreement(a, b) / (a.Rows()*a.Cols());
 	}
 
-	int GetAgreement(const MatI& a, const MatI& b) {
+	int ComputeAgreement(const MatI& a, const MatI& b) {
 		CHECK_EQ(a.Rows(), b.Rows());
 		CHECK_EQ(a.Cols(), a.Cols());
 		int n = 0;
@@ -107,5 +90,30 @@ namespace indoor_context {
 			}
 		}
 		return n;
+	}
+
+
+
+	void LoadTrueOrientsOld(const proto::TruthedFrame& tru_frame,
+	                        MatI& gt_orients,
+	                        bool label_by_tangents) {
+		CHECK(tru_frame.has_orient_map_file());
+		CHECK(fs::exists(tru_frame.orient_map_file()));
+		ImageBundle gt_orient_image(tru_frame.orient_map_file());
+		gt_orients.Resize(gt_orient_image.ny(), gt_orient_image.nx());
+		for (int y = 0; y < gt_orients.Rows(); y++) {
+			PixelRGB<byte>* inrow = gt_orient_image.rgb[y];
+			int* outrow = gt_orients[y];
+			for (int x = 0; x < gt_orients.Cols(); x++) {
+				const PixelRGB<byte>& pixel = inrow[x];
+				if (pixel.r > 0) {
+					outrow[x] = label_by_tangents ? 0 : 1;
+				} else if (pixel.g > 0) {
+					outrow[x] = label_by_tangents ? 1 : 0;
+				} else {
+					outrow[x] = 2;
+				}
+			}
+		}
 	}
 }

@@ -5,13 +5,14 @@
 #include "line_sweeper.h"
 #include "common_types.h"
 #include "vanishing_points.h"
-#include "range_utils.tpp"
 #include "clipping.h"
 #include "misc.h"
 #include "image_bundle.h"
 #include "timer.h"
 #include "math_utils.h"
 
+#include "range_utils.tpp"
+#include "fill_polygon.tpp"
 #include "image_utils.tpp"
 #include "io_utils.tpp"
 
@@ -139,7 +140,7 @@ namespace indoor_context {
 					poly.push_back(back_line ^ vline1);
 
 					// Mark the area
-					FillPolygonFast(poly, support_maps[i], 1);
+					FillPolygon(poly, support_maps[i], 1);
 				}
 			}			
 		}

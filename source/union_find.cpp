@@ -1,7 +1,8 @@
 #include <ext/numeric>
 
 #include "union_find.h"
-#include "common_types_vw.h"
+
+#include "common_types.h"
 #include "misc.h"
 
 namespace indoor_context {

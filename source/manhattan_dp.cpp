@@ -10,6 +10,7 @@
 #include "floor_ceil_map.h"
 #include "clipping.h"
 
+#include "fill_polygon.tpp"
 #include "integral_col_image.tpp"
 #include "math_utils.tpp"
 #include "io_utils.tpp"
@@ -301,12 +302,6 @@ namespace indoor_context {
 		opp_rows.Resize(orient_map.Rows(), orient_map.Cols());
 		for (int y = 0; y < opp_rows.Rows(); y++) {
 			for (int x = 0; x < opp_rows.Cols(); x++) {
-				/*Vector<2> pos = makeVector(x,y);
-				Vector<3> canon_im_pt = unproject((pos-grid_offset) * grid_scaling);
-				Vector<3> im_pt = pc->RetToIm(H_canon_inv * pc->ImToRet(canon_im_pt));
-				Vector<3> opp_im_pt = fcmap.TransferIm(im_pt);
-				Vector<2> opp_grid_pos = project(H_canon*opp_im_pt)/grid_scaling + grid_offset;*/
-
 				Vector<2> opp_grid_pos = ImageToGrid(fcmap.TransferIm(GridToImage(makeVector(x,y))));
 				opp_rows[y][x] = Clamp(opp_grid_pos[1], 0, orient_map.Rows()-1);
 			}
@@ -321,7 +316,6 @@ namespace indoor_context {
 		// unordered_map::insert actually does a lookup first and returns
 		// an existing element if there is one, or returns an iterator
 		// pointing to a newly inserted element if not.
-		//pair<Cache::iterator,bool> res = cache.insert(state);
 		Cache::iterator it = cache.find(state);
 		if (it == cache.end()) {
 			cur_depth++;
@@ -331,7 +325,6 @@ namespace indoor_context {
 		} else {
 			// The key was already in the map, return the precomputed value
 			cache_hits++;
-			//return it->second;
 			return *it;
 		}
 	}
@@ -414,11 +407,11 @@ namespace indoor_context {
 				// Check bounds. TODO: relax this
 				if (next.row < 0 || next.row >= orient_map.Rows()) continue;
 
-				// TODO: don't cross the vanishing point's column
+				// TODO: don't cross the column containing the vanishing point
 
 				// Compute the row of the opposite face (floor <-> ceiling)
 				int opp_row = Clamp<int>(opp_rows[next.row][next.col], 0, orient_map.Rows()-1);
-				// TODO: what if opp_row is outside the bounds of orient_map
+				// TODO: what if opp_row is outside the bounds of orient_map?
 
 				// Compute the score for this segment
 				int r0 = min(next.row, opp_row);
@@ -472,19 +465,19 @@ namespace indoor_context {
 				Vector<2> br = makeVector(tr[0], opp_rows[ out->row ][ out->col ]);
 
 				soln_grid_walls.push_back(ManhattanWall(unproject(tl),
-																								unproject(tr),
-																								unproject(br),
-																								unproject(bl),
-																								out->axis));
+						unproject(tr),
+						unproject(br),
+						unproject(bl),
+						out->axis));
 				soln_walls.push_back(ManhattanWall(GridToImage(tl),
-																					 GridToImage(tr),
-																					 GridToImage(br),
-																					 GridToImage(bl),
-																					 out->axis));
+						GridToImage(tr),
+						GridToImage(br),
+						GridToImage(bl),
+						out->axis));
 
 				vector<Vector<3> > poly;
 				copy_all_into(soln_walls.back().poly.verts, poly);
-				FillPolygonFast(poly, soln_orients, out->axis);
+				FillPolygon(poly, soln_orients, out->axis);
 
 				abbrev_backtrack.push_back(cur);
 				out = NULL;
@@ -574,8 +567,8 @@ namespace indoor_context {
 
 
 
-	void ManhattanReconstruction::Compute(const PosedImage& pim,
-																				const proto::TruthedMap& tru_map) {
+	void ManhattanDPReconstruction::Compute(const PosedImage& pim,
+	                                      const proto::TruthedMap& tru_map) {
 		// Identify lines
 		TIMED("Detect lines") WITHOUT_DLOG line_detector.Compute(pim);
 
@@ -623,7 +616,7 @@ namespace indoor_context {
 			}*/
 	}
 
-	void ManhattanReconstruction::ReportBacktrack() {
+	void ManhattanDPReconstruction::ReportBacktrack() {
 		BOOST_FOREACH(const DPState* cur, dp.full_backtrack) {
 			switch (cur->dir) {
 			case DPState::DIR_UP: DLOG_N << "UP"; break;

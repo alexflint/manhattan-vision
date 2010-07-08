@@ -7,7 +7,7 @@
 
 #include <VW/Image/imagecopy.tpp>
 
-#include "common_types_entry.h"
+#include "entrypoint_types.h"
 #include "vars.h"
 #include "map.pb.h"
 #include "mean_shift.h"

@@ -2,8 +2,9 @@
 #include <boost/thread.hpp>
 
 #include "worker.h"
+
+#include "common_types.h"
 #include "concurrent_queue.tpp"
-#include "common_types_vw.h"
 
 namespace indoor_context {
 	Worker::Worker()
