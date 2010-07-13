@@ -35,7 +35,7 @@ void DrawSegmentation(const MatI& mat,
 }
 
 void DrawSpot(ImageRGB<byte>& image,
-              const Vector<2>& p,
+              const Vec2& p,
               const PixelRGB<byte>& color,
               const int size) {
 	const int cx = roundi(p[0]);
@@ -53,13 +53,13 @@ void DrawSpot(ImageRGB<byte>& image,
 }
 
 void DrawThickLineClipped(ImageRGB<byte>& canvas,
-                          const toon::Vector<2>& start,
-                          const toon::Vector<2>& end,
+                          const Vec2& start,
+                          const Vec2& end,
                           const PixelRGB<byte>& color,
                           const int w) {
 	for (int dy = -w; dy <= w; dy++) {
 		for (int dx = -w; dx <= w; dx++) {
-			Vector<2> d = makeVector(dx, dy);
+			Vec2 d = makeVector(dx, dy);
 			DrawLineClipped(canvas, start+d, end+d, color);
 		}
 	}
@@ -85,8 +85,8 @@ void DrawLineClipped(ImageRGB<byte>& image,
 }
 
 void DrawLineClipped(ImageRGB<byte>& image,
-                     const Vector<2>& a,
-                     const Vector<2>& b,
+                     const Vec2& a,
+                     const Vec2& b,
                      const PixelRGB<byte>& color,
                      double alpha) {
 	DrawLineClipped(image, a[0], a[1], b[0], b[1], color, alpha);
@@ -100,13 +100,13 @@ void DrawLineClipped(ImageRGB<byte>& image,
 }
 
 void DrawLine(ImageRGB<byte>& canvas,
-              const Vector<2>& start,
-              const Vector<2>& end,
+              const Vec2& start,
+              const Vec2& end,
               const PixelRGB<byte>& color,
               const float alpha) {
 	double length = norm(end-start);
-	Vector<2> step = unit(end-start);
-	Vector<2> cur = start;
+	Vec2 step = unit(end-start);
+	Vec2 cur = start;
 	for (int i = 0; i <= length; i++) {
 		const int x = roundi(cur[0]);
 		const int y = roundi(cur[1]);
@@ -224,7 +224,7 @@ void DrawHistogram(ImageRGB<byte>& canvas,
 		for (int x = 0; x < nx; x++) {
 			row[x] = (hist[x] >= cutoff) ? Colors::black() : Colors::white();
 		}
-		}
+	}
 }
 
 void CopyImageScaled(const ImageRGB<byte>& image,

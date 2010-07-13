@@ -56,7 +56,7 @@ void FloorPlanRenderer::Render(const proto::FloorPlan& floorplan,
                                const PosedCamera& cam,
                                ImageRGB<byte>& canvas) {
 	Render(floorplan,
-			cam.GetLinearApproximation(),
+			cam.Linearize(),
 			asToon(cam.im_size()),
 			canvas);
 }
@@ -74,7 +74,7 @@ void FloorPlanRenderer::RenderOrients(const proto::FloorPlan& floorplan,
                                       const PosedCamera& cam,
                                       MatI& orients) {
 	RenderOrients(floorplan,
-			cam.GetLinearApproximation(),
+			cam.Linearize(),
 			asToon(cam.im_size()),
 			orients);
 }

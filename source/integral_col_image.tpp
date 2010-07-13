@@ -44,9 +44,9 @@ namespace indoor_context {
 		// [row0,row1] of a particular column. This includes items in both
 		// row0 and row1.
 		int Count(int item, int col, int row0, int row1) const {
-			CHECK_LT(item, N);
+			/*CHECK_LT(item, N);
 			CHECK_GE(item, 0);
-			CHECK_LE(row0, row1);
+			CHECK_LE(row0, row1);*/
 			return mint[item][row1+1][col] - mint[item][row0][col];
 		}
 	};

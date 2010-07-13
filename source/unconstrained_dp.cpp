@@ -171,7 +171,6 @@ void ProcessFrame(int index, const Map& map, const proto::TruthedMap& tru_map) {
 	// Get ground truth orientations
 	MatI gt_orients;
 	LoadTrueOrients(tru_frame, gt_orients);
-	InterchangeLabels(gt_orients, 0, 1);  // here we use a different convention for orient labels
 
 	// Process
 	DoViz(map, kf, pim, tru_map, tru_frame, gt_orients);

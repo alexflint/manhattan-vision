@@ -1,8 +1,18 @@
+#include <LU.h>
+
 #include "entrypoint_types.h"
 #include "map.h"
 #include "map.pb.h"
 
+#include "camera.h"
+#include "colors.h"
+#include "canvas.h"
+#include "floor_ceil_map.h"
 
+#include "vector_utils.tpp"
+#include "math_utils.tpp"
+
+using indoor_context::Sign;
 
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
@@ -21,11 +31,50 @@ int main(int argc, char **argv) {
 	proto::TruthedMap tru_map;
 	map.LoadWithGroundTruth(path, tru_map);
 
-	// Get the frames
+	// Get the floor and ceiling positions
+	double zfloor = tru_map.floorplan().zfloor();
+	double zceil = tru_map.floorplan().zceil();
+	Vec3 vup = map.kfs[0].pc->pose.inverse() * makeVector(0,1,0);
+	if (Sign(zceil-zfloor) == Sign(vup[2])) {
+		swap(zfloor, zceil);
+	}
+
+	// Load the key frames
 	KeyFrame& kf1 = *map.KeyFrameByIdOrDie(frame1_id);
 	KeyFrame& kf2 = *map.KeyFrameByIdOrDie(frame2_id);
-	Matrix<3,4> m1 = kf1.pc->GetLinearApproximation();
-	Matrix<3,4> m2 = kf2.pc->GetLinearApproximation();
+	kf1.LoadImage();
+	kf2.LoadImage();
+
+	// Get the homographies
+	Mat3 hfloor = GetHomographyVia(*kf1.pc, *kf2.pc, makeVector(0, 0, -1, zfloor));
+	Mat3 hceil = GetHomographyVia(*kf1.pc, *kf2.pc, makeVector(0, 0, -1, zceil));
+	Mat3 floor2ceil = GetManhattanHomology(*kf1.pc, zfloor, zceil);
+
+	Vec3 horizon = kf1.pc->GetImageHorizon();
+
+	// Draw some points
+	BrightColors bc;
+	FileCanvas canvas1("out/from_pts.png", kf1.image.rgb);
+	FileCanvas canvas2("out/to_pts.png", kf2.image.rgb);
+	for (int y = 0; y < kf1.image.ny(); y += 100) {
+		for (int x = 0; x < kf2.image.nx(); x += 100) {
+			Vec3 p = makeVector(x,y,1.0);
+			if (horizon*p <= 0) continue;  // check that point is below horizon
+
+			Vec3 q = floor2ceil * p;
+
+			PixelRGB<byte> color = bc.Next();
+			canvas1.DrawDot(project(p), 4.0, Colors::white());
+			canvas1.DrawDot(project(p), 3.0, color);
+			canvas1.DrawDot(project(q), 3.0, color);
+			canvas1.StrokeLine(project(p), project(q), color);
+
+			canvas2.DrawDot(project(hfloor*p), 4.0, Colors::white());
+			canvas2.DrawDot(project(hfloor*p), 3.0, color);
+			canvas2.DrawDot(project(hceil*q), 3.0, color);
+			canvas2.StrokeLine(project(hfloor*p), project(hceil*q), color);
+		}
+	}
 
 	return 0;
 }

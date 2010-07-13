@@ -31,6 +31,9 @@ public:
 	// Transform image -> retina in homogeneous coordinates
 	virtual Vec3 ImToRet(const Vec3& v) const = 0;
 
+	// Approximate this camera by a linear transform
+	Mat3 Linearize() const;
+
 	// Get the dimensions of a pixel in the retina (assumes
 	// rectangular pixels). Calls the pure virtual RetToIm and ImToRet.
 	Vec2 GetRetinaPixelSize() const;
@@ -103,7 +106,7 @@ public:
 	Vec3 ImToRet(const Vec3& v) const;
 
 	// Construct a linear camera as an approximation to some other camera.
-	static LinearCamera* Approximate(const CameraBase& cam);
+	static Mat3 Linearize(const CameraBase& cam);
 	static void Linearize(const CameraBase& cam, Mat3& m);
 private:
 	Mat3 m;  // the intrinsics matrix (i.e. the transform from retina to image coordinates)
@@ -146,13 +149,18 @@ public:
 	// the location of things in world by the *inverse* of M
 	void Transform(const toon::SE3<>& M);
 
-	// Get a linear approximation of this camera (incorporates both intrinsics and extrinisics)
-	toon::Matrix<3,4> GetLinearApproximation() const;
+	// Get a linear approximation of this camera
+	// incorporating both intrinsics and extrinisics.
+	toon::Matrix<3,4> Linearize() const;
 
 	// Get the i-th vanishing point in retina coords
 	Vec3 GetRetinaVpt(int axis) const;
 	// Get the i-th vanishing point in image coords
 	Vec3 GetImageVpt(int axis) const;
+
+	// Get the horizon line in the retina (positive side is above horizon)
+	Vec3 GetRetinaHorizon() const;
+	Vec3 GetImageHorizon() const;
 
 	// Get the image size
 	inline const ImageRef& im_size() const { return camera.im_size(); }

@@ -67,7 +67,7 @@ Map::Map() {
 	orig_camera.reset(new Camera);
 	if (GV3::get<int>("Map.LinearizeCamera")) {
 		// Use a fast approximation to the camera
-		camera.reset(LinearCamera::Approximate(*orig_camera));
+		camera.reset(new LinearCamera(orig_camera->Linearize(), orig_camera->im_size()));
 
 		// Report the deviation
 		double err = CameraBase::GetMaxDeviation(*orig_camera, *camera);
@@ -80,9 +80,9 @@ Map::Map() {
 void Map::Load(const string& path) {
 	// Read the keyframe files one-by-one
 	TiXmlDocument doc;
-	CHECK(doc.LoadFile(xml_file.c_str()))
-	<< "Failed to load " << xml_file;
-	fs::path xml_dir(fs::path(xml_file).parent_path());
+	CHECK(doc.LoadFile(path.c_str()))
+	<< "Failed to load " << path;
+	fs::path xml_dir(fs::path(path).parent_path());
 	fs::path ptam_dir(GV3::get<string>("Map.PtamDir"));
 	const TiXmlElement* root_elem = doc.RootElement();
 
@@ -94,7 +94,7 @@ void Map::Load(const string& path) {
 				frame_elem != NULL;
 				frame_elem = frame_elem->NextSiblingElement("Frame")) {
 			string image_file = (ptam_dir/frame_elem->Attribute("name")).string();
-			Vector<6> lnPose = stream_to<Vector<6> >(frame_elem->Attribute("pose"));
+			Vec6 lnPose = stream_to<Vec6>(frame_elem->Attribute("pose"));
 			Frame* f = new Frame;  // will be owned by the ptr_vector
 			f->Configure(this, next_id++, image_file, SE3<>::exp(lnPose));
 			bool lost = frame_elem->Attribute("lost") == "1";
@@ -113,7 +113,7 @@ void Map::Load(const string& path) {
 			pt_elem = pt_elem->NextSiblingElement("MapPoint")) {
 		int id = lexical_cast<int>(pt_elem->Attribute("id"));
 		points_id_to_index[id] = pts.size();  // indices start from zero
-		pts.push_back(stream_to<Vector<3> >(pt_elem->Attribute("position")));
+		pts.push_back(stream_to<Vec3>(pt_elem->Attribute("position")));
 	}
 
 	// Read key frames
@@ -126,7 +126,7 @@ void Map::Load(const string& path) {
 			kf_elem = kf_elem->NextSiblingElement("KeyFrame")) {
 		// Get the id, pose, and hash
 		int id = lexical_cast<int>(kf_elem->Attribute("id"));
-		Vector<6> lnPose = stream_to<Vector<6> >(kf_elem->Attribute("pose"));
+		Vec6 lnPose = stream_to<Vec6>(kf_elem->Attribute("pose"));
 		string hash = kf_elem->FirstChildElement("Image")->Attribute("md5");
 
 		// Get the filename
@@ -236,15 +236,14 @@ void Map::Transform(const SE3<>& M) {
 	}
 
 	// Transform the points
-	BOOST_FOREACH(Vector<3>& v, pts) {
+	BOOST_FOREACH(Vec3& v, pts) {
 		v = M*v;
 	}
 }
 
 void Map::Rotate(const SO3<>& R) {
-	SE3<> M;
-	M.get_rotation() = R;
-	Transform(M);
+	Vec3 t = Zeros;
+	Transform(SE3<>(R,t));
 }
 
 void Map::DetectLines() {
@@ -252,16 +251,14 @@ void Map::DetectLines() {
 	segments.clear();
 	COUNTED_FOREACH(int i, KeyFrame& kf, kfs) {
 		// TODO: check that this still works, or go back to kf.vpt_homog_dual
-		Matrix<3> vpt_homog = kf.pc->pose.get_rotation().inverse() * kf.unwarped.image_to_retina;
-		LU<3> lu(vpt_homog);
-		Matrix<3> vpt_homog_inv = lu.get_inverse();
-		Matrix<3> vpt_homog_dual = vpt_homog_inv.T();
+		Mat3 vpt_homog = kf.pc->pose.get_rotation().inverse() * kf.unwarped.image_to_retina;
+		Mat3 vpt_homog_inv = LU<3>(vpt_homog).get_inverse();
 
 		CHECK_GT(kf.unwarped.image.nx(), 0)
 		<< "Unwarped image not initialized, perhaps this->auto_undistort=false?";
 		kf.line_detector.Compute(kf.unwarped.image);
 		BOOST_FOREACH(LineDetection& det, kf.line_detector.detections) {
-			det.eqn = /*kf.*/vpt_homog_dual * det.eqn;
+			det.eqn = vpt_homog_inv.T() * det.eqn;
 			segments.push_back(det);
 		}
 	}
@@ -269,13 +266,14 @@ void Map::DetectLines() {
 	manhattan_est.Bootstrap(segments);
 }
 
-void Map::InitializeUndistorter(toon::Vector<2,int> imsize) {
-	if (imsize[0] == 0 && imsize[1] == 0) {
+void Map::InitializeUndistorter(const Vec2I& imsize) {
+	Vec2I sz = imsize;
+	if (sz[0] == 0 && sz[1] == 0) {
 		CHECK(!kfs.empty())	<< "If no size is passed to Map::InitializeUndistorter then "
 				<< "there must be at least one keyframe loaded";
-		imsize = asToon(kfs[0].image.sz());
+		sz = asToon(kfs[0].image.sz());
 	}
-	undistorter.Compute(asIR(imsize));
+	undistorter.Compute(asIR(sz));
 }
 
 void Map::RunManhattanEstimator() {
@@ -308,7 +306,7 @@ void Map::EstimateSceneRotation() {
 
 	// Count the number of keyframes for which each vanishing point
 	// has the largest absolute Y coordinate.
-	Vector<3,int> up_votes = Zeros;
+	Vec3I up_votes = Zeros;
 	BOOST_FOREACH(const KeyFrame& kf, kfs) {
 		double maxy = 0;
 		int maxi;
@@ -327,8 +325,8 @@ void Map::EstimateSceneRotation() {
 	// Note that this is equivalent to swapping _rows_ in R^-1
 	int updir = max_index(&up_votes[0], &up_votes[3]);
 	if (updir != 2) {
-		Matrix<3> m = manhattan_est.R.get_matrix().T();
-		Vector<3> m2 = m[2];
+		Mat3 m = manhattan_est.R.get_matrix().T();
+		Vec3 m2 = m[2];
 		m[2] = m[updir];
 		m[updir] = m2;
 

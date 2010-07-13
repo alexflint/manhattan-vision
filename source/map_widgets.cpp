@@ -352,16 +352,4 @@ void MapWidget::ToggleLines() {
 	}
 }
 
-
-
-///////////////////// MapViz /////////////////////////////
-void MapViz::Run() {
-	viewer.Run();
-}
-
-MapViz::MapViz() {
-	map.Load();
-	//widget.Configure(&map);
-	//viewer.Add(widget);
-}
 }

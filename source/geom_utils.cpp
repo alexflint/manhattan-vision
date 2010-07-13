@@ -1,8 +1,9 @@
-#include <cv.h>
+#include <LU.h>
 #include <SVD.h>
 
 #include "geom_utils.h"
 #include "common_types.h"
+#include "camera.h"
 
 #include "math_utils.tpp"
 #include "vector_utils.tpp"
@@ -10,10 +11,18 @@
 namespace indoor_context {
 using namespace toon;
 
+// Local functions
+namespace {
+// Compute the determinant of a 2x2 matrix with the two vectors as its columns
+inline double Det(const Vec2& a, const Vec2& b) {
+	return a[0]*b[1] - b[0]*a[1];
+}
+}
+
+
 bool PointInTriangle(const Vec2& a,
                      const Vec2& b,
                      const Vec2& c,
-                     const Vec2& d,
                      const Vec2& p) {
 	double A, B, C;
 	A = (a[0] - p[0]) * (b[1] - p[1]) - (b[0] - p[0]) * (a[1] - p[1]);
@@ -27,15 +36,14 @@ bool PointInQuad(const Vec2& a,
                  const Vec2& c,
                  const Vec2& d,
                  const Vec2& p) {
-	double A, B, C, D;
-	A = (a[0] - p[0]) * (b[1] - p[1]) - (b[0] - p[0]) * (a[1] - p[1]);
-	B = (b[0] - p[0]) * (c[1] - p[1]) - (c[0] - p[0]) * (b[1] - p[1]);
-	C = (c[0] - p[0]) * (d[1] - p[1]) - (d[0] - p[0]) * (c[1] - p[1]);
-	D = (d[0] - p[0]) * (a[1] - p[1]) - (a[0] - p[0]) * (d[1] - p[1]);
+	double A = (a[0] - p[0]) * (b[1] - p[1]) - (b[0] - p[0]) * (a[1] - p[1]);
+	double B = (b[0] - p[0]) * (c[1] - p[1]) - (c[0] - p[0]) * (b[1] - p[1]);
+	double C = (c[0] - p[0]) * (d[1] - p[1]) - (d[0] - p[0]) * (c[1] - p[1]);
+	double D = (d[0] - p[0]) * (a[1] - p[1]) - (a[0] - p[0]) * (d[1] - p[1]);
 	return Sign(A) == Sign(B) && Sign(B) == Sign(C) && Sign(C) == Sign(D);
 }
 
-void ClipLineToImage(Vec2& a,
+/*void ClipLineToImage(Vec2& a,
                      Vec2& b,
                      const ImageRef& size) {
 	CvSize sz = cvSize(size.x, size.y);
@@ -46,7 +54,7 @@ void ClipLineToImage(Vec2& a,
 	a[1] = cva.y;
 	b[0] = cvb.x;
 	b[1] = cvb.y;
-}
+}*/
 
 Vec3 HMidpoint(const Vec3& a, const Vec3& b) {
 	return makeVector(a[0]*b[2] + b[0]*a[2],
@@ -135,4 +143,72 @@ Vec3 PlaneToDepthEqn(const Matrix<3,4>& camera, const Vec4& plane) {
 	double dw = 1.0 / (camera[2] * atretina(decomp.backsub(makeVector(0,0,1,0))));
 	return makeVector(du-dw, dv-dw, dw);
 }
+
+
+// Compute the cross ratio for four points in homgeneous coordinates
+// See Hartley&Zisserman
+double CrossRatio(const Vec2& a, const Vec2& b, const Vec2& c, const Vec2& d) {
+	//return norm(a-c)*norm(b-d)/(norm(b-c)*norm(a-d));
+	return Det(a,b)*Det(c,d) / (Det(a,c)*Det(b,d));
+}
+
+// Compute the cross ratio for four points in homgeneous coordinates
+// See Hartley&Zisserman
+double CrossRatio(const Vec3& a, const Vec3& b, const Vec3& c, const Vec3& d) {
+	return CrossRatio(project(a), project(b), project(c), project(d));
+}
+
+// Get the homography mapping points from one camera, onto a plane,
+// then into another camera.
+Mat3 GetHomographyVia(const Matrix<3,4>& from,
+                      const Matrix<3,4>& to,
+                      const Vec4& plane) {
+	Mat4 m;
+	m.slice<0,0,3,4>() = from;
+	m.slice<3,0,1,4>() = plane.as_row();
+	Mat4 m_inv = LU<4>(m).get_inverse();
+	return to * m_inv.slice<0,0,4,3>();
+}
+
+// Get the homography mapping points from one camera, onto a plane,
+// then into another camera.
+Mat3 GetHomographyVia(const PosedCamera& from,
+                      const PosedCamera& to,
+                      const Vec4& plane) {
+	return GetHomographyVia(from.Linearize(), to.Linearize(), plane);
+}
+
+// Construct the planar homology M with the given vertex, axis, and points. We have
+//   M*p = q
+//   M*vertex = vertex
+//   M*x = x  for all x with on the axis (i.e. x*axis=0)
+// See Criminisi "Single View Metrology"
+Mat3 ConstructPlanarHomology(const Vec3& vertex, const Vec3& axis,
+                             const Vec3& p, const Vec3& q) {
+	Mat3 I = Identity;
+	double cr = CrossRatio(vertex, p, q, p^q^axis);
+	return I + (cr-1)*(vertex.as_col()*axis.as_row())/(vertex*axis);
+}
+
+// Get a mapping from points on the plane {z=z0} to the plane {z=z1},
+// projected in the specified camera.
+Mat3 GetManhattanHomology(const Matrix<3,4>& cam, double z0, double z1) {
+	Mat3 m = cam.slice<0,0,3,3>();
+	Mat3 m_inv = LU<3>(m).get_inverse();
+
+	Vec3 vertex = m * GetAxis<3>(2);
+	Vec3 axis = m_inv.T() * GetAxis<3>(2);
+
+	Vec3 p0 = cam * makeVector(0,0,z0,1);
+	Vec3 p1 = cam * makeVector(0,0,z1,1);
+
+	return ConstructPlanarHomology(vertex, axis, p0, p1);
+}
+
+// Get a mapping from points on the plane {z=z0} to the plane {z=z1},
+// projected in the specified camera.
+Mat3 GetManhattanHomology(const PosedCamera& pc, double z0, double z1) {
+	return GetManhattanHomology(pc.Linearize(), z0, z1);
+}
+
 }

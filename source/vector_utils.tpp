@@ -40,7 +40,6 @@ ImageRef round_pos(const toon::Vector<3,T>& v) {
 	return round_pos(project(v));
 }
 
-
 // toon::Vector -> ImageRef
 template <typename T>
 ImageRef asIR(const toon::Vector<2,T>& v) {

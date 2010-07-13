@@ -55,6 +55,10 @@ double CameraBase::GetMaxDeviation(const CameraBase& cam1, const CameraBase& cam
 	return maxerr;
 }
 
+Mat3 CameraBase::Linearize() const {
+	return LinearCamera::Linearize(*this);
+}
+
 
 ///// Camera
 
@@ -124,10 +128,10 @@ Vec3 LinearCamera::ImToRet(const Vec3& v) const {
 }
 
 //static
-LinearCamera* LinearCamera::Approximate(const CameraBase& cam) {
+Mat3 LinearCamera::Linearize(const CameraBase& cam) {
 	Mat3 m;
 	Linearize(cam, m);
-	return new LinearCamera(m, cam.im_size());
+	return m;
 }
 
 //static
@@ -151,8 +155,7 @@ void PosedCamera::SetPose(const toon::SE3<>& p) {
 }
 
 Vec3 PosedCamera::GetRetinaVpt(int i) const {
-	CHECK_GE(i,0);
-	CHECK_LT(i,3);
+	CHECK_INTERVAL(i,0,2);
 	return col(pose.get_rotation(), i);
 }
 
@@ -160,15 +163,23 @@ Vec3 PosedCamera::GetImageVpt(int i) const {
 	return RetToIm(GetRetinaVpt(i));
 }
 
+Vec3 PosedCamera::GetRetinaHorizon() const {
+	Vec3 v = GetRetinaVpt(2);
+	return v * Sign(v[1]);
+}
+
+Vec3 PosedCamera::GetImageHorizon() const {
+	Vec3 v = GetImageVpt(0) ^ GetImageVpt(1);  // can't use GetImageVpt(2) because no orthogonality
+	return v * Sign(v[1]);
+}
+
 void PosedCamera::Transform(const toon::SE3<>& m) {
 	pose *= m;
 	invpose = pose.inverse();
 }
 
-Matrix<3,4> PosedCamera::GetLinearApproximation() const {
-	Mat3 linear_intr;
-	LinearCamera::Linearize(camera, linear_intr);
-	return linear_intr * as_matrix(pose);
+Matrix<3,4> PosedCamera::Linearize() const {
+	return camera.Linearize() * as_matrix(pose);
 }
 
 }

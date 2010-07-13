@@ -10,15 +10,15 @@ namespace indoor_context {
 	// corresponding floor point.
 	class FloorCeilMap {
 	public:
-		toon::Vector<3> up;  // vertical vanishing point
+		Vec3 up;  // vertical vanishing point
 		double zFloor, zCeil;  // z coord of floor and ceiling in the world
-		toon::Matrix<3> FtoC, CtoF;  // the homography and its inverse
+		Mat3 FtoC, CtoF;  // the homography and its inverse
 		const PosedCamera* pc;  // intrinsic camera parameters
 
 		// Compute the homography
-		void Compute(const toon::Vector<3>& ret_floor_pt,
-								 const toon::Vector<3>& ret_ceil_pt,
-								 const PosedCamera& pc);
+		void Compute(const Vec3& ret_floor_pt,
+		             const Vec3& ret_ceil_pt,
+		             const PosedCamera& pc);
 
 		// Determine whether a point is above or the below the horizon
 		bool BelowHorizon(const toon::Vector<3>& ret_x);

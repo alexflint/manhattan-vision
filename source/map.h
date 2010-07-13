@@ -126,7 +126,7 @@ public:
 	// Load a map, detecting its format automatically from GVars
 	void Load(const string& path);
 	// Load a map with ground truth. Store the ground truth in tru_map.
-	void LoadWithTruth(const string& path, proto::TruthedMap& tru_map);
+	void LoadWithGroundTruth(const string& path, proto::TruthedMap& tru_map);
 	// Deprecated: use Load(xml_file) instead
 	void LoadXml(const string& path);
 
@@ -150,7 +150,7 @@ public:
 	// Initialize the undistort map. If no image size is specified
 	// then the size of the first keyframe will be used. If no
 	// keyframes are loaded then an error will be raised.
-	void InitializeUndistorter(toon::Vector<2,int> size=toon::Zeros);
+	void InitializeUndistorter(const Vec2I& size=toon::Zeros);
 	// Detect lines in each keyframe and project to plane at infinity
 	void DetectLines();
 	// Compute vanishing points globally and project back into frames

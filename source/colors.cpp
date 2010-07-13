@@ -9,9 +9,8 @@ namespace indoor_context {
 		// N colors are used then they will reaonably far from each other,
 		// but the sequence is independent of the number of colors actually
 		// used.
-		PixelHSV<byte> hsv(ReverseBits(i), 255, 255);
 		PixelRGB<byte> rgb;
-		VW::ImageConversions::HSV2RGB(hsv.h, hsv.s, hsv.v, rgb.r, rgb.g, rgb.b);
+		VW::ImageConversions::HSV2RGB(ReverseBits(i), 255, 255, rgb.r, rgb.g, rgb.b);
 		rgb.alpha = alpha*255;
 		return rgb;
 	}

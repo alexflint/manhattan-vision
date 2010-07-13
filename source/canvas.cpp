@@ -70,7 +70,7 @@ void Canvas::PopState() {
 void Canvas::SetColor(const PixelRGB<byte>& p) {
 	// The VW convention for alpha is 0=opaque, 255=transparent but
 	// the Cairo convention is 0=transparent, 1=opaque
-	c_->set_source_rgba(p.r/255.0, p.g/255.0, p.b/255.0, 1.0-p.alpha/255.0);
+	c_->set_source_rgba(1.0*p.r/255.0, 1.0*p.g/255.0, 1.0*p.b/255.0, 1.0-(1.0*p.alpha/255.0));
 }
 
 void Canvas::SetLineWidth(double v) {

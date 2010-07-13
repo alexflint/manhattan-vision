@@ -66,7 +66,7 @@ public:
 	// Draw the predicted model
 	void OutputSolutionOrients(const string& path);
 	// Transfer the solution to an auxilliary view
-	void GetAuxOrients(const Frame& aux, double zfloor, MatI& aux_orients);
+	void GetAuxOrients(const PosedCamera& aux, double zfloor, MatI& aux_orients);
 	// Draw the solution in an auxilliary view
 	void OutputSolutionInView(const string& path,
 	                          const Frame& aux,
@@ -147,10 +147,12 @@ void ManhattanBnbReconstructor::OutputSolutionOrients(const string& path) {
 	WriteImage(path, soln_canvas);
 }
 
-void ManhattanBnbReconstructor::GetAuxOrients(const Frame& aux, double zfloor, MatI& aux_orients) {
-	aux_orients.Resize(aux.pc->im_size().y, aux.pc->im_size().x);
+void ManhattanBnbReconstructor::GetAuxOrients(const PosedCamera& aux,
+                                              double zfloor,
+                                              MatI& aux_orients) {
+	aux_orients.Resize(aux.im_size().y, aux.im_size().x);
 	manhattan_bnb.TransferBuilding(manhattan_bnb.soln,
-			aux.pc->pose,
+			aux.pose,
 			zfloor,
 			aux_orients);
 }
@@ -228,7 +230,6 @@ void ProcessFrame(Map& map,
 
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
-	Viewer3D::Init(&argc, argv);
 	if (argc < 2 || argc > 4) {
 		DLOG	<< "Usage: " << argv[0] << " truthed_map.pro INDEX NBRS";
 		return 0;
@@ -244,15 +245,10 @@ int main(int argc, char **argv) {
 		ParseMultiRange(argv[3], aux_ids);
 	}
 
-	// Load the truthed map
-	proto::TruthedMap tru_map;
-	ifstream s(argv[1], ios::binary);
-	CHECK(tru_map.ParseFromIstream(&s)) << "Failed to read from " << argv[1];
-
 	// Load the map
 	Map map;
-	map.LoadXml(tru_map.spec_file());
-	map.RotateToSceneFrame(SO3<>::exp(asToon(tru_map.ln_scene_from_slam())));
+	proto::TruthedMap tru_map;
+	map.LoadWithGroundTruth(argv[1], tru_map);
 
 	sum_accuracy = 0;
 	num_frames = 0;

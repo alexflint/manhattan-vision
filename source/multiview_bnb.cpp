@@ -21,7 +21,6 @@
 
 #include "line_detector.h"
 #include "vanishing_points.h"
-#include "building_estimator.h"
 #include "bld_helpers.h"
 
 #include "image_utils.tpp"
@@ -67,76 +66,76 @@ void ProcessFrame(int id, const Map& map, const proto::TruthedMap& tru_map) {
 	// Detect lines
 	GuidedLineDetector line_detector;
 	TIMED("Detect lines") WITHOUT_DLOG line_detector.Compute(pim);
-		// Compute line sweeps
-		IsctGeomLabeller labeller;
-		TIMED("Compute orientations") WITHOUT_DLOG labeller.Compute(pim, line_detector.detections);
+	// Compute line sweeps
+	IsctGeomLabeller labeller;
+	TIMED("Compute orientations") WITHOUT_DLOG labeller.Compute(pim, line_detector.detections);
 
-		// Copy the lines into structure recovery format
-		vector<ManhattanEdge> edges[3];
-		int next_id = 0;
-		for (int i = 0; i < 3; i++) {
-			COUNTED_FOREACH(int j, const LineDetection& det, line_detector.detections[i]) {
-				Vector<3> a = unproject(map.camera->ImToRet(project(det.seg.start)));
-				Vector<3> b = unproject(map.camera->ImToRet(project(det.seg.end)));
-				edges[i].push_back(ManhattanEdge(a, b, i, next_id++));
-			}
+	// Copy the lines into structure recovery format
+	vector<ManhattanEdge> edges[3];
+	int next_id = 0;
+	for (int i = 0; i < 3; i++) {
+		COUNTED_FOREACH(int j, const LineDetection& det, line_detector.detections[i]) {
+			Vector<3> a = unproject(map.camera->ImToRet(project(det.seg.start)));
+			Vector<3> b = unproject(map.camera->ImToRet(project(det.seg.end)));
+			edges[i].push_back(ManhattanEdge(a, b, i, next_id++));
 		}
-		DLOG << format("Line counts by axis: %d, %d, %d")
-		% edges[0].size() % edges[1].size() % edges[2].size();
+	}
+	DLOG << format("Line counts by axis: %d, %d, %d")
+	% edges[0].size() % edges[1].size() % edges[2].size();
 
-		// Enumerate building hypotheses
-		MonocularManhattanBnb recovery;
-		bool success = recovery.Compute(pc, edges, labeller.orient_map);
-		if (success) {
-			// Load ground truth. The branch--and--bound uses labels that
-			// refer to the normal direction of the wall, which we indicate by
-			// the third parameter below.
-			MatI gt_orients;
-			GetTrueOrients(tru_map.floorplan(), *kf.pc, gt_orients);
+	// Enumerate building hypotheses
+	MonocularManhattanBnb recovery;
+	bool success = recovery.Compute(pc, edges, labeller.orient_map);
+	if (success) {
+		// Load ground truth. The branch--and--bound uses labels that
+		// refer to the normal direction of the wall, which we indicate by
+		// the third parameter below.
+		MatI gt_orients;
+		GetTrueOrients(tru_map.floorplan(), *kf.pc, gt_orients);
 
-			// Compute accuracy
-			double accuracy = GetAccuracy(recovery.soln_orients, gt_orients);
-			sum_accuracy += accuracy;
-			num_frames++;
-			DLOG << format("Accuracy: %.2f%%") % (accuracy*100);
+		// Compute accuracy
+		double accuracy = GetAccuracy(recovery.soln_orients, gt_orients);
+		sum_accuracy += accuracy;
+		num_frames++;
+		DLOG << format("Accuracy: %.2f%%") % (accuracy*100);
 
-			// Write accuracy
-			format filepat("out/frame%03d_%s");
-			sofstream acc_out(str(filepat % id % "bnb_accuracy.txt"));
-			acc_out << static_cast<int>(accuracy*100) << endl;
+		// Write accuracy
+		format filepat("out/frame%03d_%s");
+		sofstream acc_out(str(filepat % id % "bnb_accuracy.txt"));
+		acc_out << static_cast<int>(accuracy*100) << endl;
 
-			// Vizualize
-			ImageRGB<byte> orient_canvas;
-			ImageCopy(pim.rgb, orient_canvas);
-			labeller.DrawOrientViz(orient_canvas);
-			line_detector.DrawSegments(orient_canvas);
-			WriteImage(str(filepat % id % "bnb_orients.png"), orient_canvas);
-			line_detector.OutputSegmentsViz(str(filepat % id % "bnb_lines.png"));
+		// Vizualize
+		ImageRGB<byte> orient_canvas;
+		ImageCopy(pim.rgb, orient_canvas);
+		labeller.DrawOrientViz(orient_canvas);
+		line_detector.DrawSegments(orient_canvas);
+		WriteImage(str(filepat % id % "bnb_orients.png"), orient_canvas);
+		line_detector.OutputSegmentsViz(str(filepat % id % "bnb_lines.png"));
 
-			// Draw the predicted model
-			WriteOrientViz(str(filepat % id % "bnb_soln.png"),
-			               kf.image,
-			               recovery.soln_orients);
+		// Draw the predicted model
+		WriteOrientViz(str(filepat % id % "bnb_soln.png"),
+					   kf.image,
+					   recovery.soln_orients);
 
-			// Draw the predicted model in the other frames
-			for (int ref_id = id+1; ref_id < id+5; ref_id++) {
-				if (ref_id < map.kfs.size()) {
-					const KeyFrame& ref_kf = *map.KeyFrameByIdOrDie(ref_id);
-					TITLE("Projecting into frame " + lexical_cast<string>(ref_id));
-					MatI ref_orients(ref_kf.image.ny(), ref_kf.image.nx());
-					recovery.TransferBuilding(recovery.soln,
-							kf.pc->pose,
-							ref_kf.pc->pose,
-							tru_map.floorplan().zceil(),
-							ref_orients);
+		// Draw the predicted model in the other frames
+		for (int ref_id = id+1; ref_id < id+5; ref_id++) {
+			if (ref_id < map.kfs.size()) {
+				const KeyFrame& ref_kf = *map.KeyFrameByIdOrDie(ref_id);
+				TITLE("Projecting into frame " + lexical_cast<string>(ref_id));
+				MatI ref_orients(ref_kf.image.ny(), ref_kf.image.nx());
+				recovery.TransferBuilding(recovery.soln,
+						kf.pc->pose,
+						ref_kf.pc->pose,
+						tru_map.floorplan().zceil(),
+						ref_orients);
 
-					WriteOrientViz(str(filepat % id % str(format("ref%03d.png")%ref_id)),
-					               ref_kf.image,
-					               ref_orients);
-				}
+				WriteOrientViz(str(filepat % id % str(format("ref%03d.png")%ref_id)),
+							   ref_kf.image,
+							   ref_orients);
 			}
 		}
 	}
+}
 
 int main(int argc, char **argv) {
 	InitVars(argc, argv);

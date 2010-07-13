@@ -9,14 +9,7 @@ namespace indoor_context {
 	class TruthedFrame;
 	}
 
-	// Replace all instances of A in m with B, and vice versa
-	void InterchangeLabels(MatI& m, int a, int b);
-
 	// Get the ground truth orientation map for a frame by rendering the floorplan.
-	// There are two conventions for labelling the wall segments. If
-	// label_by_tangents is true then they will be labelled by their
-	// horizontal tangent direction. Otherwise they will be labelled by
-	// their normal direction. These differ by swapping 0 and 1 labels.
 	void GetTrueOrients(const proto::FloorPlan& floorplan,
 	                    const PosedCamera& pc,
 	                    MatI& gt_orients);
@@ -31,12 +24,7 @@ namespace indoor_context {
 	// Downsample the orientation map by a factor k
 	void DownsampleOrients(const MatI& in, MatI& out, int k);
 
-	// Load the ground truth orientation map for a frame from a file. There are two
-	// conventions for labelling the wall segments. If
-	// label_by_tangents is true then they will be labelled by their
-	// horizontal tangent direction. Otherwise they will be labelled by
-	// their normal direction. These differ by swapping 0 and 1 labels.
-	void LoadTrueOrientsOld(const proto::TruthedFrame& tru_frame,
-	                        MatI& gt_orients,
-	                        bool label_by_tangents=true);
+	// Replace all instances of A in m with B, and vice versa
+	// Should no longer be needed
+	void InterchangeLabels(MatI& m, int a, int b);
 }

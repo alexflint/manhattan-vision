@@ -1,15 +1,16 @@
 #pragma once
 
-#include <TooN/se3.h>
 #include "common_types.h"
 
 namespace indoor_context {
+// Forward declarations
+class PosedCamera;
+
 // Return true if the point P is inside the quad ABCD. Clockwise and
 // anticlockwise are both fine.
 bool PointInTriangle(const Vec2& a,
                      const Vec2& b,
                      const Vec2& c,
-                     const Vec2& d,
                      const Vec2& p);
 
 // Return true if the point P is inside the quad ABCD. Clockwise and
@@ -20,14 +21,8 @@ bool PointInQuad(const Vec2& a,
                  const Vec2& d,
                  const Vec2& p);
 
-// Clip a line to an image
-void ClipLineToImage(Vec2& a,
-                     Vec2& b,
-                     const ImageRef& size);
-
 // Find the (Euclidean) mid-point between two homogeneous vectors
-Vec3 HMidpoint(const Vec3& a,
-               const Vec3& b);
+Vec3 HMidpoint(const Vec3& a,  const Vec3& b);
 
 // Get the distance from a point to a line segment spanning two end
 // points.
@@ -53,8 +48,6 @@ Mat3 BuildRotation(const Vec3& axis,
 // Get the matrix for a rotation about an axis u by an angle t
 Mat3 BuildRotation(const Vec3& u, const double& t);
 
-
-
 // Get a camera centre in world coordinates
 Vec3 GetCameraCentre(const toon::Matrix<3,4>& camera);
 
@@ -69,4 +62,43 @@ double GetPlaneDepth(const Vec3& pixel, const toon::Matrix<3,4>& camera, const V
 
 // Intersect a ray with a plan
 Vec3 IntersectRay(const Vec3& pixel, const toon::Matrix<3,4>& camera, const Vec4& plane);
+
+// Compute the cross ratio for four points in homgeneous coordinates
+// See Hartley&Zisserman
+double CrossRatio(const Vec2& a, const Vec2& b, const Vec2& c, const Vec2& d);
+
+// Compute the cross ratio for four points in homgeneous coordinates
+// See Hartley&Zisserman
+double CrossRatio(const Vec3& a, const Vec3& b, const Vec3& c, const Vec3& d);
+
+// Get the homography mapping points from one camera, onto a plane,
+// then into another camera.
+Mat3 GetHomographyVia(const toon::Matrix<3,4>& from,
+                      const toon::Matrix<3,4>& to,
+                      const Vec4& plane);
+
+// Get the homography mapping points from one camera, onto a plane,
+// then into another camera.
+Mat3 GetHomographyVia(const PosedCamera& from,
+                      const PosedCamera& to,
+                      const Vec4& plane);
+
+// Construct the planar homology M with the given vertex, axis, and pair of points:
+//   M*p = q
+//   M*vertex = vertex
+//   M*x = x  for all x on axis (i.e. fo all x such that x*axis=0)
+// See Criminisi "Single View Metrology"
+Mat3 ConstructPlanarHomology(const Vec3& vertex,
+                             const Vec3& axis,
+                             const Vec3& p,
+                             const Vec3& q);
+
+// Get a mapping from points on the plane {z=z0} to the plane {z=z1},
+// projected in the specified camera.
+Mat3 GetManhattanHomology(const toon::Matrix<3,4>& cam, double z0, double z1);
+
+// Get a mapping from points on the plane z=z0 to the plane z=z1,
+// projected in the specified camera.
+Mat3 GetManhattanHomology(const PosedCamera& pc, double z0, double z1);
+
 }
