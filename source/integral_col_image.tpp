@@ -4,50 +4,41 @@
 
 namespace indoor_context {
 
-	// Represents an image in which counting the number of some item in
-	// any interval of any column is an O(1) operation. The number of
-	// different items is specified by the template parameter N.
-	template <unsigned N>
-	class IntegralColImage {
-	public:
-		MatI mint[N];
+// Represents an image in which counting the number of some item in
+// any interval of any column is an O(1) operation.
+template <typename T>
+class IntegralColImage {
+public:
+	VNL::Matrix<T> m_int;
 
-		// Initialize empty
-		IntegralColImage() { }
-		// Initialize and compute an integral image
-		IntegralColImage(const MatI& m) {
-			Compute(m);
-		}
+	// Initialize empty
+	IntegralColImage() { }
+	// Initialize and compute an integral image
+	IntegralColImage(const VNL::Matrix<T>& m) {
+		Compute(m);
+	}
 
-		// Compute the integral image: O(N)
-		void Compute(const MatI& m) {
-			// Allocate and copy the first row
-			for (int i = 0; i < N; i++) {
-				mint[i].Resize(m.Rows()+1, m.Cols(), 0);
-				mint[i].Fill(0);
-			}
+	// Compute the integral image: O(N)
+	void Compute(const VNL::Matrix<T>& m) {
+		// Allocate and copy the first row
+		m_int.Resize(m.Rows()+1, m.Cols(), 0);
+		m_int.Fill(0);  // TODO: is this necessary given third param above?
 
-			// Build the integral-col images
-			for (int y = 0; y < m.Rows(); y++) {
-				const int* inrow = m[y];
-				for (int i = 0; i < N; i++) {
-					const int* prevrow = mint[i][y];
-					int* outrow = mint[i][y+1];
-					for (int x = 0; x < m.Cols(); x++) {
-						outrow[x] = (inrow[x] == i) ? prevrow[x]+1 : prevrow[x];
-					}
-				}
+		// Build the integral-col images
+		for (int y = 0; y < m.Rows(); y++) {
+			const T* inrow = m[y];
+			const T* prevrow = m_int[y];
+			T* outrow = m_int[y+1];
+			for (int x = 0; x < m.Cols(); x++) {
+				outrow[x] = prevrow[x]+inrow[x];
 			}
 		}
+	}
 
-		// Count the number of times a specified item appears within rows
-		// [row0,row1] of a particular column. This includes items in both
-		// row0 and row1.
-		int Count(int item, int col, int row0, int row1) const {
-			/*CHECK_LT(item, N);
-			CHECK_GE(item, 0);
-			CHECK_LE(row0, row1);*/
-			return mint[item][row1+1][col] - mint[item][row0][col];
-		}
-	};
+	// Sum over the the rows r0...r1 within a particular column. The sum
+	// includes the values both in row r0 and row r1.
+	T Sum(int col, int r0, int r1) const {
+		return m_int[r1+1][col] - m_int[r0][col];
+	}
+};
 }

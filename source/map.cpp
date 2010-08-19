@@ -12,9 +12,10 @@
 #include "common_types.h"
 #include "tinyxml.h"
 #include "lazyvar.h"
-
 #include "image_utils.h"
 #include "io_utils.tpp"
+
+#include "counted_foreach.tpp"
 #include "math_utils.tpp"
 #include "vector_utils.tpp"
 
@@ -23,12 +24,16 @@ using namespace toon;
 
 lazyvar<int> gvBoundPercentile("Map.BoundPercentile");
 lazyvar<bool> gvLoadOriginalFrames("Map.LoadOriginalFrames");
+lazyvar<int> gvLinearizeCamera("Map.LinearizeCamera");
+lazyvar<string> gvPtamDir("Map.PtamDir");
+
 
 void Frame::Configure(Map* m, int i, const string& im_file, const SE3<>& pose) {
 	map = m;
 	id = i;
 	image_file = im_file;
 	pc.reset(new PosedCamera(pose, *map->camera));
+	image.SetPC(*pc);
 }
 
 void Frame::LoadImage(bool undistort) {
@@ -54,20 +59,18 @@ void Frame::UndistortImage() {
 }
 
 void KeyFrame::RunGuidedLineDetector() {
-	pim.reset(new PosedImage(*pc));
-	ImageCopy(image.rgb, pim->rgb);
-	guided_line_detector.Compute(*pim);
+	guided_line_detector.Compute(image);
 }
-
 
 
 
 
 Map::Map() {
 	orig_camera.reset(new Camera);
-	if (GV3::get<int>("Map.LinearizeCamera")) {
+	if (*gvLinearizeCamera) {
 		// Use a fast approximation to the camera
-		camera.reset(new LinearCamera(orig_camera->Linearize(), orig_camera->im_size()));
+		Mat3 cam = orig_camera->Linearize();
+		camera.reset(new LinearCamera(cam, orig_camera->image_size()));
 
 		// Report the deviation
 		double err = CameraBase::GetMaxDeviation(*orig_camera, *camera);
@@ -83,7 +86,7 @@ void Map::Load(const string& path) {
 	CHECK(doc.LoadFile(path.c_str()))
 	<< "Failed to load " << path;
 	fs::path xml_dir(fs::path(path).parent_path());
-	fs::path ptam_dir(GV3::get<string>("Map.PtamDir"));
+	fs::path ptam_dir(*gvPtamDir);
 	const TiXmlElement* root_elem = doc.RootElement();
 
 	// Read frame poses
@@ -251,7 +254,7 @@ void Map::DetectLines() {
 	segments.clear();
 	COUNTED_FOREACH(int i, KeyFrame& kf, kfs) {
 		// TODO: check that this still works, or go back to kf.vpt_homog_dual
-		Mat3 vpt_homog = kf.pc->pose.get_rotation().inverse() * kf.unwarped.image_to_retina;
+		Mat3 vpt_homog = kf.pc->pose().get_rotation().inverse() * kf.unwarped.image_to_retina;
 		Mat3 vpt_homog_inv = LU<3>(vpt_homog).get_inverse();
 
 		CHECK_GT(kf.unwarped.image.nx(), 0)
@@ -293,7 +296,7 @@ void Map::RunManhattanEstimator() {
 	// Propagate vanishing points back to keyframes
 	BOOST_FOREACH(KeyFrame& kf, kfs) {
 		for (int i = 0; i < 3; i++) {
-			kf.retina_vpts[i] = kf.pc->pose.get_rotation() * col(manhattan_est.R, i);
+			kf.retina_vpts[i] = kf.pc->pose().get_rotation() * col(manhattan_est.R, i);
 			kf.image_vpts[i] = kf.pc->RetToIm(kf.retina_vpts[i]);
 		}
 	}

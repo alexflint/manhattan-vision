@@ -88,16 +88,16 @@ int ClipToFrustrum(const Range& poly,
 	Vec4 frustrum[] = {
 			makeVector(0.0, 0, 1, -kZNear),
 			makeVector(0.0, 0, -1, kZFar),
-			concat(pc.ret_bounds().left_eqn(), 0),
-			concat(pc.ret_bounds().right_eqn(), 0),
-			concat(pc.ret_bounds().top_eqn(), 0),
-			concat(pc.ret_bounds().bottom_eqn(), 0)
+			concat(pc.retina_bounds().left_eqn(), 0),
+			concat(pc.retina_bounds().right_eqn(), 0),
+			concat(pc.retina_bounds().top_eqn(), 0),
+			concat(pc.retina_bounds().bottom_eqn(), 0)
 	};
 
 	// Construct the camera matrix
 	Mat4 m = Identity;
-	m.slice<0,0,3,3>() = pc.pose.get_rotation().get_matrix();
-	m.slice<0,3,3,1>() = pc.pose.get_translation().as_col();
+	m.slice<0,0,3,3>() = pc.pose().get_rotation().get_matrix();
+	m.slice<0,3,3,1>() = pc.pose().get_translation().as_col();
 
 	// Transfer planes _from camera to world_ using the _forwards_ camera matrix
 	vector<Vec3> temp1, temp2;

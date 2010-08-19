@@ -6,7 +6,6 @@
 #include "common_types.h"
 #include "vanishing_points.h"
 #include "clipping.h"
-#include "misc.h"
 #include "image_bundle.h"
 #include "timer.h"
 #include "math_utils.h"
@@ -34,12 +33,12 @@ void LineSweeper::Compute(const PosedImage& pim,
 	input = &pim;
 
 	// Get bounding lines for the image
-	Bounds2D<double> im_bounds = Bounds2D<double>::FromSize(pim.sz());
+	Bounds2D<double> image_bounds = Bounds2D<double>::FromSize(pim.sz());
 	vector<Vec3 > bounding_lines;
-	bounding_lines.push_back(im_bounds.left_eqn());      // left
-	bounding_lines.push_back(im_bounds.top_eqn());      // top
-	bounding_lines.push_back(im_bounds.right_eqn());      // right
-	bounding_lines.push_back(im_bounds.bottom_eqn());      // bottom
+	bounding_lines.push_back(image_bounds.left_eqn());      // left
+	bounding_lines.push_back(image_bounds.top_eqn());      // top
+	bounding_lines.push_back(image_bounds.right_eqn());      // right
+	bounding_lines.push_back(image_bounds.bottom_eqn());      // bottom
 
 	// Build support maps for each direction
 	vector<Vec3 > blocks;
@@ -51,8 +50,8 @@ void LineSweeper::Compute(const PosedImage& pim,
 
 		for (int j = 0; j < 3; j++) {
 			if (i == j) continue;
-			const Vec3 pivot = pim.pc.GetImageVpt(i);
-			const Vec3 dir = pim.pc.GetImageVpt(j);
+			const Vec3 pivot = pim.pc().GetImageVpt(i);
+			const Vec3 dir = pim.pc().GetImageVpt(j);
 
 			// TODO: Set these to projection with image bounds:
 			BOOST_FOREACH(const LineDetection& det, lines[i]) {

@@ -12,18 +12,18 @@ SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmessage-length=0" )
 SET( CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake_modules" )
 LIST( APPEND CMAKE_MODULE_PATH "${CMAKE_ROOT}/Modules" )
 
-# Find dependencies
+# Find required dependencies
+FIND_PACKAGE( OpenGL REQUIRED )
 FIND_PACKAGE( GLUT REQUIRED )
-FIND_PACKAGE( OpenCV REQUIRED )
 FIND_PACKAGE( Protobuf REQUIRED )
 FIND_PACKAGE( Cairomm REQUIRED )
 FIND_PACKAGE( SigC++ REQUIRED )	# for cairo
 
-# Find VW
-# VWFirewire uses the old libdc1934 so I have disabled it. This rules
-# out using VW's Sequencer class.
-SET( VW_USE_LIBS VWGL VW VNL )
+SET( VW_USE_LIBS VW VNL )
 FIND_PACKAGE( VW REQUIRED )
+
+# Find optional dependencies
+FIND_PACKAGE( Matlab )	# for mex stuff
 
 # Find TooN headers (TooN is just headers!)
 FIND_PATH( TOON_INCLUDE_DIR TooN.h
@@ -34,9 +34,6 @@ ENDIF( NOT TOON_INCLUDE_DIR )
 
 # Find Boost
 SET( Boost_FIND_QUIETLY OFF )
-#SET( Boost_ADDITIONAL_VERSIONS "1.42.0" "1.42")
-#SET( _boost_COMPILER_VERSION "43" )
-#SET( Boost_USE_MULTITHREAD ON )
 FIND_PACKAGE( Boost 1.42.0
 	COMPONENTS date_time filesystem iostreams thread
 	REQUIRED )
@@ -52,48 +49,19 @@ ENDIF( USE_CUDA )
 SET( GraphCuts_INCLUDE_DIR /usr/local/include/graphcuts )
 SET( GraphCuts_LIBRARIES -lgraphcuts )
 
-# Setup paths to PTAM 
-# TODO: make this robust and optional. We are using ATANCamera from a
-# version of PTAM different to the one we use to actually do the
-# mapping. This is slightly worrying.
-#SET( PTAM_PATH "/homes/50/alexf/work/ptam_versions/trunk_george" )
-#SET( PTAM_LIBRARIES ${PTAM_PATH}/x86_64provost/libptam.a )
-
 # Include dirs
 INCLUDE_DIRECTORIES(
 	${VW_INCLUDE_DIR}
+	${TOON_INCLUDE_DIR}
+	${CMAKE_CURRENT_BINARY_DIR}	 # because protobufs will be generated here
+	${OPENGL_INCLUDE_DIR}
 	${GLUT_INCLUDE_DIR}
 	${PROTOBUF_INCLUDE_DIR}
-	${CMAKE_CURRENT_BINARY_DIR}	 # because protobufs will be generated here
-	${TOON_INCLUDE_DIR}
 	${Boost_INCLUDE_DIRS}
-	${OPENCV_INCLUDE_DIR}
 	${Cairomm_INCLUDE_DIRS}
 	${SigC++_INCLUDE_DIRS}
 	${GraphCuts_INCLUDE_DIR}
 )
-
-# Setup linked libraries
-SET( LIBS
-	core
-	-lGVars3
-	-lprofiler
-	-lcvd
-	-lGKTools
-	-lboost_date_time
-	-lboost_filesystem 
-	-lboost_iostreams 
-	-lboost_thread
-	${Boost_LIBRARIES}
-	${OPENCV_LIBRARIES}
-	${VW_LIBRARIES}
-	${PROTOBUF_LIBRARY}
-	-llapack
-	${Cairomm_LIBRARIES}
-	${SigC++_LIBRARIES}
-	${GraphCuts_LIBRARIES}
-	-lGL
-	)
 
 # Generate protos
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS map.proto)
@@ -117,7 +85,7 @@ SET( CORE_HEADERS
 	kmeans.h
 	lazyvar.h
 	log.h
-	misc.h 
+	counted_foreach.h 
 	progress_reporter.h 
 	timer.h 
 	union_find.h 
@@ -134,6 +102,7 @@ SET( CORE_HEADERS
 	hotspot.h
 	colors.h
 	mean_shift.h
+	line_segment.h
 	
 	image_utils.h
 	math_utils.h
@@ -168,6 +137,7 @@ SET( CORE_HEADERS
 	integral_col_image.tpp
 	histogram.tpp
 	fill_polygon.tpp
+	polygon.tpp
 
 	ATANCamera.h
 	
@@ -175,6 +145,11 @@ SET( CORE_HEADERS
 	read_ply.h
 	
 	floorplan_renderer.h
+
+	manhattan_bnb.h
+	manhattan_dp.h
+	manhattan_inference.h
+
 )
 
 SET( CORE_SOURCES 
@@ -195,7 +170,6 @@ SET( CORE_SOURCES
 	hw_convolver.cpp
 	kmeans.cpp 
 	log.cpp
-	misc.cpp
 	progress_reporter.cpp
 	union_find.cpp
 	vanishing_points.cpp
@@ -231,6 +205,7 @@ SET( CORE_SOURCES
 	
 	manhattan_bnb.cpp
 	manhattan_dp.cpp
+	manhattan_inference.cpp
 	
 	camera.cpp
 	glut_window.cpp
@@ -271,63 +246,19 @@ ELSE( USE_CUDA )
 	MESSAGE( STATUS "Not using CUDA (USE_CUDA was not set)." )
 ENDIF( USE_CUDA )
 
-
 # Core library
 ADD_LIBRARY( core SHARED ${CORE_SOURCES} )
 
-
 # Executable targets
 SET( EXECUTABLES
-#	find_vpts
-#	consensus_vpts
-#	heh_features
-#	seq_vpts
-#	runfhseg
-#	seq_segmenter
-#	match_spix
-#	label_planes
-#	edgels
-#	fit_rotation
-#	repair_vpts
-#	legend
-#	third_vpt
-#	calibrate_vpts
-#	map_textons
-#	sweep_planes
-#	vpts_gui
-#	vpts_3d
-#	explie
-#	unwarp
-#	keyframe_vpts
-#	multiview_vpts
-#	multiview_find_vpts
-#	lie_est
-#	project_gradient
-#	recover_rotation
-#	recover_scene_bounds
-#	map_annotator
-
-#	learn_textons
-#	detect_planes
-#	plane_ess
-
-#	multi_horiz_vpts
-#	keyframe_line_sweeper
-#	frame_line_sweeper
 	map_viewer
 
 	edit_floorplan
 	edit_map
 
-#	os_test
 	cairo_test
 	clip_test
 	clip3d_test
-#	glut_keys
-
-#	fcmap_test
-#	approx_camera
-#	fast_orients
 
 	map2pmvs
 	ply_viewer
@@ -345,6 +276,7 @@ SET( EXECUTABLES
 	toon_speed_test
 	include_test
 	render_test
+	rectification_test
 
 	poster_lines
 	poster_vpts
@@ -356,25 +288,114 @@ SET( EXECUTABLES
 	multiview_bnb
 	monocular_dp
 	multiview_dp
+	feature_dp
+	
+	test
 )
 
 
-# SET( TMP_MAP_FILE "${CMAKE_CURRENT_BINARY_DIR}/out.map" )
-# LIST( APPEND CMAKE_CXX_FLAGS "-Wl,-Map=${TMP_MAP_FILE} -Wl,--cref" )
+SET (USE_CPU_PROFILER FALSE)
+
+IF (USE_CPU_PROFILER)
+    SET( CPU_PROFILER_LIBRARIES -lprofiler )
+ENDIF (USE_CPU_PROFILER)
+
+# Setup linked libraries
+SET( EXTERNAL_LIBRARIES
+	-lGVars3
+	-lcvd
+	-lGKTools
+	-llapack
+	${VW_LIBRARIES}
+	${Cairomm_LIBRARIES}
+	${SigC++_LIBRARIES}
+	${GraphCuts_LIBRARIES}
+	${PROTOBUF_LIBRARY}
+	${GLUT_LIBRARIES}
+	${OPENGL_LIBRARIES}
+	${Boost_LIBRARIES}
+	${CPU_PROFILER_LIBRARIES}
+	)
+	
+MESSAGE(STATUS ${EXTERNAL_LIBRARIES})
 
 FOREACH( EXECUTABLE ${EXECUTABLES} )
-	SET( CUR_EXE_FILE ${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE})
-
 	ADD_EXECUTABLE( ${EXECUTABLE} ${EXECUTABLE}.cpp )
-	TARGET_LINK_LIBRARIES( ${EXECUTABLE} ${LIBS} )
-
-	# Extract symbols and linker map
-	#ADD_CUSTOM_COMMAND(
-#		TARGET ${EXECUTABLE} POST_BUILD
-#		# Run nm to extract symbols
-#		COMMAND ${CMAKE_NM} -S ${CUR_EXE_FILE} > ${CUR_EXE_FILE}.syms
-#		# Extract everything after the "Cross Reference Table" line in the map file
-#		COMMAND grep -A 100000 "Cross Reference Table" ${TMP_MAP_FILE} > ${CUR_EXE_FILE}.cref
-#		VERBATIM)
+	TARGET_LINK_LIBRARIES( ${EXECUTABLE} core ${EXTERNAL_LIBRARIES} )
 ENDFOREACH( EXECUTABLE )
 
+
+# Matlab entrypoints
+IF ( MATLAB_FOUND )
+    # Here we do some strange contortions due to mex/matlab setup:
+    #    1. Build a normal static library called foo.mex.a for each foo.mex.cpp
+    #    2. Build a MEX library (foo.mexa64, for example) and link it to (1)
+    #    3. Build a normal executable and it it to (1)
+    # This gives us a normal executable and a MEX binary that both provide access
+    # to the same underlying code.
+    #
+    # The reason for all these contortions is that we want to have libcore.so
+    # containing the logic without needing to link it to Matlab libraries or
+    # include mex.h, and whateverwe compile with the "mex" program that comes
+    # with matlab can't reference all our core logic because then we would have
+    # to find a way to get mex to recognize all our CMake includes and linkages.
+    # So we introduce a third piece that bridges the two: these are the .mex.cpp
+    # files
+    
+    INCLUDE_DIRECTORIES( ${MATLAB_INCLUDE_DIR} )
+    
+    # This library contains common matlab utilities
+    SET( MATUTILS_SOURCES matlab_utils.cpp )
+    ADD_LIBRARY( matutils ${MATUTILS_SOURCES} )
+    
+    # The code with the mexFunction(...) stub 
+    SET( MEX_STUB_SOURCE mex_stub.cpp )
+    # The code with the main(...) stub
+    SET( MAIN_STUB_SOURCE "main_stub.cpp" )
+
+    # The list of matlab targets    
+    SET( MEX_OUTPUTS
+        discriminative_dp
+        load_training_data
+        compatibility
+        solve_dp
+    )
+    
+    # The list of common libraries that they get linked to
+    SET ( INTERNAL_MATLAB_LIBRARIES core matutils )
+    
+    # Create the matlab targets
+    FOREACH( MEX_OUTPUT ${MEX_OUTPUTS} )
+        SET( EXECUTABLE_NAME ${MEX_OUTPUT} )
+        SET( BRIDGE_LIBRARY ${MEX_OUTPUT}.mex )
+        SET( BRIDGE_SOURCE ${MEX_OUTPUT}.mex.cpp )
+        
+        # Build target as a static library
+        ADD_LIBRARY( ${BRIDGE_LIBRARY} STATIC ${BRIDGE_SOURCE} )
+        TARGET_LINK_LIBRARIES( ${BRIDGE_LIBRARY} core ${MATLAB_LIBRARIES} )
+    	
+        # Build the matlab entry point to it
+    	ADD_CUSTOM_COMMAND(
+    	    TARGET ${BRIDGE_LIBRARY} POST_BUILD
+    		COMMAND	mex -g -output ${MEX_OUTPUT}
+    		    ${CMAKE_CURRENT_SOURCE_DIR}/${MEX_STUB_SOURCE}
+    		    ${CMAKE_CURRENT_BINARY_DIR}/lib${BRIDGE_LIBRARY}.a
+    		    ${CMAKE_CURRENT_BINARY_DIR}/libcore.so
+    		    ${CMAKE_CURRENT_BINARY_DIR}/libmatutils.a
+    		    ${EXTERNAL_LIBRARIES}
+    		DEPENDS ${MEX_STUB_SOURCE} ${BRIDGE_LIBRARY} ${INTERNAL_MATLAB_LIBRARIES}
+    		)
+
+    	# Build the regular executable entry point to it
+    	ADD_EXECUTABLE( ${EXECUTABLE_NAME} ${MAIN_STUB_SOURCE} )
+    	TARGET_LINK_LIBRARIES( ${MEX_OUTPUT}
+    	    ${BRIDGE_LIBRARY}
+    	    ${INTERNAL_MATLAB_LIBRARIES}
+    	    ${EXTERNAL_LIBRARIES}
+    	    )
+
+        # For convenience, always build the MEX target when building the binary target
+    	ADD_DEPENDENCIES( ${MEX_OUTPUT} ${BRIDGE_LIBRARY} )
+    	
+    ENDFOREACH( MEX_OUTPUT )
+ENDIF ( MATLAB_FOUND )

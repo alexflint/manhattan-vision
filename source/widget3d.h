@@ -6,7 +6,7 @@
 #include <boost/ptr_container/ptr_vector.hpp>
 
 #include "common_types.h"
-#include "polygon.tpp"
+#include "line_segment.h"
 #include "event.tpp"
 
 namespace indoor_context {

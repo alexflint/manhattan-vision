@@ -74,7 +74,8 @@ typedef VW::PixelMono<double> PixelD;
 } // indoor_context
 
 // These rely on the above typedefs...
-#include "log.h"
+#include "log.tpp"
+#include "check.tpp"
 #include "lazyvar.h"
 #include "image_bundle.h"
 #include "initialized_ptr.tpp"

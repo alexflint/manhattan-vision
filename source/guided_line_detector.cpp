@@ -6,6 +6,7 @@
 #include "geom_utils.h"
 #include "clipping.h"
 
+#include "counted_foreach.tpp"
 #include "image_utils.tpp"
 #include "io_utils.tpp"
 #include "math_utils.tpp"
@@ -14,11 +15,15 @@
 namespace indoor_context {
 using namespace toon;
 
+lazyvar<double> gvDistThresh("GuidedLineDetector.DistThresh");
+lazyvar<double> gvMagThresh("GuidedLineDetector.MagThresh");
+lazyvar<int> gvMinPeak("GuidedLineDetector.MinPeak");
+
 void DrawAxes(ImageRGB<byte>& canvas, const PosedCamera& pc) {
 	Vec2 image_ctr = pc.RetToIm(makeVector(0.0, 0.0));
-	Vec3 scene_ctr = pc.pose.inverse() * makeVector(0,0,1);
+	Vec3 scene_ctr = pc.pose_inverse() * makeVector(0,0,1);
 	for (int j = 0; j < 3; j++) {
-		Vec3 retina_ej = pc.pose * (scene_ctr + GetAxis<3>(j));
+		Vec3 retina_ej = pc.pose() * (scene_ctr + GetAxis<3>(j));
 		Vec2 image_ej = pc.RetToIm(project(retina_ej));
 		DrawLineClipped(canvas, image_ctr, image_ej, BrightColors::Get(j));
 	}
@@ -35,7 +40,7 @@ void GuidedLineDetector::Compute(const PosedImage& image) {
 	input = &image;
 	image.BuildMono();
 
-	ComputeUndist(image.sz(), image.pc.camera);
+	ComputeUndist(image.sz(), image.pc().camera());
 	ComputeGradients();
 	ComputeVptProjs();
 	ComputeAssocs();
@@ -44,21 +49,22 @@ void GuidedLineDetector::Compute(const PosedImage& image) {
 }
 
 void GuidedLineDetector::ComputeUndist(const ImageRef& sz, const CameraBase& cam) {
-	if (undist[0].Rows() != sz.y || undist[0].Cols() != sz.x) {
-		for (int i = 0; i < 3; i++) {
-			undist[i].Resize(sz.y, sz.x);
-		}
-		Vec3 retina_pt;
-		for (int y = 0; y < sz.y; y++) {
-			float* xrow = undist[0][y];
-			float* yrow = undist[1][y];
-			float* zrow = undist[2][y];
-			for (int x = 0; x < sz.x; x++) {
-				retina_pt = unit(unproject(cam.ImToRet(makeVector(1.0*x,y))));
-				xrow[x] = retina_pt[0];
-				yrow[x] = retina_pt[1];
-				zrow[x] = retina_pt[2];
-			}
+	// Precompute the undistort map. For some reason we can't avoid doing this
+	// every time. If we skip this every time undist[0].size() == sz then the
+	// detections seem to change from one to the next!
+	for (int i = 0; i < 3; i++) {
+		undist[i].Resize(sz.y, sz.x);
+	}
+	Vec3 retina_pt;
+	for (int y = 0; y < sz.y; y++) {
+		float* xrow = undist[0][y];
+		float* yrow = undist[1][y];
+		float* zrow = undist[2][y];
+		for (int x = 0; x < sz.x; x++) {
+			retina_pt = unit(unproject(cam.ImToRet(makeVector(1.0*x,y))));
+			xrow[x] = retina_pt[0];
+			yrow[x] = retina_pt[1];
+			zrow[x] = retina_pt[2];
 		}
 	}
 }
@@ -70,8 +76,8 @@ void GuidedLineDetector::ComputeGradients() {
 
 void GuidedLineDetector::ComputeVptProjs() {
 	for (int j = 0; j < 3; j++) {
-		retina_vpts[j] = unit(col(input->pc.pose.get_rotation(), j));
-		image_vpts[j] = input->pc.RetToIm(retina_vpts[j]);
+		retina_vpts[j] = unit(col(input->pc().pose().get_rotation(), j));
+		image_vpts[j] = input->pc().RetToIm(retina_vpts[j]);
 	}
 }
 
@@ -81,10 +87,9 @@ void GuidedLineDetector::ComputeAssocs() {
 
 	// DistThresh is distance from point to line but we maximize
 	// projection of point onto line, so convert threshold.
-	const double kDistThresh = GV3::get<double>("GuidedLineDetector.DistThresh");
+	const double kDistThresh = *gvDistThresh;
 	const double kProjThresh = sqrt(1.0 - kDistThresh*kDistThresh);
-
-	const double kMagThresh = GV3::get<double>("GuidedLineDetector.MagThresh");
+	const double kMagThresh = *gvMagThresh;
 	const double kMagSqrThresh = kMagThresh * kMagThresh;
 
 	assocs.Resize(input->ny(), input->nx());
@@ -147,7 +152,7 @@ int GuidedLineDetector::GetBin(int x, int y, int vpt_index) {
 	const Vec3& v0 = retina_vpts[ vpt_index ];
 	const Vec3& v1 = retina_vpts[ (vpt_index+1)%3 ];
 	const Vec3& v2 = retina_vpts[ (vpt_index+2)%3 ];
-	Vec3 p = unit(unproject(input->pc.camera.ImToRet(makeVector(1.0*x,y))));
+	Vec3 p = unit(unproject(input->pc().camera().ImToRet(makeVector(1.0*x,y))));
 	//Vec3 p = makeVector(undist[0][y][x], undist[1][y][x], undist[2][y][x]);
 	// Unroll these dot products for (significant) efficiency
 	double d0 = p[0]*v0[0] + p[1]*v0[1] + p[2]*v0[2];
@@ -186,10 +191,10 @@ void GuidedLineDetector::ComputeHistograms() {
 
 	// Compute bounds on the angles for clustering
 	Bounds2D<double> bounds = Bounds2D<double>::FromSize(input->sz());
-	Vec3 retina_cnrs[] = { unit(unproject(input->pc.ImToRet(bounds.tl()))),
-			unit(unproject(input->pc.ImToRet(bounds.tr()))),
-			unit(unproject(input->pc.ImToRet(bounds.br()))),
-			unit(unproject(input->pc.ImToRet(bounds.bl()))) };
+	Vec3 retina_cnrs[] = { unit(unproject(input->pc().ImToRet(bounds.tl()))),
+			unit(unproject(input->pc().ImToRet(bounds.tr()))),
+			unit(unproject(input->pc().ImToRet(bounds.br()))),
+			unit(unproject(input->pc().ImToRet(bounds.bl()))) };
 
 
 	for (int j = 0; j < 3; j++) {
@@ -316,7 +321,6 @@ void GuidedLineDetector::ComputeHistograms() {
 }
 
 void GuidedLineDetector::ComputeSegments() {
-	const int kMinPeak = GV3::get<int>("GuidedLineDetector.MinPeak");
 	const double kCutThresh = 8; // in pixels
 	const double kMinSegLength = 25;  // in pixels
 
@@ -326,7 +330,7 @@ void GuidedLineDetector::ComputeSegments() {
 
 		vector<LineBin>& hist = histogram[i];
 		for (int j = 0; j < num_t_bins; j++) {
-			if (hist[j].support > kMinPeak &&
+			if (hist[j].support > *gvMinPeak &&
 					(j == 0 || hist[j].support > hist[j-1].support) &&
 					(j == num_t_bins-1 || hist[j].support > hist[j+1].support)) {
 
@@ -382,7 +386,7 @@ void GuidedLineDetector::ComputeVptWindows() {
 	// Compute the size in the retina of a pixel at the image centre
 	Vec2 c = makeVector(input->nx()/2, input->ny()/2);
 	Vec2 d = c+makeVector(1,1);
-	double step = kStepDist * norm(input->pc.ImToRet(c) - input->pc.ImToRet(d));
+	double step = kStepDist * norm(input->pc().ImToRet(c) - input->pc().ImToRet(d));
 
 	vector<Vector<5> > quad_norms[3];
 
@@ -400,7 +404,7 @@ void GuidedLineDetector::ComputeVptWindows() {
 		for (int d1 = -kRadius; d1 <= kRadius; d1++) {
 			for (int d2 = -kRadius; d2 <= kRadius; d2++) {
 				Vec3 retina_vpt = v0 + step*d1*v1 + step*d2*v2;
-				Vec3 v = unproject(input->pc.RetToIm(project(retina_vpt)));
+				Vec3 v = unproject(input->pc().RetToIm(project(retina_vpt)));
 				vpt_windows[i][j] = v;
 				quad_norms[i][j] = makeVector(v[0]*v[0]+v[1]*v[1],
 						-2*v[0]*v[2],
@@ -504,7 +508,7 @@ void GuidedLineDetector::OutputVptWindowViz(const string& filename) {
 
 
 void GuidedLineDetector::DrawSceneAxes(ImageRGB<byte>& canvas) {
-	DrawAxes(canvas, input->pc);
+	DrawAxes(canvas, input->pc());
 }
 
 void GuidedLineDetector::OutputSceneAxesViz(const string& filename) {
@@ -608,8 +612,8 @@ void GuidedLineDetector::OutputThetaViz(const string& basename) {
 }
 
 void GuidedLineDetector::DrawRays(ImageRGB<byte>& canvas, int axis) {
-	Vec2 retina_tl = input->pc.ImToRet(makeVector(0.0, 0.0));
-	Vec2 retina_br = input->pc.ImToRet(makeVector(canvas.GetWidth()-1.0,
+	Vec2 retina_tl = input->pc().ImToRet(makeVector(0.0, 0.0));
+	Vec2 retina_br = input->pc().ImToRet(makeVector(canvas.GetWidth()-1.0,
 			canvas.GetHeight()-1.0));
 	Vec3 left = makeVector(1, 0, -retina_tl[0]);
 	Vec3 right = makeVector(-1, 0, retina_br[0]);
@@ -644,8 +648,8 @@ void GuidedLineDetector::DrawRays(ImageRGB<byte>& canvas, int axis) {
 			ClipAgainstLine(retina_x, retina_vpt, top, 1);
 			ClipAgainstLine(retina_x, retina_vpt, bottom, 1);
 
-			Vec2 image_x = input->pc.RetToIm(project(retina_x));
-			Vec2 image_vpt = input->pc.RetToIm(project(retina_vpt));
+			Vec2 image_x = input->pc().RetToIm(project(retina_x));
+			Vec2 image_vpt = input->pc().RetToIm(project(retina_vpt));
 
 			int ins = 127 + floori(128 * histogram[i][peak.second].support / max_support);
 			PixelRGB<byte> color(i==0?ins:0, i==1?ins:0, i==2?ins:0);

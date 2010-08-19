@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
 	toon::Matrix<3,4> cam = linear_intr * as_matrix(kf->pc->pose);
 
 	// Set up the renderer
-	SimpleRenderer re(cam, asToon(kf->pc->im_size()));
+	SimpleRenderer re(cam, asToon(kf->pc->image_size()));
 	re.Clear(2);
 
 	// Do the rendering

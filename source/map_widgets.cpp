@@ -13,6 +13,7 @@
 #include "geom_utils.h"
 #include "lazyvar.h"
 
+#include "counted_foreach.tpp"
 #include "math_utils.tpp"
 #include "range_utils.tpp"
 #include "io_utils.tpp"
@@ -44,7 +45,7 @@ bool KeyFrameWidget::HitTest(const Vector<2>& mouse) const {
 }
 
 void KeyFrameWidget::GLTransformToCameraCoords() const {
-	const SE3<>& inv = kf.pc->invpose;
+	const SE3<>& inv = kf.pc->pose_inverse();
 	Matrix<4> invmat = Identity;
 	invmat.slice<0,0,3,3>() = inv.get_rotation().get_matrix();
 	invmat.slice<0,3,3,1>() = inv.get_translation().as_col();
@@ -132,19 +133,20 @@ Vector<3> KeyFrameWidget::ImagePtToWorld(const Vector<2>& p) {
 	// Pixel Coordinates -> Homogeneous Pixel Coords -> Retina Plane (Z=1) Coordates
 	//  -> (Z = retina_z) Plane Coordinates -> World Coordaintes -> whew!
 	const Matrix<3>& im_to_ret = kf.unwarped.image_to_retina;
-	return kf.pc->invpose * (retina_z * atretina(im_to_ret * unproject(p)));
+	return kf.pc->pose_inverse() * (retina_z * atretina(im_to_ret * unproject(p)));
 }
 
 Vector<3> KeyFrameWidget::WorldToRetina(const Vector<3>& p) {
-	return kf.pc->invpose * (retina_z * atretina(kf.pc->pose * p));
+	return kf.pc->pose_inverse() * (retina_z * atretina(kf.pc->pose() * p));
 }
 
 LineWidget& KeyFrameWidget::AddLineInRetina(const Vector<3>& ret_a,
                                             const Vector<3>& ret_b,
                                             const float width,
                                             const PixelRGB<byte>& color) {
-	LineWidget* w = new LineWidget(kf.pc->invpose * (retina_z * atretina(ret_a)),
-			kf.pc->invpose * (retina_z * atretina(ret_b)),
+	LineWidget* w = new LineWidget(
+			kf.pc->pose_inverse() * (retina_z * atretina(ret_a)),
+			kf.pc->pose_inverse() * (retina_z * atretina(ret_b)),
 			width,
 			color);
 	AddOwned(w);
@@ -216,7 +218,7 @@ void KeyFrameWidget::OnClick(int button, const Vector<2>& mouse) {
 }
 
 void KeyFrameWidget::OnDoubleClick(int button, const Vector<2>& mouse) {
-	viewer().viewCentre = -kf.pc->invpose.get_translation();
+	viewer().viewCentre = -kf.pc->pose_inverse().get_translation();
 }
 
 

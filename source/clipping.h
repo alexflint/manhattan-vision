@@ -5,6 +5,7 @@
 #include "common_types.h"
 #include "math_utils.tpp"
 #include "image_utils.tpp"
+#include "polygon.tpp"
 
 namespace indoor_context {
 // Return the sign of the dot product between two vectors
@@ -51,6 +52,9 @@ bool ClipAgainstLine(Vec3& start,
                      const Vec3& line,
                      const int side);
 
+// Clip a line segment to the interior of a rectangular region. Returns false iff
+// the entire line segment was outside the clip area.
+bool ClipAgainstBounds(Vec3& start, Vec3& end, const Bounds2D<>& bounds);
 
 
 int PointSign(const Vec3& point, const Vec3& line);

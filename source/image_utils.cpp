@@ -1,13 +1,15 @@
 #include <boost/bind.hpp>
 
-#include <cv.h>
-
 #include <helpers.h>
 
 #include "common_types.h"
+#include "clipping.h"
+
 #include "image_utils.tpp"
 #include "range_utils.tpp"
 #include "math_utils.tpp"
+#include "vector_utils.tpp"
+#include "polygon.tpp"
 
 namespace indoor_context {
 using namespace toon;
@@ -73,14 +75,11 @@ void DrawLineClipped(ImageRGB<byte>& image,
                      const float y1,
                      const PixelRGB<byte> color,
                      double alpha) {
-	CvSize sz = cvSize(image.GetWidth(), image.GetHeight());
-	CvPoint a = cvPoint(x0, y0);
-	CvPoint b = cvPoint(x1, y1);
-	cvClipLine(sz, &a, &b);
-	// If the line doesn't intersect the image bounds at all then
-	// cvClipLine won't change them at all.
-	if (a.x >= 0 && a.x < image.GetWidth() && a.y >= 0 && a.y < image.GetHeight()) {
-		DrawLine(image, makeVector(a.x, a.y), makeVector(b.x, b.y), color, alpha);
+	Vec3 a = makeVector(x0, y0, 1.0);
+	Vec3 b = makeVector(x1, y1, 1.0);
+	bool nonempty = ClipAgainstBounds(a, b, Bounds2D<>::FromTightSize(asToon(image.GetSize())));
+	if (nonempty) {
+		DrawLine(image, project(a), project(b), color, alpha);
 	}
 }
 

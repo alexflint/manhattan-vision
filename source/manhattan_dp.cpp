@@ -25,17 +25,9 @@ namespace indoor_context {
 using namespace toon;
 
 lazyvar<int> gvMaxComplexity("ManhattanDP.MaxCorners");
-lazyvar<int> gvGridScale("ManhattanDP.OrientSampleFactor");
-lazyvar<float> gvGridYOffsetRel("ManhattanDP.ExtraSearchMargin");
-lazyvar<int> gvVerticalAxis("ManhattanDP.VerticalAxis");
+lazyvar<Vec2> gvGridSize("ManhattanDP.GridSize");
 lazyvar<float> gvLineJumpThreshold("ManhattanDP.LineJumpThreshold");
-lazyvar<float> gvCornerPenalty("ManhattanDP.CornerPenalty");
-
-
-
-
-
-
+lazyvar<float> gvCornerPenalty("ManhattanDP.DefaultCornerPenalty");
 
 DPState::DPState() : row(-1), col(-1), axis(-1), remaining(-1), dir(-1) { }
 DPState::DPState(int r, int c, int a, int b, int d)
@@ -126,45 +118,40 @@ inline DPSolution& DPCache::operator[](const DPState& x) {
 
 ManhattanDP::ManhattanDP() {
 	jump_thresh = *gvLineJumpThreshold;
-	vert_axis = *gvVerticalAxis;
-
 	max_corners = *gvMaxComplexity;
-	corner_penalty = *gvCornerPenalty;
-
-	grid_scale_factor = *gvGridScale;
-	grid_offset_factor = *gvGridYOffsetRel;
+	grid_size = *gvGridSize;
 }
 
-void ManhattanDP::Compute(const MatI& orients, const PosedCamera& cam, const Mat3& fcmap) {
+void ManhattanDP::Compute(const ScoreFunction& score_f,
+                          const PosedCamera& cam,
+                          const Mat3& fcmap) {
 	pc = &cam;  // the camera
 	floorToCeil = fcmap;  // the mapping between floor and ceiling
-	input_orients = &orients;
-	input_size = makeVector(orients.Cols(), orients.Rows());
+	score_func = &score_f;
 
-	ComputeGridWarp();  // note this _must_ come before everything else
-	ComputeOrients();
+	ComputeGridTransform();  // note this _must_ come before everything else
+	ComputeScores();
+	//ComputeGridWarpOld()
 	ComputeOppositeRows();
+
+	// Reset the cache
+	cache_lookups = 0;
+	cache_hits = 0;
+	cache.reset(grid_size, max_corners);
 
 	// Reset the profiling histograms
 	horiz_len_hist.Clear();
 	horiz_cutoff_hist.Clear();
 
-	// Reset the cache
-	cache_lookups = 0;
-	cache_hits = 0;
-
-	// Reset the cache
-	cache.reset(grid_size, max_corners);
-
 	// Begin the search
 	DPSolution best(-INFINITY);
-	DPState init(-1, orient_map.Cols()-1, -1, -1, DPState::DIR_OUT);
+	DPState init(-1, grid_size[0]-1, -1, -1, DPState::DIR_OUT);
 	max_depth = cur_depth = 0;
 	VW::Timer dp_timer;
 	for (init.remaining = 1; init.remaining <= max_corners; init.remaining++) {
-		int penalty = corner_penalty * init.remaining;
+		int penalty = score_func->wall_penalty * init.remaining;
 		for (init.axis = 0; init.axis <= 1; init.axis++) {
-			for (init.row = 0; init.row < orient_map.Rows(); init.row++) {
+			for (init.row = 0; init.row < grid_size[1]; init.row++) {
 				best.ReplaceIfSuperior(Solve(init), init, -penalty);
 			}
 		}
@@ -172,139 +159,78 @@ void ManhattanDP::Compute(const MatI& orients, const PosedCamera& cam, const Mat
 	solve_time = dp_timer.GetAsMilliseconds();
 	DLOG << "Solve DP: " << solve_time << "ms";
 
-	// Store the optimal solution
-	solution = best;
-
 	// Backtrack from the solution
+	solution = best;
 	ComputeBacktrack();
 }
 
-void ManhattanDP::ComputeGridWarp() {
-	// Build a rotation to move the vertical vanishing point to infinity.
-	// R must satisfy:
-	//   (1) R*up = [0,1,0]
-	//   (2) R is as close to the identity as possible
-	//        (so that the other vpts are minimally affected)
-	Vec3 up = pc->GetRetinaVpt(2);
-	Mat3 R_up;
-	R_up[0] = up ^ GetAxis<3>(2);
-	R_up[1] = up;
-	R_up[2] = R_up[0] ^ R_up[1];
+void ManhattanDP::ComputeGridTransform() {
+	// TODO: this produces slightly different results to
+	// ComputeGridWarpOld, find out why!
 
-	// T_centre projects the centre of the original image projects to
-	// the centre of the new image
-	Mat3 T_centre = Identity;
-	T_centre.slice<0,2,2,1>() = -project(R_up*makeVector(0,0,1)).as_col();
-
-	// Compute the warping homographies to transform the image so that
-	// vertical in the world is vertical in the image.
-	Mat3 H_rect = T_centre * R_up;
-
-	// Compute scaling to keep all corners within bounds
-	double scale = 1.0;
-	const Bounds2D<>& ret_bounds = pc->camera.ret_bounds();
-	Polygon<4> ret_perimeter = ret_bounds.GetPolygon();
-	for (int i = 0; i < 4; i++) {
-		double canon_x = project(H_rect * ret_perimeter.verts[i])[0];
-		// this works because the retina is centred at zero...
-		scale = max(scale, canon_x/ret_bounds.left);
-		scale = max(scale, canon_x/ret_bounds.right);
-	}
-	DiagonalMatrix<3> M_scale(makeVector(1.0/scale, 1.0/scale, 1.0));
-
-	// Compute offsets and scaling applied after the warp
-	double grid_scaling = grid_scale_factor;
-	Vec2 grid_offset = makeVector(0, input_size[1] * grid_offset_factor/grid_scaling);
-	grid_size = input_size/grid_scaling + grid_offset*2;
-
-	// Make the grid transform as a matrix
-	Mat3 grid_xform = Identity;
-	grid_xform[0][0] = 1.0/grid_scaling;
-	grid_xform[1][1] = 1.0/grid_scaling;
-	grid_xform.slice<0,2,2,1>() = grid_offset.as_col();
-
-	// Approximate the camera as linear
-	Mat3 intr = pc->camera.Linearize();
-	Mat3 intr_inv = LU<>(intr).get_inverse();
-
-	// Compose the whole thing
-	imageToGrid = grid_xform * intr * H_rect * M_scale * intr_inv;
+	// Compute the rectification matrix
+	// should we use FromTightSize here???
+	imageToGrid = GetVerticalRectifier(*pc, Bounds2D<>::FromSize(grid_size));
 	gridToImage = LU<>(imageToGrid).get_inverse();
 
 	// Locate the vanishing points in grid coordinates
-	for (int i = 0; i < 2; i++) {
-		horiz_vpts[i] = ImageToGrid(pc->GetImageVpt(i));
+	for (int i = 0; i < 3; i++) {
+		vpt_cols[i] = ImageToGrid(pc->GetImageVpt(i))[0];
 	}
 
+	// Calculate the horizon row
 	// Note that H_canon breaks the orthogonality of the vanishing
 	// points, so the horzon is not guaranteed to be in the middle of
 	// the image even though the vertical vanishing point is
 	// guaranteed to be at infinity. The horizon is, however,
 	// guaranteed to be horizontal in the image.
-	CHECK_TOL(horiz_vpts[0][1], horiz_vpts[1][1], 1e-6)
-	<< "The horizon should be horizontal in the image. Perhaps H_canon is wrong?"
-	<< "the vpts are: " << horiz_vpts[0] << " and " << horiz_vpts[1];
+	double y0 = ImageToGrid(pc->GetImageVpt(0))[1];
+	double y1 = ImageToGrid(pc->GetImageVpt(1))[1];
+	CHECK_EQ_TOL(y0, y1, 1e-6) << "The horizon is not horizontal in the image.";
+	horizon_row = roundi((y0 + y1)/2.0);
 
-	// Calculate the row the horizon is in
-	horizon_row = roundi(horiz_vpts[0][1]);
+	// Check that image is not flipped. This should be guaranteed by GetVerticalRectifier
+	Vec2 floor_pt = makeVector(0, horizon_row+1);
+	// Note that PosedCamera::GetImageHorizon always returns a line with positive half on the floor...
+	CHECK_GT(GridToImage(floor_pt)*pc->GetImageHorizon(), 0)
+		<< "The matrix returned by GetVerticalRectifier flips the image upside down!";
 }
 
-void ManhattanDP::ComputeOrients() {
-	const MatI& orients = *input_orients;
-
-	// Setup the votes
-	MatI votes[3];
+void ManhattanDP::ComputeScores() {
 	for (int i = 0; i < 3; i++) {
-		votes[i].Resize(grid_size[1], grid_size[0], 0);
-	}
+		// Initialize
+		grid_scores[i].Resize(grid_size[1], grid_size[0], 0);
 
-	// Accumulate votes (accounting for warping, downsampling, and grid_offset)
-	MatI canon_orients(orients.Rows(), orients.Cols());
-	for (int y = 0; y < orients.Rows(); y++) {
-		const int* orientrow = orients[y];
-		for (int x = 0; x < orients.Cols(); x++) {
-			if (orientrow[x] != -1) {
-				Vec2I grid_pt = ImageToGrid(makeVector(x, y, 1.0));
+		CHECK_EQ(score_func->pixel_scores[i].Rows(), pc->image_size().y);
+		CHECK_EQ(score_func->pixel_scores[i].Cols(), pc->image_size().x);
+
+		// Transform the scores according to ImageToGrid(.)
+		for (int y = 0; y < pc->image_size().y; y++) {
+			const float* inrow = score_func->pixel_scores[i][y];
+			for (int x = 0; x < pc->image_size().x; x++) {
+				Vec2I grid_pt = RoundVector(ImageToGrid(makeVector(x, y, 1.0)));
 				if (grid_pt[0] >= 0 && grid_pt[0] < grid_size[0] &&
-						grid_pt[1] >= 0 && grid_pt[1] < grid_size[1]) {
-					votes[ orientrow[x] ][ grid_pt[1] ][ grid_pt[0] ]++;
+					grid_pt[1] >= 0 && grid_pt[1] < grid_size[1]) {
+					grid_scores[i][ grid_pt[1] ][ grid_pt[0] ] += inrow[x];
 				}
 			}
 		}
-	}
 
-	// Resolve votes into a final orientation map
-	orient_map.Resize(grid_size[1], grid_size[0], -1);
-	int cell_area = (input_size[0]*input_size[1]) / (grid_size[0]*grid_size[1]);
-	for (int y = 0; y < grid_size[1]; y++) {
-		int* outrow = orient_map[y];
-		int* voterow[] = { votes[0][y], votes[1][y], votes[2][y] };
-		for (int x = 0; x < grid_size[0]; x++) {
-			outrow[x] = -1;
-			int best_vote = cell_area/10;  // below this threshold pixels will be "unknown"
-			for (int i = 0; i < 3; i++) {
-				if (voterow[i][x] > best_vote) {
-					best_vote = voterow[i][x];
-					outrow[x] = i;
-				}
-			}
-		}
+		// Compute the integral-col image
+		integ_scores[i].Compute(grid_scores[i]);
 	}
-
-	// Compute the integral-col image
-	integ_orients.Compute(orient_map);
 }
 
 void ManhattanDP::ComputeOppositeRows() {
-	opp_rows.Resize(orient_map.Rows(), orient_map.Cols());
+	opp_rows.Resize(grid_size[1], grid_size[0]);
 	Mat3 grid_floorToCeil = imageToGrid * floorToCeil * gridToImage;  // floorToCeil in grid coords
 	Mat3 grid_ceilToFloor = LU<>(grid_floorToCeil).get_inverse();
-	for (int y = 0; y < opp_rows.Rows(); y++) {
+	for (int y = 0; y < grid_size[1]; y++) {
 		const Mat3& m = y < horizon_row ? grid_ceilToFloor : grid_floorToCeil;
-		for (int x = 0; x < opp_rows.Cols(); x++) {
+		for (int x = 0; x < grid_size[0]; x++) {
 			Vec2 opp_grid_pos = project(m * makeVector(x,y,1.0));
 			// TODO: is Clamp appropriate here??
-			opp_rows[y][x] = Clamp<int>(opp_grid_pos[1], 0, orient_map.Rows()-1);
+			opp_rows[y][x] = /*Clamp<int>(*/opp_grid_pos[1]/*, 0, grid_size[1]-1)*/;
 		}
 	}
 }
@@ -316,7 +242,7 @@ const DPSolution& ManhattanDP::Solve(const DPState& state) {
 	// unordered_map::insert actually does a lookup first and returns
 	// an existing element if there is one, or returns an iterator
 	// pointing to a newly inserted element if not.
-	Cache::iterator it = cache.find(state);
+	DPCache::iterator it = cache.find(state);
 	if (it == cache.end()) {
 		cur_depth++;
 		const DPSolution& soln = (cache[state] = Solve_Impl(state));  // single equals sign intended!
@@ -373,7 +299,7 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 
 		// Try going up/down. Never cross the horizon
 		int next_row = state.row + (state.dir == DPState::DIR_UP ? -1 : 1);
-		if (next_row != horizon_row && next_row >= 0 && next_row < orient_map.Rows()) {
+		if (next_row != horizon_row && next_row >= 0 && next_row < grid_size[1]) {
 			DPState next = state;
 			next.row = next_row;
 			best.ReplaceIfSuperior(Solve(next), next);
@@ -384,28 +310,28 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 		next.dir = DPState::DIR_IN;
 		next.remaining = state.remaining-1;
 
-		double score_delta = 0.0;
-		const Vec2& vpt = horiz_vpts[state.axis];
+		double delta_score = 0.0;
+		double vpt_x = vpt_cols[state.axis];
 
-		double m = (state.row-vpt[1])/(state.col-vpt[0]);
-		double c = vpt[1] - m*vpt[0];
+		double m = (state.row-horizon_row)/(state.col-vpt_x);
+		double c = horizon_row - m*vpt_x;
 
 		//horiz_len_hist.Add(state.col-1); // for profiling
 		for (next.col = state.col-1; next.col >= 0; next.col--) {
 			// Check that we don't cross the vpt
-			if (abs(vpt[0] - next.col) < 1.0) break;
+			if (abs(vpt_x - next.col) < 1.0) break;
 
 			// Compute the new row
 			double next_y = m*next.col + c;
 			next.row = roundi(next_y);
 
 			// Check bounds.
-			if (next.row < 0 || next.row >= orient_map.Rows()) continue;
+			if (next.row < 0 || next.row >= grid_size[1]) continue;
 
 			// Compute the row of the opposite face (floor <-> ceiling)
 			// TODO: ComputeOppositeRows clamps the values in opp_rows, review
 			// whether this is appropriate.
-			int opp_row = opp_rows[next.row][next.col];
+			/*int opp_row = [next.row][next.col];
 
 			// Compute the score for this segment
 			// TODO: this is the cost function: factor it out
@@ -414,10 +340,13 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 			int r1 = max(next.row, opp_row);
 			score_delta += integ_orients.Count(vert_axis, next.col, 0, r0)
 							+ integ_orients.Count(wall_orient, next.col, r0, r1)
-							+ integ_orients.Count(vert_axis, next.col, r1, orient_map.Rows()-1);
+							+ integ_orients.Count(vert_axis, next.col, r1, grid_orients.Rows()-1);*/
+
+			// Compute cost
+			delta_score += MarginalWallScore(next.row, next.col, next.axis);
 
 			// Recurse
-			best.ReplaceIfSuperior(Solve(next), next, score_delta);
+			best.ReplaceIfSuperior(Solve(next), next, delta_score);
 
 			// Compute the error associated with jumping to the nearest (integer-valued) pixel
 			double jump_error = abs(next.row - next_y);
@@ -425,19 +354,19 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 			double rel_jump_error = jump_error / dist;
 
 			// If the error is sufficiently small then allow the line to
-			// continue with a slight aberation. This approximation
-			// reduces complexity from O( W*H*(W+H) ) to O(W*H)
+			// continue with a slight "kink". This approximation
+			// reduces overall complexity from O( W*H*(W+H) ) to O(W*H)
 			if (rel_jump_error < jump_thresh) {
 				horiz_cutoff_hist.Add(state.col - next.col);
 				// we just continue from this point -- don't add an intersection
 				next.dir = DPState::DIR_OUT;
 				next.remaining = state.remaining;
-				best.ReplaceIfSuperior(Solve(next), next, score_delta);
-				// This recursion has already (approximately)
+				best.ReplaceIfSuperior(Solve(next), next, delta_score);
+				// The above recursion has already (approximately)
 				// considered all further points along the line so there is
 				// no need to continue. Note that we break here
 				// regardless of whether this solution replaced the
-				// best so far because if this solution did _not_ replace
+				// best so far because if this solution did not replace
 				// the best so far then nothing along this line will
 				// do so.
 				break;
@@ -449,10 +378,23 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 	return best;
 }
 
+double ManhattanDP::MarginalWallScore(int row, int col, int axis) {
+	// Compute the row of the opposite face (floor <-> ceiling)
+	int opp_row = Clamp<int>(opp_rows[row][col], 0, grid_size[1]-1);
+
+	// Compute the score for this segment
+	int wall_orient = 1-axis;  // labels refer to normal direction rather than vpt index
+	int r0 = min(row, opp_row);
+	int r1 = max(row, opp_row);
+	return integ_scores[kVerticalAxis].Sum(col, 0, r0-1)
+         + integ_scores[wall_orient].Sum(col, r0, r1-1)
+         + integ_scores[kVerticalAxis].Sum(col, r1, grid_size[1]-1);
+}
+
 void ManhattanDP::ComputeBacktrack() {
 	soln_walls.clear();
 	soln_grid_walls.clear();
-	soln_orients.Resize(input_size[1], input_size[0], 2);
+	soln_orients.Resize(pc->image_size().y, pc->image_size().x, kVerticalAxis);
 
 	// Trace the solution
 	const DPState* cur = &solution.src;
@@ -461,8 +403,8 @@ void ManhattanDP::ComputeBacktrack() {
 		full_backtrack.push_back(cur);
 
 		if (cur->dir == DPState::DIR_IN && out != NULL) {
-			Vec2 tl = cur->position();
-			Vec2 tr = out->position();
+			Vec2 tl = makeVector(cur->col, cur->row);  // check this! was: cur->position()
+			Vec2 tr = makeVector(out->col, out->row);  // check this! was: out->position
 			Vec2 bl = makeVector(tl[0], opp_rows[ cur->row ][ cur->col ]);
 			Vec2 br = makeVector(tr[0], opp_rows[ out->row ][ out->col ]);
 
@@ -477,7 +419,7 @@ void ManhattanDP::ComputeBacktrack() {
 					GridToImage(bl),
 					out->axis));
 
-			vector<Vec3 > poly;
+			vector<Vec3> poly;
 			copy_all_into(soln_walls.back().poly.verts, poly);
 			int wall_orient = 1-out->axis;  // labels refer to normal direction rather than vpt index
 			FillPolygon(poly, soln_orients, wall_orient);
@@ -504,11 +446,9 @@ Vec2 ManhattanDP::ImageToGrid(const Vec3& x) {
 
 bool ManhattanDP::OcclusionValid(int col, int left_axis, int right_axis, int occl_side) {
 	int occl_axis = occl_side < 0 ? left_axis : right_axis;
-	int occl_vpt_col = horiz_vpts[occl_axis][0];
+	int occl_vpt_col = vpt_cols[occl_axis];
 	int occl_vpt_side = occl_vpt_col < col ? -1 : 1;
-
-	int opp_axis = 1-occl_axis;  // irrespective of whether left_axis=right_axis!
-	int opp_vpt_col = horiz_vpts[opp_axis][0];
+	int opp_vpt_col = vpt_cols[1-occl_axis];  // irrespective of whether left_axis=right_axis!
 	int opp_vpt_side = opp_vpt_col < col ? -1 : 1;
 
 	// is the occluding vpt on the same side as the occluding stripe?
@@ -540,14 +480,10 @@ void ManhattanDP::DrawWalls(ImageRGB<byte>& canvas,
                             const vector<ManhattanWall>& walls) const {
 	BrightColors bc;
 	BOOST_FOREACH(const ManhattanWall& wall, walls) {
-		// Draw a quad with a cross through it
+		// Draw a quad
 		PixelRGB<byte> color = bc.Next();
 		for (int i = 0; i < 4; i++) {
-			for (int j = 0; j < i; j++) {
-				DrawLineClipped(canvas,
-						LineSeg(wall.poly.verts[i], wall.poly.verts[j]),
-						color);
-			}
+			DrawLineClipped(canvas, wall.poly.edge(i), color);
 		}
 	}
 }
@@ -558,36 +494,15 @@ void ManhattanDP::DrawSolution(ImageRGB<byte>& canvas) const {
 }
 
 void ManhattanDP::DrawGridSolution(ImageRGB<byte>& canvas) const {
-	DrawOrientations(orient_map, canvas);
 	DrawWalls(canvas, soln_grid_walls);
 }
 
 
-
-
-
-
-void ManhattanDPReconstructor::Compute(const PosedImage& pim,
-                                       const proto::TruthedMap& tru_map) {
-	input = &pim;
-
-	// Detect lines and line sweeps
-	TIMED("Detect lines")
-		line_detector.Compute(pim);
-	TIMED("Estimate orientations")
-		line_sweeper.Compute(pim, line_detector.detections);
-
-	// TODO: do this with a line detector
-	double zfloor = tru_map.floorplan().zfloor();
-	double zceil = tru_map.floorplan().zceil();
-	Vec3 vup = pim.pc.pose.inverse() * makeVector(0,1,0);
-	if (Sign(zceil-zfloor) == Sign(vup[2])) {
-		swap(zfloor, zceil);
-	}
-	Mat3 floorToCeil = GetManhattanHomology(pim.pc, zfloor, zceil);
-
-	// Run the DP
-	TIMED("Complete DP") dp.Compute(line_sweeper.orient_map, pim.pc, floorToCeil);
+void ManhattanDPReconstructor::Compute(const PosedImage& image,
+                                       const Mat3& floorToCeil,
+                                       const ManhattanDP::ScoreFunction& s) {
+	input_image = &image;
+	TIMED("Complete DP") dp.Compute(s, image.pc(), floorToCeil);
 }
 
 void ManhattanDPReconstructor::ReportBacktrack() {
@@ -608,36 +523,17 @@ double ManhattanDPReconstructor::GetAccuracy(const MatI& gt_orients) {
 
 double ManhattanDPReconstructor::GetAccuracy(const proto::FloorPlan& gt_floorplan) {
 	MatI gt_orients;
-	GetTrueOrients(gt_floorplan, input->pc, gt_orients);
+	GetTrueOrients(gt_floorplan, input_image->pc(), gt_orients);
 	return GetAccuracy(gt_orients);
 }
 
 void ManhattanDPReconstructor::OutputOrigViz(const string& path) {
-	WriteImage(path, input->rgb);
-}
-
-void ManhattanDPReconstructor::OutputOrientViz(const string& path) {
-	ImageRGB<byte> orient_canvas;
-	ImageCopy(input->rgb, orient_canvas);
-	line_sweeper.DrawOrientViz(orient_canvas);
-	line_detector.DrawSegments(orient_canvas);
-	WriteImage(path, orient_canvas);
-}
-
-void ManhattanDPReconstructor::OutputLineViz(const string& path) {
-	FileCanvas canvas(path, asToon(input->sz()));
-	canvas.DrawImage(input->rgb);
-	canvas.SetLineWidth(3.0);
-	for (int i = 0; i < 3; i++) {
-		BOOST_FOREACH(const LineDetection& det, line_detector.detections[i]) {
-			canvas.StrokeLine(det.seg, Colors::primary(i));
-		}
-	}
+	WriteImage(path, input_image->rgb);
 }
 
 void ManhattanDPReconstructor::OutputSolutionOrients(const string& path) {
 	ImageRGB<byte> soln_canvas;
-	ImageCopy(input->rgb, soln_canvas);
+	ImageCopy(input_image->rgb, soln_canvas);
 	DrawOrientations(dp.soln_orients, soln_canvas, 0.35);
 	WriteImage(path, soln_canvas);
 }
@@ -649,29 +545,72 @@ void ManhattanDPReconstructor::OutputGridViz(const string& path) {
 }
 
 void ManhattanDPReconstructor::OutputOppRowViz(const string& path) {
-	FileCanvas canvas(path, input->rgb);
-	for (int y = 5; y < input->ny(); y += 100) {
-		for (int x = 5; x < input->nx(); x += 100) {
-			Vec2 v = makeVector(x,y);
-			Vec2 grid = dp.ImageToGrid(unproject(v));
-			int opp_row = dp.opp_rows[ roundi(grid[1]) ][ roundi(grid[0]) ];
+	FileCanvas canvas(path, input_image->rgb);
+	for (int y = 5; y < input_image->ny(); y += 100) {
+		for (int x = 5; x < input_image->nx(); x += 100) {
+			Vec3 v = makeVector(x,y,1.0);
+			Vec2I grid = RoundVector(dp.ImageToGrid(v));
+			int opp_row = dp.opp_rows[ grid[1] ][ grid[0] ];
 			Vec2 opp = project(dp.GridToImage(makeVector(grid[0], opp_row)));
 
 			bool ceil = grid[1] < dp.horizon_row;
 			PixelRGB<byte> color = ceil ? Colors::blue() : Colors::green();
 
-			canvas.DrawDot(v, 5, Colors::white());
-			canvas.DrawDot(v, 4, color);
+			canvas.DrawDot(project(v), 5, Colors::white());
+			canvas.DrawDot(project(v), 4, color);
 			canvas.DrawDot(opp, 2, color);
-			canvas.StrokeLine(v, opp, color);
+			canvas.StrokeLine(project(v), opp, color);
 		}
 	}
 
 	// Draw the horizon line
 	Vec2 horizon_l = project(dp.GridToImage(makeVector(0, dp.horizon_row)));
-	Vec2 horizon_r = project(dp.GridToImage(makeVector(input->nx(), dp.horizon_row)));
+	Vec2 horizon_r = project(dp.GridToImage(makeVector(input_image->nx(), dp.horizon_row)));
 	canvas.StrokeLine(horizon_l, horizon_r, Colors::white());
 }
+
+void LineSweepDPCost::OutputOrientViz(const string& path) {
+	ImageRGB<byte> orient_canvas;
+	ImageCopy(input_image->rgb, orient_canvas);
+	line_sweeper.DrawOrientViz(orient_canvas);
+	line_detector.DrawSegments(orient_canvas);
+	WriteImage(path, orient_canvas);
+}
+
+void LineSweepDPCost::OutputLineViz(const string& path) {
+	FileCanvas canvas(path, asToon(input_image->sz()));
+	canvas.DrawImage(input_image->rgb);
+	canvas.SetLineWidth(3.0);
+	for (int i = 0; i < 3; i++) {
+		BOOST_FOREACH(const LineDetection& det, line_detector.detections[i]) {
+			canvas.StrokeLine(det.seg, Colors::primary(i));
+		}
+	}
+}
+
+
+
+void LineSweepDPCost::Compute(const PosedImage& image) {
+	input_image = &image;
+
+	// Detect lines and guess initial orientation
+	TIMED("Detect lines") line_detector.Compute(image);
+	TIMED("Estimate orientations")
+		line_sweeper.Compute(image, line_detector.detections);
+
+	// Convert the line sweeper labels to a score matrix
+	scorefunc.Resize(image.nx(), image.ny());
+	for (int y = 0; y < image.ny(); y++) {
+		const int* inrow = line_sweeper.orient_map[y];
+		for (int i = 0; i < 3; i++) {
+			float* outrow = scorefunc.pixel_scores[i][y];
+			for (int x = 0; x < image.nx(); x++) {
+				outrow[x] = (inrow[x] == i ? 1.0 : 0.0);
+			}
+		}
+	}
+}
+
 }
 
 
@@ -679,7 +618,7 @@ void ManhattanDPReconstructor::OutputOppRowViz(const string& path) {
 void ManhattanDPReconstructor::GetAuxOrients(const PosedCamera& aux,
                                              double zfloor,
                                              MatI& aux_orients) {
-	aux_orients.Resize(aux.im_size().y, aux.im_size().x);
+	aux_orients.Resize(aux.image_size().y, aux.im_size().x);
 	dp.TransferBuilding(manhattan_bnb.soln, aux.pose, zfloor, aux_orients);
 }
 

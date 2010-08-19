@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common_types.h"
+#include "polygon-fwd.h"
 
 namespace indoor_context {
 // Forward declarations
@@ -100,5 +101,14 @@ Mat3 GetManhattanHomology(const toon::Matrix<3,4>& cam, double z0, double z1);
 // Get a mapping from points on the plane z=z0 to the plane z=z1,
 // projected in the specified camera.
 Mat3 GetManhattanHomology(const PosedCamera& pc, double z0, double z1);
+
+// Get a homogrphy that makes vertical lines in the world appear vertical in the image.
+// The output image will fit within the bounds of the original image.
+// (aspect ratio will be preserved as much as possible).
+Mat3 GetVerticalRectifier(const PosedCamera& pc);
+
+// As above, but the output image will fit within the specified bounds
+// (aspect ratio will be preserved as much as possible).
+Mat3 GetVerticalRectifier(const PosedCamera& pc, const Bounds2D<>& out_bounds);
 
 }

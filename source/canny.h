@@ -1,7 +1,6 @@
 #pragma once
 
 #include "common_types.h"
-#include "misc.h"
 #include "image_bundle.h"
 
 namespace indoor_context {

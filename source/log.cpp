@@ -1,7 +1,6 @@
 #include <unistd.h>
 #include <algorithm>
 
-
 #include <boost/scoped_ptr.hpp>
 #include <boost/scoped_array.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
@@ -10,12 +9,21 @@
 #include <boost/iostreams/concepts.hpp>
 #include <boost/iostreams/operations.hpp>
 
-#include "log.h"
+#include "log.tpp"
 #include "common_types.h"
 
 namespace indoor_context {
 namespace ios=boost::iostreams;
+
+// Constants
 static const int kLogFileNo = STDOUT_FILENO;
+
+// Special tokens for the interface betwen Scoped* and *Filter
+struct SpecialLogTokens {
+	static const int kNullToken = -1;
+	static const int kEndToken = -2;
+	static const int kNewline = '\n';
+};
 
 // Ends the current line whenever kNewline is
 // recieved, unless the line has already be ended.
@@ -57,7 +65,7 @@ public:
 
 	template <typename Sink>
 	bool put(Sink& dest, int c) {
-		// Do not read from LogState::GetIndentLevel() here because
+		// Do not read from LogManager::GetIndentLevel() here because
 		// internal caching means that this gets called out-of-sync with
 		// the indent changes
 		if (c <= -10) {
@@ -77,8 +85,39 @@ public:
 	}
 };
 
-// Get the singleton log stream
-ostream& GetLogInstance() {
+// Static vars
+bool LogManager::enabled = true;
+int LogManager::indent_level = 0;
+
+// Static
+void LogManager::SetIndent(int newlevel) {
+	GetLogStream().put(-10-newlevel);
+	indent_level = newlevel;
+}
+
+LogManager::ScopedIndenter::ScopedIndenter(int lines) : nlines(lines) {
+	LogManager::SetIndent(LogManager::indent_level + kIndentIncrement);
+}
+
+LogManager::ScopedIndenter::~ScopedIndenter() {
+	LogManager::SetIndent(LogManager::indent_level - kIndentIncrement);
+	if (LogManager::enabled) {
+		for (int i = 0; i < nlines; i++) {
+			LOG_STREAM << "\n";
+		}
+	}
+}
+
+LogManager::ScopedEnabler::ScopedEnabler(bool newstate)
+: oldstate(LogManager::enabled) {
+	LogManager::enabled = newstate;
+}
+
+LogManager::ScopedEnabler::~ScopedEnabler() {
+	LogManager::enabled = oldstate;
+}
+
+ostream& LogManager::GetLogStream() {
 	static scoped_ptr<ios::filtering_ostream> str;
 	static AutoNewlineFilter nlfilter;
 	static IndentFilter ifilter;
@@ -91,40 +130,12 @@ ostream& GetLogInstance() {
 	return *str;
 }
 
-// Static vars
-bool LogState::enabled = true;
-int LogState::indent_level = 0;
-
-// Static
-void LogState::SetIndent(int newlevel) {
-	GetLogInstance().put(-10-newlevel);
-	indent_level = newlevel;
+LogManager::DelayedNewline::~DelayedNewline() {
+	s.put(SpecialLogTokens::kEndToken);
+	s << flush;
 }
 
-LogState::ScopedIndenter::ScopedIndenter(int lines) : nlines(lines) {
-	LogState::SetIndent(LogState::indent_level + kIndentIncrement);
-}
-
-LogState::ScopedIndenter::~ScopedIndenter() {
-	LogState::SetIndent(LogState::indent_level - kIndentIncrement);
-	if (LogState::enabled) {
-		for (int i = 0; i < nlines; i++) {
-			DLOG_STREAM << "\n";
-		}
-	}
-}
-
-LogState::ScopedEnabler::ScopedEnabler(bool newstate)
-: oldstate(LogState::enabled) {
-	LogState::enabled = newstate;
-}
-
-LogState::ScopedEnabler::~ScopedEnabler() {
-	LogState::enabled = oldstate;
-}
-
-// Parse a set of expressions of the form "EXPR1, EXPR2, "...x
-vector<string> ParseVaExprs(const string& s) {
+vector<string> LogManager::ParseVaExprs(const string& s) {
 	// We are essentially parsing C++ expressions here... uh oh.
 	// The logic I apply is that commas can only appear in function
 	// calls (or in for loops but they don't have a value so can't be

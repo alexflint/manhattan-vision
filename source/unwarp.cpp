@@ -2,8 +2,6 @@
 
 #include <VW/Image/imageio.tpp>
 
-
-#include "misc.h"
 #include "common_types.h"
 #include "vanishing_points.h"
 #include "timer.h"
@@ -16,7 +14,6 @@
 #include "math_utils.tpp"
 
 #include "unwarped_image.h"
-#include "misc.h"
 #include "vars.h"
 
 using namespace indoor_context;

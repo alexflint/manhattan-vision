@@ -6,11 +6,6 @@
 #include "range_utils.tpp"
 
 namespace indoor_context {
-	// Read a vector of vectors
-	//istream& operator>>(istream& s, vector<VecD>& vs);
-	// Write a vector of vectors
-	//ostream& operator<<(ostream& s, const vector<VecD>& vs);
-
 	// Read an object from a file
 	template <typename T>
 	void ReadFile(const char* file, T& x) {
@@ -296,5 +291,12 @@ namespace indoor_context {
 			}
 			a = b+1;
 		} while (pos != string::npos);
+	}
+
+	template <typename T>
+	vector<T> ParseMultiRange(const string& s) {
+		vector<T> v;
+		ParseMultiRange(s, v);
+		return v;
 	}
 }

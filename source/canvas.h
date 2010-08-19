@@ -9,6 +9,7 @@
 #include <VW/Image/imagergb.h>
 
 #include "common_types.h"
+#include "line_segment.h"
 #include "polygon-fwd.h"
 
 namespace indoor_context {

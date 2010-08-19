@@ -1,6 +1,5 @@
 #include "hw_convolver.h"
 #include "common_types.h"
-#include "misc.h"
 #include "cuda_conv.h"
 
 #include <VW/Utils/timer.h>

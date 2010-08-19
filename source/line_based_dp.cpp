@@ -159,7 +159,7 @@ public:
 			BOOST_FOREACH (const LineSeg& b, ret_clines[1]) {
 				double x = project(a.eqn() ^ b.eqn())[0];
 				// ignore y coord in bounds test
-				if (pc.camera.ret_bounds().Contains(makeVector(x,0))) {
+				if (pc.camera.retina_bounds().Contains(makeVector(x,0))) {
 					num_hline_divs++;
 					div_xs.push_back(x);
 				}
@@ -195,7 +195,7 @@ public:
 			for (int j = 0; j < 2; j++) {
 				COUNTED_FOREACH(int k, const LineSeg& seg, ret_clines[j]) {
 					double y = project(seg.eqn() ^ div_eqn)[1];
-					if (pc.camera.ret_bounds().Contains(makeVector(0, y))) {
+					if (pc.camera.retina_bounds().Contains(makeVector(0, y))) {
 						isct_ys[j][i].push_back(make_pair(y, k));
 					}
 				}

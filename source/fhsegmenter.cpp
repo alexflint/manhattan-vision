@@ -12,7 +12,6 @@
 #include "fhsegmenter.h"
 #include "union_find.h"
 #include "timer.h"
-#include "misc.h"
 #include "filters.h"
 #include "image_bundle.h"
 #include "image_utils.tpp"

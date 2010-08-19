@@ -4,7 +4,6 @@
 #include <boost/function.hpp>
 
 #include "common_types.h"
-#include "ptam_include.h"
 #include "line_detector.h"
 #include "camera.h"
 #include "progress_reporter.h"
@@ -13,20 +12,20 @@
 namespace indoor_context {
 
 struct ManhattanEdge {
-	toon::Vector<3> start, end, eqn;
+	Vec3 start, end, eqn;
 	int axis;
 	int id; // unique identifier for this edge
 	ManhattanEdge();
-	ManhattanEdge(const toon::Vector<3>& a, const toon::Vector<3>& b, int axis,
+	ManhattanEdge(const Vec3& a, const Vec3& b, int axis,
 	              int id);
-	bool Contains(const toon::Vector<3>& p) const;
+	bool Contains(const Vec3& p) const;
 };
 
 struct ManhattanCorner {
-	toon::Vector<3> div_eqn; // homogeneous line equation of this edge,
+	Vec3 div_eqn; // homogeneous line equation of this edge,
 	// positive side is always to the left in the
 	// image
-	toon::Vector<3> left_ceil, left_floor, right_ceil, right_floor;
+	Vec3 left_ceil, left_floor, right_ceil, right_floor;
 	int left_axis, right_axis;
 	bool leftmost, rightmost;
 	int occl_side; // -1 for left, 1 for right, 0 for no occlusion
@@ -140,46 +139,46 @@ public:
 
 	// Add a corner to bld. Return true if the corner is valid
 	bool AddCorner(ManhattanBuilding& bld, int edge_id,
-	               const toon::Vector<3>& div_eqn, int new_axis,
+	               const Vec3& div_eqn, int new_axis,
 	               bool update_left);
 
 	// Returns either v or -v, whichver is a valid div_eqn (i.e. has v[0] > 0)
-	toon::Vector<3> DivVec(const toon::Vector<3>& v);
+	Vec3 DivVec(const Vec3& v);
 
 	// Above/below horizon checks
-	bool AboveHorizon(const toon::Vector<3>& v) const;
-	bool BelowHorizon(const toon::Vector<3>& v) const;
+	bool AboveHorizon(const Vec3& v) const;
+	bool BelowHorizon(const Vec3& v) const;
 
 	// Occlusion tests
 	bool OcclusionValid(ManhattanCorner& cnr);
 	bool UpdateOcclusion(ManhattanCorner& cnr);
 	bool UpdateStripe(ManhattanCorner& left_cnr,
 	                  ManhattanCorner& right_cnr,
-	                  const toon::Vector<3>& floor_line,
-	                  const toon::Vector<3>& ceil_line,
+	                  const Vec3& floor_line,
+	                  const Vec3& ceil_line,
 	                  int new_axis);
 
 	// Determine the stripe containing the point p, set l_cnr and r_cnr
 	// to the corners to the point's left and right respectively, and
 	// return the index of the left corner
-	int LocateStripe(const ManhattanBuilding& bld, const toon::Vector<3>& p,
+	int LocateStripe(const ManhattanBuilding& bld, const Vec3& p,
 	                 ManhattanBuilding::ConstCnrIt& l_cnr,
 	                 ManhattanBuilding::ConstCnrIt& r_cnr) const;
-	int LocateStripe(ManhattanBuilding& bld, const toon::Vector<3>& p,
+	int LocateStripe(ManhattanBuilding& bld, const Vec3& p,
 	                 ManhattanBuilding::CnrIt& l_cnr,
 	                 ManhattanBuilding::CnrIt& r_cnr);
 
 	// Determine whether p is between left and right corners
-	bool StripeContains(const toon::Vector<3>& left_div,
-	                    const toon::Vector<3>& right_div,
-	                    const toon::Vector<3>& p);
+	bool StripeContains(const Vec3& left_div,
+	                    const Vec3& right_div,
+	                    const Vec3& p);
 	bool StripeContains(const ManhattanCorner& left,
-	                    const ManhattanCorner& right, const toon::Vector<3>& p);
+	                    const ManhattanCorner& right, const Vec3& p);
 
 	// Get the minimum distance from a point to the boundary of a stripe
 	double GetStripeMargin(const ManhattanCorner& left,
 	                       const ManhattanCorner& right,
-	                       const toon::Vector<3>& p);
+	                       const Vec3& p);
 };
 
 
@@ -226,9 +225,9 @@ public:
 	// Toggles between h1_axis and h2_axis
 	int OtherHorizAxis(int a) const;
 	// Project points into the world
-	toon::Vector<3> FloorPoint(const toon::Vector<3>& p, double z);
-	toon::Vector<3> CeilPoint(const toon::Vector<3>& p,
-	                          const toon::Vector<3>& floor_pt);
+	Vec3 FloorPoint(const Vec3& p, double z);
+	Vec3 CeilPoint(const Vec3& p,
+	                          const Vec3& floor_pt);
 
 	// Transfer a building between frames. PredictOrientations is a
 	// special case of this for orig_pose = new_pose.

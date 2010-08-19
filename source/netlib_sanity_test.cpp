@@ -3,8 +3,12 @@
 // then this will fail. To fix this the LD_PRELOAD environment
 // variable should be set to the path to liblapack.so.
 
+#include <stdlib.h>
+
+#include <string>
 #include <iostream>
 #include <SVD.h>
+
 using namespace std;
 using namespace TooN;
 
@@ -12,6 +16,12 @@ class NetLibSanityTest;
 class NetLibSanityTest {
 public:
 	NetLibSanityTest() {
+		const char* p = getenv("LD_PRELOAD");
+		string ldpreload = p ? p : "";
+		if (ldpreload.find("/usr/lib/liblapack.so") == string::npos) {
+			cout << "Error: It looks like liblapack.so is missing from LD_PRELOAD.\nRun:\n  export LD_PRELOAD=/usr/lib/liblapack.so\nSee details in netlib_sanity_test.cpp" << endl;
+			exit(-1);
+		}
 		Matrix<3,2> m;
 		m[0] = makeVector(1,0);
 		m[1] = makeVector(0,1);

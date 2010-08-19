@@ -25,7 +25,7 @@ void RenderPoly(const vector<Vec3>& poly, const PixelRGB<byte>& color) {
 
 void DrawFrustrum(const PosedCamera& pc) {
 	double znear = 1e-6, zfar = 1e+6;
-	Polygon<4> poly = pc.ret_bounds().GetPolygon();
+	Polygon<4> poly = pc.retina_bounds().GetPolygon();
 	GL_PRIMITIVE(GL_LINE_LOOP) {
 		for (int i = 0; i < 4; i++) {
 			glVertexV(poly.verts[i]*znear);

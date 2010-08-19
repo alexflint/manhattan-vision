@@ -5,9 +5,7 @@
 #include "image_bundle.h"
 #include "common_types.h"
 #include "canny.h"
-#include "misc.h"
-
-#include "polygon.tpp"
+#include "line_segment.h"
 
 namespace indoor_context {
 
@@ -21,27 +19,26 @@ public:
 	  confidence(0),
 	  axis(-1),
 	  pixels(new vector<ImageRef>) { }
-	LineDetection(const toon::Vector<3>& a,
-	              const toon::Vector<3>& b,
-	              int ax=-1)
+	LineDetection(const Vec3& a, const Vec3& b, int ax=-1)
 	: seg(a,b),
 	  eqn(a^b),
 	  confidence(0),
 	  axis(ax),
-	  pixels(new vector<ImageRef>) { }
+	  pixels(new vector<ImageRef>) {
+	}
 	LineSeg seg;
-	toon::Vector<3> eqn;
+	Vec3 eqn;
 	double confidence;
 	int axis;
 	shared_ptr<vector<ImageRef> > pixels;
 
 	void DrawPixels(ImageRGB<byte>& canvas,
 	                const PixelRGB<byte>& color,
-	                toon::Vector<2> offset=toon::Zeros,
+	                Vec2 offset=toon::Zeros,
 	                int thickness=1) const;
 	void DrawLine(ImageRGB<byte>& canvas,
 	              const PixelRGB<byte>& color,
-	              toon::Vector<2> offset=toon::Zeros,
+	              Vec2 offset=toon::Zeros,
 	              int thickness=1) const;
 };
 

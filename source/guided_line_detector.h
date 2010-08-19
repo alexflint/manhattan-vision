@@ -39,8 +39,8 @@ namespace indoor_context {
 		Gradients gradients;
 
 		// Projected vanishing points
-		toon::Vector<3> image_vpts[3];
-		toon::Vector<3> retina_vpts[3];
+		Vec3 image_vpts[3];
+		Vec3 retina_vpts[3];
 
 		// Undistort map
 		MatF undist[3];
@@ -66,7 +66,7 @@ namespace indoor_context {
 		vector<LineDetection> detections[3];
 
 		// Windows around vanishing points
-		vector<toon::Vector<3> > vpt_windows[3];
+		vector<Vec3> vpt_windows[3];
 		vector<double> vpt_votes[3];
 
 		// The samples we selected to localise the vanishing points

@@ -41,13 +41,13 @@ Mat3 ComputeVerticalRectifier(const PosedCamera& pc) {
 
 	// Compute scaling to keep all corners within bounds
 	double scale = 1.0;
-	const Bounds2D<>& ret_bounds = pc.camera.ret_bounds();
-	Polygon<4> ret_perimeter = ret_bounds.GetPolygon();
+	const Bounds2D<>& retina_bounds = pc.camera.ret_bounds();
+	Polygon<4> ret_perimeter = retina_bounds.GetPolygon();
 	for (int i = 0; i < 4; i++) {
 		double canon_x = project(H_canon * ret_perimeter.verts[i])[0];
 		// this works because the retina is centred at zero...
-		scale = max(scale, canon_x/ret_bounds.left);
-		scale = max(scale, canon_x/ret_bounds.right);
+		scale = max(scale, canon_x/retina_bounds.left);
+		scale = max(scale, canon_x/retina_bounds.right);
 	}
 
 	// Since H_canon operates on homogeneous coordinates we must not

@@ -4,7 +4,6 @@
 #include <boost/scoped_array.hpp>
 
 #include "common_types.h"
-#include "misc.h"
 
 namespace indoor_context {
 
@@ -129,7 +128,7 @@ public:
 	inline toon::Vector<N, int> dimensions() const { return dim_lens; }
 
 	// Get the i-th dimension
-	inline int dim(int i) { return dim_lens[i]; }
+	inline int dim(int i) const { return dim_lens[i]; }
 
 	// Get size
 	int size() const { return n; }

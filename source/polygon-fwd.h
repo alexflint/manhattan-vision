@@ -5,9 +5,6 @@
 #include "common_types.h"
 
 namespace indoor_context {
-	// Represents a 2D line segment in homogeneous coordinates
-	class LineSeg;
-
 	// Represents a polygon as a sequence of vertices
 	template <unsigned N, typename T=double>
 	class Polygon;

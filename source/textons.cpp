@@ -18,8 +18,6 @@
 #include "textons.h"
 #include "filters.h"
 #include "kmeans.h"
-#include "misc.h"
-#include "log.h"
 #include "progress_reporter.h"
 
 #include "io_utils.tpp"
@@ -47,6 +45,17 @@ namespace indoor_context {
 	const lazyvar<string> gvVocabFile("Textons.VocabFile");
 	// Strategy for filtering (CPU, CPUParallel, or GPU)
 	const lazyvar<string> gvFilterStrategy("Textons.FilterStrategy");
+
+	lazyvar<int> gvColorInfo("Textons.Features.ColorInfo");
+	lazyvar<float> gvGaborWeight("Textons.Features.GaborWeight");
+	lazyvar<float> gvMonoWeight("Textons.Features.MonoWeight");
+	lazyvar<float> gvRWeight("Textons.Features.RWeight");
+	lazyvar<float> gvGWeight("Textons.Features.GWeight");
+	lazyvar<float> gvBWeight("Textons.Features.BWeight");
+	lazyvar<float> gvHWeight("Textons.Features.HWeight");
+	lazyvar<float> gvSWeight("Textons.Features.SWeight");
+	lazyvar<float> gvVWeight("Textons.Features.VWeight");
+
 
 	TextonVocab::TextonVocab() {
 	}
@@ -111,15 +120,15 @@ namespace indoor_context {
 	void TextonFeatures::InitVars() {
 		// These vars are used in TextonFeatures::Get so cache them for
 		// efficiency and thread safety.
-		color_info = GV3::get<int>("Textons.Features.ColorInfo");
-		gabor_weight = GV3::get<float>("Textons.Features.GaborWeight");
-		mono_weight = GV3::get<float>("Textons.Features.MonoWeight");
-		r_weight = GV3::get<float>("Textons.Features.RWeight");
-		g_weight = GV3::get<float>("Textons.Features.GWeight");
-		b_weight = GV3::get<float>("Textons.Features.BWeight");
-		h_weight = GV3::get<float>("Textons.Features.HWeight");
-		s_weight = GV3::get<float>("Textons.Features.SWeight");
-		v_weight = GV3::get<float>("Textons.Features.VWeight");
+		color_info = *gvColorInfo;
+		gabor_weight = *gvGaborWeight;
+		mono_weight = *gvMonoWeight;
+		r_weight = *gvRWeight;
+		g_weight = *gvGWeight;
+		b_weight = *gvBWeight;
+		h_weight = *gvHWeight;
+		s_weight = *gvSWeight;
+		v_weight = *gvVWeight;
 	}
 		
 

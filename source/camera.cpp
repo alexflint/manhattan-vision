@@ -13,11 +13,11 @@ lazyvar<Vec2 > gvImageSize("Camera.ImageSize");
 
 ///// CameraBase
 
-void CameraBase::SetImageSize(const ImageRef& im_size) {
-	im_size_ = im_size;
-	im_bounds_ = Bounds2D<double>::FromSize(im_size);
-	ret_bounds_ = Bounds2D<double>::FromCorners(
-			ImToRet(im_bounds_.tl()), ImToRet(im_bounds_.br()));
+void CameraBase::SetImageSize(const ImageRef& image_size) {
+	image_size_ = image_size;
+	image_bounds_ = Bounds2D<double>::FromSize(image_size);
+	retina_bounds_ = Bounds2D<double>::FromCorners(
+			ImToRet(image_bounds_.tl()), ImToRet(image_bounds_.br()));
 }
 
 Vec2 CameraBase::GetRetinaPixelSize() const {
@@ -34,10 +34,10 @@ double CameraBase::GetMaxDeviation(const CameraBase& cam1, const CameraBase& cam
 	const int kDeviationSamples = 100;
 	double maxerr = 0.0;
 
-	double x1 = cam1.ret_bounds().left;
-	double x2 = cam1.ret_bounds().right;
-	double y1 = cam1.ret_bounds().top;
-	double y2 = cam1.ret_bounds().bottom;
+	double x1 = cam1.retina_bounds().left();
+	double x2 = cam1.retina_bounds().right();
+	double y1 = cam1.retina_bounds().top();
+	double y2 = cam1.retina_bounds().bottom();
 
 	for (int y = 0; y < kDeviationSamples; y++) {
 		for (int x = 0; x < kDeviationSamples; x++) {
@@ -62,22 +62,22 @@ Mat3 CameraBase::Linearize() const {
 
 ///// Camera
 
-Camera::Camera() : cam_(new PTAMM::ATANCamera(*gvDefaultCamera)) {
+Camera::Camera() : atan_(new PTAMM::ATANCamera(*gvDefaultCamera)) {
 	SetImageSize(asIR(*gvImageSize));
 }
 
-Camera::Camera(const ImageRef& im_size)
-: cam_(new PTAMM::ATANCamera(*gvDefaultCamera)) {
-	SetImageSize(im_size);
+Camera::Camera(const ImageRef& image_size)
+: atan_(new PTAMM::ATANCamera(*gvDefaultCamera)) {
+	SetImageSize(image_size);
 }
 
-Camera::Camera(const ImageRef& im_size, const string& cam_name)
-: cam_(new PTAMM::ATANCamera(cam_name)) {
-	SetImageSize(im_size);
+Camera::Camera(const ImageRef& image_size, const string& cam_name)
+: atan_(new PTAMM::ATANCamera(cam_name)) {
+	SetImageSize(image_size);
 }
 
 Vec2 Camera::RetToIm(const Vec2& v) const {
-	return cam_->Project(v);
+	return atan_->Project(v);
 }
 
 Vec3 Camera::RetToIm(const Vec3& v) const {
@@ -85,7 +85,7 @@ Vec3 Camera::RetToIm(const Vec3& v) const {
 }
 
 Vec2 Camera::ImToRet(const Vec2& v) const {
-	return cam_->UnProject(v);
+	return atan_->UnProject(v);
 }
 
 Vec3 Camera::ImToRet(const Vec3& v) const {
@@ -140,23 +140,26 @@ void LinearCamera::Linearize(const CameraBase& cam, Mat3& m) {
 	m.T()[0] = cam.RetToIm(makeVector(1.0, 0, 1)) - c;
 	m.T()[1] = cam.RetToIm(makeVector(0.0, 1, 1)) - c;
 	m.T()[2] = c;
+
+	// there may be an error in this function since the linearizations seem
+	// to vary from one frame to the next!
 }
 
 
 ///// PosedCamera
-PosedCamera::PosedCamera(const toon::SE3<>& pose, const CameraBase& cam)
-: camera(cam) {
+PosedCamera::PosedCamera(const toon::SE3<>& pose, const CameraBase& camera)
+: camera_(&camera) {
 	SetPose(pose);
 }
 
-void PosedCamera::SetPose(const toon::SE3<>& p) {
-	pose = p;
-	invpose = p.inverse();
+void PosedCamera::SetPose(const toon::SE3<>& pose) {
+	pose_ = pose;
+	invpose_ = pose.inverse();
 }
 
 Vec3 PosedCamera::GetRetinaVpt(int i) const {
 	CHECK_INTERVAL(i,0,2);
-	return col(pose.get_rotation(), i);
+	return col(pose_.get_rotation(), i);
 }
 
 Vec3 PosedCamera::GetImageVpt(int i) const {
@@ -164,7 +167,7 @@ Vec3 PosedCamera::GetImageVpt(int i) const {
 }
 
 Vec3 PosedCamera::GetRetinaHorizon() const {
-	Vec3 v = GetRetinaVpt(2);
+	Vec3 v = GetRetinaVpt(kVerticalAxis);
 	return v * Sign(v[1]);
 }
 
@@ -174,12 +177,12 @@ Vec3 PosedCamera::GetImageHorizon() const {
 }
 
 void PosedCamera::Transform(const toon::SE3<>& m) {
-	pose *= m;
-	invpose = pose.inverse();
+	pose_ *= m;
+	invpose_ = pose_.inverse();
 }
 
 Matrix<3,4> PosedCamera::Linearize() const {
-	return camera.Linearize() * as_matrix(pose);
+	return camera_->Linearize() * as_matrix(pose_);
 }
 
 }

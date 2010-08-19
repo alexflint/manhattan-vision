@@ -48,9 +48,22 @@ int main(int argc, char **argv) {
 	// Get the homographies
 	Mat3 hfloor = GetHomographyVia(*kf1.pc, *kf2.pc, makeVector(0, 0, -1, zfloor));
 	Mat3 hceil = GetHomographyVia(*kf1.pc, *kf2.pc, makeVector(0, 0, -1, zceil));
-	Mat3 floor2ceil = GetManhattanHomology(*kf1.pc, zfloor, zceil);
-
+	Mat3 floorToCeil = GetManhattanHomology(*kf1.pc, zfloor, zceil);
 	Vec3 horizon = kf1.pc->GetImageHorizon();
+
+	// Compute integral col image for kf2
+	MatF aux_orients;
+	GetTrueOrients(tru_map.floorplan(), *kf2.pc, aux_orients);
+	IntegralColImage<3> integ_orients(aux_orients);
+
+	// Transfer some quads
+	int x = 100;
+	int y = 45;
+	int axis = 1;
+
+	double opp_x
+
+
 
 	// Draw some points
 	BrightColors bc;

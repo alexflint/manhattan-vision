@@ -2,8 +2,6 @@
 #include <VNL/vector.tpp>
 
 #include "filters.h"
-#include "log.h"
-#include "misc.h"
 #include "common_types.h"
 #include "math_utils.tpp"
 #include "image_utils.tpp"

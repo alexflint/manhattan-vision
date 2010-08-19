@@ -33,7 +33,7 @@ public:
 	int id;
 
 	// The raw image from the camera
-	ImageBundle image;
+	PosedImage image;
 	// Path to the image file for this frame (if any)
 	string image_file;
 	// The MD5 hash from the map XML
@@ -72,7 +72,7 @@ public:
 	// The canny line detector
 	CannyLineDetector line_detector;
 	// Posed image, initialized in RunGuidedLineDetector
-	scoped_ptr<PosedImage> pim;
+	//scoped_ptr<PosedImage> pim;
 	// The guided line detector (for after canonical frame is established)
 	GuidedLineDetector guided_line_detector;
 

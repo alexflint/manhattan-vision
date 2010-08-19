@@ -116,4 +116,15 @@ namespace indoor_context {
 			}
 		}
 	}
+
+
+	Mat3 GetFloorCeilHomology(const PosedCamera& pc, const proto::FloorPlan& fp) {
+		double zfloor = fp.zfloor();
+		double zceil = fp.zceil();
+		Vec3 vup = pc.pose().inverse() * makeVector(0,1,0);
+		if (Sign(zceil-zfloor) == Sign(vup[2])) {
+			swap(zfloor, zceil);
+		}
+		return GetManhattanHomology(pc, zfloor, zceil);
+	}
 }

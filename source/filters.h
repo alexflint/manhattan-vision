@@ -4,9 +4,7 @@
 #include <iostream>
 
 #include "worker.h"
-#include "misc.h"
 #include "common_types.h"
-#include "log.h"
 #include "hw_convolver.h"
 
 namespace indoor_context {
@@ -16,8 +14,7 @@ namespace indoor_context {
 class Filter2D {
 public:
 	// Run the filter
-	virtual void Run(const ImageF& input,
-	                 ImageF& output) = 0;
+	virtual void Run(const ImageF& input, ImageF& output) = 0;
 
 	// Run on dedicated hardware
 	virtual void RunOnHardware(HwConvolver& convolver,

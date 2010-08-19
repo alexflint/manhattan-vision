@@ -15,6 +15,12 @@
 
 namespace indoor_context {
 
+// Get the size of a matrix
+template <int N, typename T>
+Vec2I dimensions(const toon::Matrix<N,2>& m) {
+	return makeVector(m.num_cols(), m.num_rows());
+}
+
 // defined in math_utils.cpp TODO: move these to .h
 toon::Vector<2> asToon(const proto::Vec2& x);
 toon::Vector<3> asToon(const proto::Vec3& x);
@@ -30,6 +36,7 @@ proto::Vec6 asProto(const toon::Vector<6>& x);
 // Construct a full 3x4 matrix representing a rigid 3D transform
 toon::Matrix<3,4> as_matrix(const toon::SE3<>& se3);
 
+// TODO: sort out this rounding stuff, do it one way consistently!
 template <typename T>
 ImageRef round_pos(const toon::Vector<2,T>& v) {
 	return ImageRef(roundi(v[0]), roundi(v[1]));
@@ -40,6 +47,42 @@ ImageRef round_pos(const toon::Vector<3,T>& v) {
 	return round_pos(project(v));
 }
 
+template <int N, typename T>
+toon::Vector<N,int> RoundVector(const toon::Vector<N,T>& v) {
+	toon::Vector<N,int> u;
+	for (int i = 0; i < N; i++) {
+		u[i] = roundi(v[i]);
+	}
+	return u;
+}
+
+template <typename T>
+toon::Vector<-1,int> RoundVector(const toon::Vector<-1,T>& v) {
+	toon::Vector<-1,int> u;
+	for (int i = 0; i < v.size(); i++) {
+		u[i] = roundi(v[i]);
+	}
+	return u;
+}
+
+// For speed:
+template <typename T>
+toon::Vector<1,int> RoundVector(const toon::Vector<1,T>& v) {
+	return toon::makeVector(roundi(v[0]));
+}
+
+// For speed:
+template <typename T>
+toon::Vector<2,int> RoundVector(const toon::Vector<2,T>& v) {
+	return toon::makeVector(roundi(v[0]), roundi(v[1]));
+}
+
+// For speed:
+template <typename T>
+toon::Vector<3,int> RoundVector(const toon::Vector<3,T>& v) {
+	return toon::makeVector(roundi(v[0]), roundi(v[1]), roundi(v[2]));
+}
+
 // toon::Vector -> ImageRef
 template <typename T>
 ImageRef asIR(const toon::Vector<2,T>& v) {
@@ -48,8 +91,6 @@ ImageRef asIR(const toon::Vector<2,T>& v) {
 
 // ImageRef -> toon::Vector
 toon::Vector<2> asToon(const ImageRef& ir);
-
-
 
 // VNL -> toon for fixed size vectors
 template <int N, typename T>

@@ -3,7 +3,7 @@
 #include "common_types.h"
 #include "colors.h"
 
-#include "polygon.tpp"
+#include "line_segment.h"
 
 namespace indoor_context {
 // Vizualize a segmentation by assigning a colour to each region

@@ -10,7 +10,6 @@
 
 #include "common_types.h"
 #include "image_bundle.h"
-#include "misc.h"
 #include "canny.h"
 #include "line_detector.h"
 #include "geom_utils.h"

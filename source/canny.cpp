@@ -8,7 +8,6 @@
 #include <VW/Image/imagecopy.tpp>
 
 #include "common_types.h"
-#include "misc.h"
 #include "fast_sobel.h"
 #include "canny.h"
 #include "filters.h"

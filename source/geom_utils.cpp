@@ -145,21 +145,15 @@ Vec3 PlaneToDepthEqn(const Matrix<3,4>& camera, const Vec4& plane) {
 }
 
 
-// Compute the cross ratio for four points in homgeneous coordinates
-// See Hartley&Zisserman
 double CrossRatio(const Vec2& a, const Vec2& b, const Vec2& c, const Vec2& d) {
 	//return norm(a-c)*norm(b-d)/(norm(b-c)*norm(a-d));
 	return Det(a,b)*Det(c,d) / (Det(a,c)*Det(b,d));
 }
 
-// Compute the cross ratio for four points in homgeneous coordinates
-// See Hartley&Zisserman
 double CrossRatio(const Vec3& a, const Vec3& b, const Vec3& c, const Vec3& d) {
 	return CrossRatio(project(a), project(b), project(c), project(d));
 }
 
-// Get the homography mapping points from one camera, onto a plane,
-// then into another camera.
 Mat3 GetHomographyVia(const Matrix<3,4>& from,
                       const Matrix<3,4>& to,
                       const Vec4& plane) {
@@ -170,19 +164,12 @@ Mat3 GetHomographyVia(const Matrix<3,4>& from,
 	return to * m_inv.slice<0,0,4,3>();
 }
 
-// Get the homography mapping points from one camera, onto a plane,
-// then into another camera.
 Mat3 GetHomographyVia(const PosedCamera& from,
                       const PosedCamera& to,
                       const Vec4& plane) {
 	return GetHomographyVia(from.Linearize(), to.Linearize(), plane);
 }
 
-// Construct the planar homology M with the given vertex, axis, and points. We have
-//   M*p = q
-//   M*vertex = vertex
-//   M*x = x  for all x with on the axis (i.e. x*axis=0)
-// See Criminisi "Single View Metrology"
 Mat3 ConstructPlanarHomology(const Vec3& vertex, const Vec3& axis,
                              const Vec3& p, const Vec3& q) {
 	Mat3 I = Identity;
@@ -190,8 +177,6 @@ Mat3 ConstructPlanarHomology(const Vec3& vertex, const Vec3& axis,
 	return I + (cr-1)*(vertex.as_col()*axis.as_row())/(vertex*axis);
 }
 
-// Get a mapping from points on the plane {z=z0} to the plane {z=z1},
-// projected in the specified camera.
 Mat3 GetManhattanHomology(const Matrix<3,4>& cam, double z0, double z1) {
 	Mat3 m = cam.slice<0,0,3,3>();
 	Mat3 m_inv = LU<3>(m).get_inverse();
@@ -205,10 +190,47 @@ Mat3 GetManhattanHomology(const Matrix<3,4>& cam, double z0, double z1) {
 	return ConstructPlanarHomology(vertex, axis, p0, p1);
 }
 
-// Get a mapping from points on the plane {z=z0} to the plane {z=z1},
-// projected in the specified camera.
 Mat3 GetManhattanHomology(const PosedCamera& pc, double z0, double z1) {
 	return GetManhattanHomology(pc.Linearize(), z0, z1);
 }
 
+Mat3 GetVerticalRectifier(const PosedCamera& pc,
+                          const Bounds2D<>& out_bounds) {
+	// Here we assume that the Z axis represents the vertical direction
+	Vec3 up = pc.GetRetinaVpt(2);
+	if (up[1] < 0) up = -up;
+
+	// Build a rotation to move the vertical vanishing point to infinity.
+	// R must satisfy:
+	//   (1) R*up = [0,1,0] or [0,-1,0]  (depending on sign of up[1]
+	//   (2) R is as close to the identity as possible
+	//        (so that the other vpts are minimally affected)
+	Mat3 R_up;
+	R_up[0] = up ^ GetAxis<3>(2);
+	R_up[1] = up;
+	R_up[2] = R_up[0] ^ R_up[1];
+
+	// Compose it with the camera transform
+	// NOTE: perhaps we could just use the image vanishing points and avoid this.
+	Mat3 C = pc.camera().Linearize();
+	Mat3 C_inv = LU<>(C).get_inverse();
+	Mat3 H_rect = C * R_up * C_inv;
+
+	// Compute the image bounds after transformation
+	Polygon<4> outline = pc.camera().image_bounds().GetPolygon();
+	Polygon<4> rect_outline = outline.Transform(H_rect);
+	Bounds2D<> rect_bounds = Bounds2D<>::ComputeBoundingBox(rect_outline);
+
+	// Add a translation and scale to fit the image within the bounds
+	double scale = min(
+			out_bounds.width() / rect_bounds.width(),
+			out_bounds.height() / rect_bounds.height());  // preserve aspect ratio
+	Vec2 offset = out_bounds.center() - scale*rect_bounds.center();
+	Mat3 H_fit = Identity;
+	H_fit[0][0] = H_fit[1][1] = scale;
+	H_fit.slice<0,2,2,1>() = offset.as_col();
+
+	// Return the final transform
+	return H_fit * H_rect;
+}
 }

@@ -11,6 +11,7 @@
 #include "bld_helpers.h"
 #include "timer.h"
 
+#include "counted_foreach.tpp"
 #include "fill_polygon.tpp"
 #include "range_utils.tpp"
 #include "image_utils.tpp"
@@ -121,19 +122,16 @@ Vec3 MonocularManhattanBnb::CeilPoint(const Vec3& p,
 }
 
 void MonocularManhattanBnb::TransferBuilding(const ManhattanBuilding& bld,
-                                             //const SE3<>& orig_pose,
                                              const SE3<>& new_pose,
                                              double floor_z,
                                              MatI& orients) {
 	// Compute scaling (TODO: actually use this)
-	DiagonalMatrix<3> Mscale(makeVector(1.0*orients.Cols()/pc->im_size().x,
-			1.0*orients.Rows()/pc->im_size().y,
+	DiagonalMatrix<3> Mscale(makeVector(1.0*orients.Cols()/pc->image_size().x,
+			1.0*orients.Rows()/pc->image_size().y,
 			1.0));
 
 	// Invert the pose
-	// TODO: replace orig_pose with pc->pose
-	//const SE3<> orig_inv = orig_pose.inverse();
-	const SE3<> orig_inv = pc->pose.inverse();
+	const SE3<> orig_inv = pc->pose().inverse();
 
 	// Draw each wall segment
 	//Viewer3D v;
@@ -741,8 +739,8 @@ void ManhattanEvaluator::PredictOrientations(const ManhattanBuilding& bld,
 	CHECK_GT(orients.Cols(), 0);
 	orients.Fill(vert_axis);
 	Polygon<4> wall;
-	DiagonalMatrix<3> Mscale(makeVector(1.0*orients.Cols()/pc->im_size().x,
-			1.0*orients.Rows()/pc->im_size().y,
+	DiagonalMatrix<3> Mscale(makeVector(1.0*orients.Cols()/pc->image_size().x,
+			1.0*orients.Rows()/pc->image_size().y,
 			1.0));
 	for (ManhattanBuilding::ConstCnrIt left_cnr = bld.cnrs.begin();
 			successor(left_cnr) != bld.cnrs.end();
@@ -765,7 +763,7 @@ void ManhattanEvaluator::PredictGridOrientations(const ManhattanBuilding& bld,
 }
 void ManhattanEvaluator::PredictImOrientations(const ManhattanBuilding& bld,
                                                MatI& orients) const {
-	orients.Resize(pc->im_size().y, pc->im_size().x);
+	orients.Resize(pc->image_size().y, pc->image_size().x);
 	PredictOrientations(bld, orients);
 }
 
@@ -808,12 +806,12 @@ void ManhattanEvaluator::DrawPrediction(const ManhattanBuilding& bld,
 
 void ManhattanEvaluator::DrawOrientations(const MatI& orients,
                                           ImageRGB<byte>& canvas) {
-	ResizeImage(canvas, pc->im_size());
-	for (int y = 0; y < pc->im_size().y; y++) {
+	ResizeImage(canvas, pc->image_size());
+	for (int y = 0; y < pc->image_size().y; y++) {
 		PixelRGB<byte>* row = canvas[y];
-		const int* orient_row = orients[y*orients.Rows()/pc->im_size().y];
-		for (int x = 0; x < pc->im_size().x; x++) {
-			int orient = orient_row[x*orients.Cols()/pc->im_size().x];
+		const int* orient_row = orients[y*orients.Rows()/pc->image_size().y];
+		for (int x = 0; x < pc->image_size().x; x++) {
+			int orient = orient_row[x*orients.Cols()/pc->image_size().x];
 			if (orient == -1) {
 				row[x] = PixelRGB<byte>(255,255,255);
 			} else {

@@ -27,4 +27,7 @@ namespace indoor_context {
 	// Replace all instances of A in m with B, and vice versa
 	// Should no longer be needed
 	void InterchangeLabels(MatI& m, int a, int b);
+
+	// Get the floor->ceiling homology
+	Mat3 GetFloorCeilHomology(const PosedCamera& pc, const proto::FloorPlan& fp);
 }

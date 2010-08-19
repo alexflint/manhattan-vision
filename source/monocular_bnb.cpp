@@ -150,7 +150,7 @@ void ManhattanBnbReconstructor::OutputSolutionOrients(const string& path) {
 void ManhattanBnbReconstructor::GetAuxOrients(const PosedCamera& aux,
                                               double zfloor,
                                               MatI& aux_orients) {
-	aux_orients.Resize(aux.im_size().y, aux.im_size().x);
+	aux_orients.Resize(aux.image_size().y, aux.im_size().x);
 	manhattan_bnb.TransferBuilding(manhattan_bnb.soln,
 			aux.pose,
 			zfloor,

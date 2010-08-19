@@ -57,7 +57,7 @@ void FloorPlanRenderer::Render(const proto::FloorPlan& floorplan,
                                ImageRGB<byte>& canvas) {
 	Render(floorplan,
 			cam.Linearize(),
-			asToon(cam.im_size()),
+			asToon(cam.image_size()),
 			canvas);
 }
 
@@ -75,7 +75,7 @@ void FloorPlanRenderer::RenderOrients(const proto::FloorPlan& floorplan,
                                       MatI& orients) {
 	RenderOrients(floorplan,
 			cam.Linearize(),
-			asToon(cam.im_size()),
+			asToon(cam.image_size()),
 			orients);
 }
 
@@ -117,8 +117,8 @@ void FloorplanRenderer::PredictSurfs(const PosedCamera& pc, MatI& orients) {
 }
 
 void FloorplanRenderer::PredictOrients(const PosedCamera& pc, MatI& orients) {
-	orients.Resize(pc.im_size().y, pc.im_size().x);
-	MatF depth(pc.im_size().y, pc.im_size().x);
+	orients.Resize(pc.image_size().y, pc.im_size().x);
+	MatF depth(pc.image_size().y, pc.im_size().x);
 
 	vector<Vec3> depth_eqns;
 	Matrix<3,4> cam = as_matrix(pc.pose);

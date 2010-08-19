@@ -42,6 +42,6 @@ namespace indoor_context {
 
 	// static
 	int Worker::DefaultNumThreads() {
-		return GV3::get<int>("Worker.DefaultNumThreads");
+		return boost::thread::hardware_concurrency();
 	}
 }

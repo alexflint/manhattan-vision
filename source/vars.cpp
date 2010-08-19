@@ -3,17 +3,21 @@
 
 namespace indoor_context {
 	string config_file;
+	string kDefaultConfigFile = "config/common.cfg";
 
-	void InitVars(int argc,
-								char **argv,
-								const char* default_config_file) {
+	void InitVars() {
+		config_file = kDefaultConfigFile;
+		ReloadVars();
+	}
+
+	void InitVars(int argc, char **argv) {
 		// Parse the arguments first
 		GVars3::GUI.parseArguments(argc, argv);
 		// Setup a var so that we can specify the config file with -config
-		GVars3::gvar3<string> gvConfigFile("config", default_config_file, GVars3::SILENT);
+		GVars3::gvar3<string> gvConfigFile("config", kDefaultConfigFile, GVars3::SILENT);
 		config_file = *gvConfigFile;
 		// Now read the config file
-		GVars3::GUI.LoadFile(config_file);
+		ReloadVars();
 	}
 
 	void ReloadVars() {

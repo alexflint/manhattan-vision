@@ -1,6 +1,5 @@
 #include "rotation_estimator.h"
 #include "common_types.h"
-#include "log.h"
 
 #include "math_utils.tpp"
 #include "io_utils.tpp"

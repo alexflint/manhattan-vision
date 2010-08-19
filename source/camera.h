@@ -9,18 +9,21 @@
 #include "polygon.tpp"
 
 namespace indoor_context {
+// The vertical axis by convention is fixed as 2
+static const int kVerticalAxis = 2;
+
 // Base class for cameras
 class CameraBase {
 public:
 	// Recompute bounds. Calls the pure virtual ImToRet and RetToIm.
-	void SetImageSize(const ImageRef& im_size);
+	void SetImageSize(const ImageRef& image_size);
 
 	// Get the image size
-	inline const ImageRef& im_size() const { return im_size_; }
-	// Get the image bounds (same info as im_size() but different format)
-	const Bounds2D<>& im_bounds() const { return im_bounds_; }
+	inline const ImageRef& image_size() const { return image_size_; }
+	// Get the image bounds (same info as image_size() but different format)
+	const Bounds2D<>& image_bounds() const { return image_bounds_; }
 	// Get the bounds of the image in retina coordinates
-	const Bounds2D<>& ret_bounds() const { return ret_bounds_; }
+	const Bounds2D<>& retina_bounds() const { return retina_bounds_; }
 
 	// Transform retina -> image
 	virtual Vec2 RetToIm(const Vec2& v) const = 0;
@@ -49,9 +52,9 @@ public:
 	static double GetMaxDeviation(const CameraBase& cam1,
 	                              const CameraBase& cam2);
 private:
-	ImageRef im_size_;
-	Bounds2D<> im_bounds_;
-	Bounds2D<> ret_bounds_;
+	ImageRef image_size_;
+	Bounds2D<> image_bounds_;
+	Bounds2D<> retina_bounds_;
 };
 
 // Represents a projection from retina to image coordinates. Simply
@@ -62,8 +65,8 @@ public:
 	// Construct a camera for 0 by 0 images
 	Camera();
 	// Construct a camera for images of a specified size
-	Camera(const ImageRef& im_size);
-	Camera(const ImageRef& im_size, const string& cam_name);
+	Camera(const ImageRef& image_size);
+	Camera(const ImageRef& image_size, const string& cam_name);
 
 	// Transform retina -> image
 	Vec2 RetToIm(const Vec2& v) const;
@@ -75,11 +78,11 @@ public:
 	Vec3 ImToRet(const Vec3& v) const;
 
 	// Get the underlying PTAM camera
-	inline PTAMM::ATANCamera& cam() const { return *cam_; }
+	inline PTAMM::ATANCamera& atan_camera() const { return *atan_; }
 private:
 	// ATANCamera is mutable because its Project() and UnProject()
 	// methods are non-const (but act as if they are const)
-	mutable shared_ptr<PTAMM::ATANCamera> cam_;
+	mutable shared_ptr<PTAMM::ATANCamera> atan_;
 };
 
 // Represents a camera that consists of a matrix transform in
@@ -89,7 +92,7 @@ public:
 	// Construct a linear camera for 0 by 0 images
 	LinearCamera();
 	// Construct a linear camera for images of a specified size
-	LinearCamera(const Mat3& m, const ImageRef& im_size);
+	LinearCamera(const Mat3& m, const ImageRef& image_size);
 
 	// Get the camera matrix
 	const Mat3& intrinsics() const { return m; }
@@ -116,33 +119,51 @@ private:
 // Represents a camera, a pose, and an image size.
 class PosedCamera {
 public:
+	PosedCamera() { };
 	// Initialize a posed camera
 	PosedCamera(const toon::SE3<>& pose, const CameraBase& cam);
-	// Configure this camera
+
+	// Get/set pose
+	const toon::SE3<>& pose() const { return pose_; }
+	const toon::SE3<>& pose_inverse() const { return invpose_; }
 	void SetPose(const toon::SE3<>& pose);
+
+	// Get/set camera
+	const CameraBase& camera() const { return *camera_; }
+	void SetCamera(const CameraBase& camera) { camera_ = &camera; }
+
+	// Get the image size
+	const ImageRef& image_size() const { return camera_->image_size(); }
+	// Get the image bounds (same info as image_size() but different format)
+	const Bounds2D<>& image_bounds() const { return camera_->image_bounds(); }
+	// Get the bounds of the image in retina coordinates
+	const Bounds2D<>& retina_bounds() const { return camera_->retina_bounds(); }
+	// Get the camera centre in world coordinates
+	const Vec3& world_centre() const { return invpose_.get_translation(); }
+
 	// Transform world coordinate to retina coords
 	inline Vec3 WorldToRet(const Vec3& v) const {
-		return pose*v;
+		return pose_*v;
 	}
 	// Transfor world to image coordinates
 	Vec3 WorldToIm(const Vec3& v) const {
-		return RetToIm(pose*v);
+		return RetToIm(pose_*v);
 	}
 	// Transform homogeneous retina to image coordinates
 	Vec3 RetToIm(const Vec3& v) const {
-		return camera.RetToIm(v);
+		return camera_->RetToIm(v);
 	}
 	// Transform retina to image coordinates
 	Vec2 RetToIm(const Vec2& v) const {
-		return camera.RetToIm(v);
+		return camera_->RetToIm(v);
 	}
 	// Transform homogeneous image to retina coordinates
 	Vec3 ImToRet(const Vec3& v) const {
-		return camera.ImToRet(v);
+		return camera_->ImToRet(v);
 	}
 	// Transform image to retina coordinates
 	Vec2 ImToRet(const Vec2& v) const {
-		return camera.ImToRet(v);
+		return camera_->ImToRet(v);
 	}
 
 	// Transform the camera's pose by M. Note that this is equivalent to transforming
@@ -158,47 +179,50 @@ public:
 	// Get the i-th vanishing point in image coords
 	Vec3 GetImageVpt(int axis) const;
 
-	// Get the horizon line in the retina (positive side is above horizon)
+	// Get the horizon line in retina coords (positive side is above horizon)
 	Vec3 GetRetinaHorizon() const;
+	// Get the horizon line in image coords (positive side is above horizon)
 	Vec3 GetImageHorizon() const;
 
-	// Get the image size
-	inline const ImageRef& im_size() const { return camera.im_size(); }
-	// Get the image bounds (same info as im_size() but different format)
-	const Bounds2D<>& im_bounds() const { return camera.im_bounds(); }
-	// Get the bounds of the image in retina coordinates
-	const Bounds2D<>& ret_bounds() const { return camera.ret_bounds(); }
-
-	// Get the camera centre in world coordinates
-	inline Vec3 world_centre() const { return invpose.get_translation(); }
-
+private:
 	// camera pose: (world->retina transformation, i.e. extrinsic camera parameters)
-	toon::SE3<> pose;
-	// inverse of above
-	toon::SE3<> invpose;
+	toon::SE3<> pose_;
+	// Inverse of above
+	toon::SE3<> invpose_;
 	// camera model
-	const CameraBase& camera;
+	const CameraBase* camera_;
 };
 
 // Represents an image with the camera that captured it, i.e. an
 // image together with its intrinsic camera parameters
 class CalibratedImage : public ImageBundle {
 public:
-	CalibratedImage(const CameraBase& cam)
-	: camera(cam) { }
-	CalibratedImage(const CameraBase& cam, const string& image_file)
-	: ImageBundle(image_file), camera(cam) { }
-	const CameraBase& camera;
+	CalibratedImage() { }
+	CalibratedImage(const CameraBase& camera) : camera_(&camera) { }
+	CalibratedImage(const CameraBase& camera, const string& image_file)
+	: ImageBundle(image_file), camera_(&camera) { }
+
+	// Get/set camera
+	const CameraBase& camera() const { return *camera_; }
+	void SetCamera(const CameraBase& camera) { camera_ = &camera; }
+private:
+	const CameraBase* camera_;
 };
 
 // Represents a calibrated image with a pose in space, i.e. an image
 // together with both intrinsic and extrinisic camera parameters
 class PosedImage : public CalibratedImage {
 public:
-	PosedImage(const PosedCamera& pcam)
-	: CalibratedImage(pcam.camera), pc(pcam) { }
-	PosedImage(const PosedCamera& pcam, const string& image_file)
-	: CalibratedImage(pcam.camera, image_file), pc(pcam) { }
-	const PosedCamera& pc;
+	PosedImage() { }
+	PosedImage(const PosedCamera& pc)
+	: CalibratedImage(pc.camera()), pc_(pc) { }
+	PosedImage(const PosedCamera& pc, const string& image_file)
+	: CalibratedImage(pc_.camera(), image_file), pc_(pc) { }
+
+	// Get/set posed camera
+	const PosedCamera& pc() const { return pc_; }
+	void SetPC(const PosedCamera& pc) { pc_ = pc; }
+private:
+	PosedCamera pc_;
 };
 }
