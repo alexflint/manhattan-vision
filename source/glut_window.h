@@ -180,15 +180,15 @@ namespace indoor_context {
 		// The invokation manager for multi-threading
 		static InvokationSerializer invoker_;
 		// The global mutex for access to windows_
-		static mutex windowMapMutex_;
+		static boost::mutex windowMapMutex_;
 		// The global mutex for window creation.
-		static mutex createWindowMutex_;
+		static boost::mutex createWindowMutex_;
 		// The global mutex for entry to Loop(), LoopAsync(), etc. This is
 		// locked at most once and never unlocked.
-		static mutex loopMutex_;
+		static boost::mutex loopMutex_;
 		// The thread in which GLUT is running, if that thread was created
 		// by GLUT window, or NULL otherwise.
-		static scoped_ptr<thread> glutLoopThread_;
+		static scoped_ptr<boost::thread> glutLoopThread_;
 		// True if Loop() has been called. Note that this might be true
 		// while glutLoopThread_ might be NULL if the user called Loop()
 		// directly.

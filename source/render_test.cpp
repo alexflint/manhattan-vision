@@ -36,8 +36,8 @@ int main(int argc, char **argv) {
 	}
 
 	// Visualize
-	WriteMatrixImageRescaled("frame.png", r.labels_);
-	WriteMatrixImageRescaled("depth.png", r.depthbuffer_);
+	WriteMatrixImageRescaled("frame.png", r.framebuffer());
+	WriteMatrixImageRescaled("depth.png", r.depthbuffer());
 
 	return 0;
 }

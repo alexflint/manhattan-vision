@@ -6,6 +6,8 @@
 #include "math_utils.tpp"
 #include "image_utils.tpp"
 
+#include "functional_types.tpp"
+
 namespace indoor_context {
 
 template <typename T, typename S>

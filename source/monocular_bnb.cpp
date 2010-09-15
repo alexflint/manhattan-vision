@@ -25,9 +25,10 @@
 
 #include "line_detector.h"
 #include "vanishing_points.h"
-#include "building_estimator.h"
+#include "manhattan_bnb.h"
 #include "bld_helpers.h"
 
+#include "counted_foreach.tpp"
 #include "vector_utils.tpp"
 #include "image_utils.tpp"
 #include "io_utils.tpp"
@@ -150,11 +151,11 @@ void ManhattanBnbReconstructor::OutputSolutionOrients(const string& path) {
 void ManhattanBnbReconstructor::GetAuxOrients(const PosedCamera& aux,
                                               double zfloor,
                                               MatI& aux_orients) {
-	aux_orients.Resize(aux.image_size().y, aux.im_size().x);
+	aux_orients.Resize(aux.image_size().y, aux.image_size().x);
 	manhattan_bnb.TransferBuilding(manhattan_bnb.soln,
-			aux.pose,
-			zfloor,
-			aux_orients);
+																 aux.pose(),
+																 zfloor,
+																 aux_orients);
 }
 
 void ManhattanBnbReconstructor::OutputSolutionInView(const string& path,
@@ -162,7 +163,7 @@ void ManhattanBnbReconstructor::OutputSolutionInView(const string& path,
                                                      double zfloor) {
 	// Generate the orientation map
 	MatI aux_orients;
-	GetAuxOrients(aux, zfloor, aux_orients);
+	GetAuxOrients(aux.image.pc(), zfloor, aux_orients);
 	CHECK(aux.image.loaded()) << "Auxiliary view not loaded";
 
 	// Draw the image

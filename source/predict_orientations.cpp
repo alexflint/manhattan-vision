@@ -11,7 +11,7 @@
 #include "map.h"
 #include "map.pb.h"
 #include "vars.h"
-#include "floorplan_renderer.h"
+#include "bld_helpers.h"
 #include "image_utils.h"
 #include "math_utils.tpp"
 
@@ -38,9 +38,9 @@ int main(int argc, char **argv) {
 	KeyFrame& kf = *map.KeyFrameById(atoi(argv[2]));
 
 	// Predict some orientations
-	FloorplanRenderer r(gt_map);
+	
 	MatI orients;
-	r.PredictOrients(*kf.pc, orients);
+	GetTrueOrients(gt_map.floorplan(), kf.image.pc(), orients);
 	WriteOrientationImage("out/predicted.png", orients);
 
 	kf.LoadImage();

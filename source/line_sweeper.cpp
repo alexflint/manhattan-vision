@@ -23,17 +23,17 @@ lazyvar<int> gvBlockMarginSqr("LineSweeper.BlockMarginSqr");
 LineSweeper::LineSweeper() : input(NULL) {
 }
 
-LineSweeper::LineSweeper(const PosedImage& pim,
+LineSweeper::LineSweeper(const PosedImage& image,
                          const vector<LineDetection> lines[]) {
-	Compute(pim, lines);
+	Compute(image, lines);
 }
 
-void LineSweeper::Compute(const PosedImage& pim,
+void LineSweeper::Compute(const PosedImage& image,
                           const vector<LineDetection> lines[]) {
-	input = &pim;
+	input = &image;
 
 	// Get bounding lines for the image
-	Bounds2D<double> image_bounds = Bounds2D<double>::FromSize(pim.sz());
+	Bounds2D<double> image_bounds = Bounds2D<double>::FromSize(image.sz());
 	vector<Vec3 > bounding_lines;
 	bounding_lines.push_back(image_bounds.left_eqn());      // left
 	bounding_lines.push_back(image_bounds.top_eqn());      // top
@@ -44,14 +44,14 @@ void LineSweeper::Compute(const PosedImage& pim,
 	vector<Vec3 > blocks;
 	blocks.reserve(lines[0].size() + lines[1].size() + lines[2].size()); // upper bound
 	for (int i = 0; i < 3; i++) {
-		support_maps[i].Resize(pim.ny(), pim.nx());
+		support_maps[i].Resize(image.ny(), image.nx());
 		support_maps[i].Fill(0);
 		num_pixels[i] = 0;
 
 		for (int j = 0; j < 3; j++) {
 			if (i == j) continue;
-			const Vec3 pivot = pim.pc().GetImageVpt(i);
-			const Vec3 dir = pim.pc().GetImageVpt(j);
+			const Vec3 pivot = image.pc().GetImageVpt(i);
+			const Vec3 dir = image.pc().GetImageVpt(j);
 
 			// TODO: Set these to projection with image bounds:
 			BOOST_FOREACH(const LineDetection& det, lines[i]) {
@@ -157,13 +157,14 @@ void LineSweeper::OutputSupportViz(const string& basename) const {
 
 
 
-void GeomLabellerBase::Init(const PosedImage& pim) {
-	input = &pim;
-	orient_map.Resize(pim.ny(), pim.nx(), 0);
+void GeomLabellerBase::Init(const PosedImage& image) {
+	input = &image;
+	orient_map.Resize(image.ny(), image.nx(), 0);
 }
 
 void GeomLabellerBase::DrawOrientViz(ImageRGB<byte>& canvas) const {
 	CHECK(input);
+	ResizeImage(canvas, input->sz());
 	for (int y = 0; y < input->ny(); y++) {
 		const int* labelrow = orient_map[y];
 		PixelRGB<byte>* outrow = canvas[y];
@@ -180,33 +181,33 @@ void GeomLabellerBase::DrawOrientViz(ImageRGB<byte>& canvas) const {
 IsctGeomLabeller::IsctGeomLabeller() {
 }
 
-IsctGeomLabeller::IsctGeomLabeller(const PosedImage& pim,
+IsctGeomLabeller::IsctGeomLabeller(const PosedImage& image,
                                    const vector<LineDetection> lines[]) {
-	Compute(pim, lines);
+	Compute(image, lines);
 }
 
-void IsctGeomLabeller::Compute(const PosedImage& pim,
+void IsctGeomLabeller::Compute(const PosedImage& image,
                                const vector<LineDetection> lines[]) {
-	Init(pim);
+	Init(image);
 
 	// Compute line sweeps
-	sweeper.Compute(pim, lines);
+	sweeper.Compute(image, lines);
 
 	// Produce final label maps
 	for (int i = 0; i < 3; i++) {
 		int sumi = 0;
-		for (int y = 0; y < pim.ny(); y++) {
+		for (int y = 0; y < image.ny(); y++) {
 			const int* suprow = sweeper.support_maps[i][y];
 			int* orientrow = orient_map[y];
-			for (int x = 0; x < pim.nx(); x++) {
+			for (int x = 0; x < image.nx(); x++) {
 				orientrow[x] |= suprow[x]<<i;
 			}
 		}
 	}
 
-	for (int y = 0; y < pim.ny(); y++) {
+	for (int y = 0; y < image.ny(); y++) {
 		int* orientrow = orient_map[y];
-		for (int x = 0; x < pim.nx(); x++) {
+		for (int x = 0; x < image.nx(); x++) {
 			// the numbers below are chosen to map:
 			//   011 -> 2
 			//   101 -> 1

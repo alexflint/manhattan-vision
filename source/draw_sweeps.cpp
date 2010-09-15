@@ -12,8 +12,9 @@
 #include "map.pb.h"
 
 #include "bld_helpers.h"
-#include "line_detector.h"
+#include "guided_line_detector.h"
 #include "vanishing_points.h"
+#include "line_sweeper.h"
 
 #include "image_utils.tpp"
 #include "vector_utils.tpp"
@@ -78,43 +79,45 @@ void RectifyVertical(const PosedCamera& pc,
 
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
-	if (argc != 2) {
-		DLOG<<"Usage: "<<argv[0]<<" truthed_map.pro";
+	if (argc != 3 && argc != 4) {
+		DLOG<<"Usage: "<<argv[0]<<" truthed_map.pro FRAMEID [--swap_colors]";
 		exit(-1);
 	}
+
+	const char* file = argv[1];
+	int frame_id = atoi(argv[2]);
+	bool swap_vert_labels = argc > 3;
 
 	// Load the map
 	Map map;
 	proto::TruthedMap gt_map;
-	map.LoadWithGroundTruth(argv[1], gt_map);
+	map.LoadWithGroundTruth(file, gt_map);
 
-	BOOST_FOREACH(KeyFrame& kf, map.kfs) {
-		DLOG << "Processing frame " << kf.id;
-		kf.LoadImage();
+	KeyFrame& kf = *map.KeyFrameByIdOrDie(frame_id);
+	kf.LoadImage();
 
-		ImageRGB<byte> rect_img;
-		RectifyVertical(*kf.pc, kf.image.rgb, rect_img);
-		WriteImage(str(format("out/frame%03d_orig.png") % kf.id), rect_img);
-
-		MatI model_orients;
-		GetTrueOrients(gt_map.floorplan(), kf.image.pc(), model_orients);
-		ImageRGB<byte> model;
-		DrawOrientations(model_orients, model);
-
-		// Make the ceiling and floor white
-		for (int y = 0; y < model.GetHeight(); y++) {
-			PixelRGB<byte>* row = model[y];
-			for (int x = 0; x < model.GetWidth(); x++) {
-				if (row[x] == Colors::blue()) row[x] = Colors::white();
-			}
-		}
-
-		ImageRGB<byte> rect_model;
-		RectifyVertical(*kf.pc, model, rect_model);
-		WriteImage(str(format("out/frame%03d_rectmodel.png") % kf.id), rect_model);
-
-		kf.UnloadImage();
+	GuidedLineDetector line_detector(kf.image);
+	IsctGeomLabeller sweeps(kf.image, line_detector.detections);
+	if (swap_vert_labels) {
+		InterchangeLabels(sweeps.orient_map, 0, 1);
 	}
+				
+	// Draw the orientation into an image
+	ImageRGB<byte> orient_canvas;
+	ImageCopy(kf.image.rgb, orient_canvas);
+	sweeps.DrawOrientViz(orient_canvas);
+
+	// Replace black pixels with white pixels
+	for (int y = 0; y < orient_canvas.GetHeight(); y++) {
+		PixelRGB<byte>* row = orient_canvas[y];
+		for (int x = 0; x < orient_canvas.GetWidth(); x++) {
+			if (row[x] == Colors::black()) row[x] = Colors::white();
+		}
+	}
+
+	ImageRGB<byte> rect_orient_canvas;
+	RectifyVertical(*kf.pc, orient_canvas, rect_orient_canvas);
+	WriteImage(str(format("out/frame%03d_sweeps.png") % kf.id), rect_orient_canvas);
 
 	return 0;
 }

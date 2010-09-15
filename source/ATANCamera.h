@@ -85,7 +85,7 @@ class ATANCamera
     inline Vector<2> UFBLinearProject(const Vector<2>& camframe);
     inline Vector<2> UFBLinearUnProject(const Vector<2>& fbframe);
     
-    Matrix<2,2> GetProjectionDerivs(); // Projection jacobian
+	TooN::Matrix<2,2> GetProjectionDerivs(); // Projection jacobian
     
     inline bool Invalid() {  return mbInvalid;}
     inline double LargestRadiusInImage() {  return mdLargestRadius; }
@@ -96,7 +96,7 @@ class ATANCamera
     inline Vector<2> ImplaneBR(); 
 
     // OpenGL helper function
-    Matrix<4> MakeUFBLinearFrustumMatrix(double near, double far);
+    TooN::Matrix<4> MakeUFBLinearFrustumMatrix(double near, double far);
 
     // Feedback for Camera Calibrator
     double PixelAspectRatio() { return mvFocal[1] / mvFocal[0];}
@@ -110,7 +110,7 @@ class ATANCamera
   protected:
   GVars3::gvar3<Vector<NUMTRACKERCAMPARAMETERS> > mgvvCameraParams; // The actual camera parameters
   
-    Matrix<2, NUMTRACKERCAMPARAMETERS> GetCameraParameterDerivs();
+    TooN::Matrix<2, NUMTRACKERCAMPARAMETERS> GetCameraParameterDerivs();
     void UpdateParams(Vector<NUMTRACKERCAMPARAMETERS> vUpdate);
   void DisableRadialDistortion();
     

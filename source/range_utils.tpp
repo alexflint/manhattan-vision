@@ -14,6 +14,10 @@
 #include "common_types.h"
 
 namespace indoor_context {
+
+	// Use anonymous namespace to include only within this file
+	namespace {	using namespace boost; }
+
 // Get the next iterator
 template <typename Iterator>
 Iterator successor(const Iterator& it) {
@@ -390,13 +394,13 @@ namespace boost {
 
 // An iterator for a vector is a pointer
 template <int N, typename T>
-struct range_mutable_iterator<toon::Vector<N,T> > {
+struct range_mutable_iterator<TooN::Vector<N,T> > {
 	typedef T* type;
 };
 
 // An iterator for a vector is a pointer
 template <int N, typename T>
-struct range_const_iterator<toon::Vector<N,T> > {
+struct range_const_iterator<TooN::Vector<N,T> > {
 	typedef const T* type;
 };
 }
@@ -409,19 +413,19 @@ namespace TooN {
 // Here we deal with statically sized vectors. As usual, the "end"
 // is one past the last element.
 template <int N, typename T>
-inline T* range_begin(toon::Vector<N,T>& v) {
+inline T* range_begin(TooN::Vector<N,T>& v) {
 	return &v[0];
 }
 template <int N, typename T>
-inline const T* range_begin(const toon::Vector<N,T>& v) {
+inline const T* range_begin(const TooN::Vector<N,T>& v) {
 	return &v[0];
 }
 template <int N, typename T>
-inline T* range_end(toon::Vector<N,T>& v) {
+inline T* range_end(TooN::Vector<N,T>& v) {
 	return &v[0]+N;
 }
 template <int N, typename T>
-inline const T* range_end(const toon::Vector<N,T>& v) {
+inline const T* range_end(const TooN::Vector<N,T>& v) {
 	return &v[0]+N;
 }
 
@@ -429,19 +433,19 @@ inline const T* range_end(const toon::Vector<N,T>& v) {
 // call size() rather then use the size template parameter. As
 // usual, the "end" is one past the last element.
 template <typename T>
-inline T* range_begin(toon::Vector<toon::Dynamic,T>& v) {
+inline T* range_begin(TooN::Vector<TooN::Dynamic,T>& v) {
 	return &v[0];
 }
 template <typename T>
-inline const T* range_begin(const toon::Vector<toon::Dynamic,T>& v) {
+inline const T* range_begin(const TooN::Vector<TooN::Dynamic,T>& v) {
 	return &v[0];
 }
 template <typename T>
-inline T* range_end(toon::Vector<toon::Dynamic,T>& v) {
+inline T* range_end(TooN::Vector<TooN::Dynamic,T>& v) {
 	return &v[0]+v.size();
 }
 template <typename T>
-inline const T* range_end(const toon::Vector<toon::Dynamic,T>& v) {
+inline const T* range_end(const TooN::Vector<TooN::Dynamic,T>& v) {
 	return &v[0]+v.size();
 }
 }

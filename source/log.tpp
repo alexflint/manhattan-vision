@@ -46,14 +46,19 @@
 #define LOG_STREAM NS::LogManager::GetLogStream()
 
 // Log to output
+// Note that DelayedFlush must go above DelayedNewline so that the
+// newline is flushed aswell.
 #define DLOG																	\
 		if (NS::LogManager::IsEnabled())										\
-			if (NS::LogManager::DelayedNewline __x = LOG_STREAM)				\
-				LOG_STREAM
+			if (NS::LogManager::DelayedFlush __y = 1)										\
+				if (NS::LogManager::DelayedNewline __x = LOG_STREAM)			\
+					LOG_STREAM
 
 // Log to output, don't append a newline
-#define DLOG_N																	\
-		if (NS::LogManager::IsEnabled()) LOG_STREAM
+#define DLOG_N \
+		if (NS::LogManager::IsEnabled()) \
+				if (NS::LogManager::DelayedFlush __y = 1)	\
+					LOG_STREAM
 
 // Enable logging in current scope
 #define ENABLE_DLOG																	\
@@ -120,6 +125,9 @@ public:
 	// Get the singleton log stream
 	static std::ostream& GetLogStream();
 
+	// Flush the log stream
+	static bool Flush();
+
 	// Control the indent level
 	static void SetIndent(int new_level);
 
@@ -179,6 +187,16 @@ public:
 		DelayedNewline(ostream& o) : s(o) { }
 		// Send an "end this line now" token followed by a flush token
 		~DelayedNewline();
+		// So that we can be used inside an IF block for the DLOG macro
+		operator bool() const { return true; }
+	};
+
+	// Flushes the log on destruction
+	class DelayedFlush {
+	public:
+		DelayedFlush(int trash) { }
+		// Send an "end this line now" token followed by a flush token
+		~DelayedFlush() { LogManager::Flush(); }
 		// So that we can be used inside an IF block for the DLOG macro
 		operator bool() const { return true; }
 	};

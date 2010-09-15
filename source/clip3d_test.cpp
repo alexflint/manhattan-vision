@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
 
 	// Do the clipping
 	vector<Vec3> fclipped;
-	ClipAgainstFrustrum(verts, pc, back_inserter(fclipped));
+	ClipToFrustrum(verts, pc, back_inserter(fclipped));
 	DREPORT(fclipped.size());
 	DREPORT(iowrap(fclipped));
 

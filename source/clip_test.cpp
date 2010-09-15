@@ -7,6 +7,7 @@
 #include "entrypoint_types.h"
 #include "clipping.h"
 #include "image_utils.h"
+#include "fill_polygon.tpp"
 
 using namespace indoor_context;
 using namespace toon;
@@ -52,7 +53,7 @@ int main(int argc, char **argv) {
 	oct.push_back(makeVector(0,5,1));
 
 	ImageRGB<byte> canvas(180, 180);
-	FillPolygonFast(offset(square,20,20), canvas, Colors::red());
+	FillPolygon(offset(square,20,20), canvas, Colors::red());
 	
 	vector<Vector<3> >* shapes[] = {&square, &diamond, &oct};
 	for (int i = 0; i < 8; i++) {
@@ -62,7 +63,7 @@ int main(int argc, char **argv) {
 			int dy = -40 + j*30 + (i-4)*1e-8;
 
 			vector<Vector<3> > poly = rotate(offset(*shapes[index], dx, dy), i);
-			FillPolygonFast(poly, canvas, Colors::primary(index));
+			FillPolygon(poly, canvas, Colors::primary(index));
 		}
 	}
 	

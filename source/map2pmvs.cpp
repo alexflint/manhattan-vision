@@ -9,6 +9,7 @@
 #include "math_utils.tpp"
 #include "io_utils.tpp"
 #include "quaternion.tpp"
+#include "counted_foreach.tpp"
 
 using namespace toon;
 using namespace indoor_context;
@@ -80,7 +81,7 @@ void PmvsFormat::WriteMap(const Map& map, const fs::path& base_dir) {
 		string id_string = PaddedInt(index, 8);
 		// Write the camera matrix
 		const Mat3& intr = kf.unwarped.retina_to_image;  // intrinsic
-		Matrix<3,4> extr = as_matrix(kf.pc->pose); // extrinsic
+		Matrix<3,4> extr = as_matrix(kf.pc->pose()); // extrinsic
 		Matrix<3,4> cam = intr * extr;
 		fs::path calib_path = calib_dir/(id_string+".txt");
 		ofstream calib_out(calib_path.string().c_str());
@@ -119,9 +120,9 @@ void PmvsFormat::WriteMap(const Map& map, const fs::path& base_dir) {
 	ofstream cams_out(cams_path.string().c_str());
 	BOOST_FOREACH(const KeyFrame& kf, map.kfs) {
 		double error;
-		Mat3 R = kf.pc->pose.get_rotation().get_matrix();
+		Mat3 R = kf.pc->pose().get_rotation().get_matrix();
 		Vec4 q = FitQtrn(R, error);
-		cams_out << q << " " << kf.pc->pose.get_translation() << "\n";
+		cams_out << q << " " << kf.pc->pose().get_translation() << "\n";
 	}
 
 	// Write the observations so we can check them with reprerr.pl in sba

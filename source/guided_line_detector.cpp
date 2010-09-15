@@ -273,32 +273,6 @@ void GuidedLineDetector::ComputeHistograms() {
 				double t = Ring(theta+theta_offsets[assoc], 2*M_PI) / theta_spans[assoc];
 				int t_bin = floori(t*num_t_bins);
 
-				if (assoc<0 || assoc>=3 || t_bin<0 || t_bin>=num_t_bins) {
-					DLOG << "t_bin or assoc out of range!";
-					INDENTED {
-						DREPORT(assoc, t_bin, num_t_bins);
-						DREPORT(t, theta, theta_offsets[assoc], theta_spans[assoc]);
-						DREPORT(x, y, px, py, pz);
-						DREPORT(d1,d2);
-						DREPORT(v0, v1 ,v2, image_vpts[assoc]);
-						DREPORT(theta + theta_offsets[assoc]);
-						DREPORT(Ring(theta+theta_offsets[assoc], M_PI));
-						DREPORT(Ring(theta+theta_offsets[assoc], M_PI) / theta_spans[assoc]);
-
-						ImageRGB<byte> canvas;
-						ImageCopy(input->rgb, canvas);
-						DrawSceneAxes(canvas);
-						PixelRGB<byte> black(0,0,0);
-						PixelRGB<byte> white(255,255,255);
-						Vec2 p = makeVector(x,y);
-						DrawSpot(canvas, p, black, 5);
-						DrawSpot(canvas, p, white, 3);
-						DrawLineClipped(canvas, project(image_vpts[assoc]), p, white);
-						WriteImage("out/error_axes.png", canvas);
-						OutputAssociationViz("out/error_assoc.png");
-					}
-					exit(-1);
-				}
 				d0row[x] = d0;
 				trow[x] = theta;
 

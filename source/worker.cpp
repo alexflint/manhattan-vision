@@ -2,11 +2,16 @@
 #include <boost/thread.hpp>
 
 #include "worker.h"
-
 #include "common_types.h"
+
 #include "concurrent_queue.tpp"
+#include "functional_types.tpp"
 
 namespace indoor_context {
+	using boost::mutex;
+	using boost::thread;
+	using boost::barrier;
+
 	Worker::Worker()
 		: consumer_thread(bind(&Worker::ConsumeLoop, ref(*this))),
 			join_barrier(2),

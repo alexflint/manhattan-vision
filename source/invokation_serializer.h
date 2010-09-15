@@ -16,12 +16,12 @@ namespace indoor_context {
 		// Thread-safe queue (don't use shared_ptr due to threads)
 		concurrent_queue<Closure*> work_queue;
 		// The thread in which process is called
-		thread::id home_thread;
+		boost::thread::id home_thread;
 	public:
 		// Return true iff the current thread is the home thread
 		bool InHomeThread();
 		// Make the specified thread the home thread (in which Process() will be called)
-		void RegisterHomeThread(thread::id home_thread);
+		void RegisterHomeThread(boost::thread::id home_thread);
 		// Process any outstanding invokations. This must be called from
 		// the home thread.
 		void Process();

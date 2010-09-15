@@ -121,7 +121,7 @@ class PosedCamera {
 public:
 	PosedCamera() { };
 	// Initialize a posed camera
-	PosedCamera(const toon::SE3<>& pose, const CameraBase& cam);
+	PosedCamera(const toon::SE3<>& pose, const CameraBase* cam);
 
 	// Get/set pose
 	const toon::SE3<>& pose() const { return pose_; }
@@ -130,7 +130,7 @@ public:
 
 	// Get/set camera
 	const CameraBase& camera() const { return *camera_; }
-	void SetCamera(const CameraBase& camera) { camera_ = &camera; }
+	void SetCamera(const CameraBase* camera) { camera_ = camera; }
 
 	// Get the image size
 	const ImageRef& image_size() const { return camera_->image_size(); }
@@ -185,6 +185,8 @@ public:
 	Vec3 GetImageHorizon() const;
 
 private:
+	// disable copying
+	PosedCamera(const PosedCamera&);
 	// camera pose: (world->retina transformation, i.e. extrinsic camera parameters)
 	toon::SE3<> pose_;
 	// Inverse of above
@@ -198,13 +200,13 @@ private:
 class CalibratedImage : public ImageBundle {
 public:
 	CalibratedImage() { }
-	CalibratedImage(const CameraBase& camera) : camera_(&camera) { }
-	CalibratedImage(const CameraBase& camera, const string& image_file)
-	: ImageBundle(image_file), camera_(&camera) { }
+	CalibratedImage(const CameraBase* camera) : camera_(camera) { }
+	CalibratedImage(const CameraBase* camera, const string& image_file)
+	: ImageBundle(image_file), camera_(camera) { }
 
 	// Get/set camera
 	const CameraBase& camera() const { return *camera_; }
-	void SetCamera(const CameraBase& camera) { camera_ = &camera; }
+	void SetCamera(const CameraBase* camera) { camera_ = camera; }
 private:
 	const CameraBase* camera_;
 };
@@ -214,14 +216,16 @@ private:
 class PosedImage : public CalibratedImage {
 public:
 	PosedImage() { }
-	PosedImage(const PosedCamera& pc)
-	: CalibratedImage(pc.camera()), pc_(pc) { }
-	PosedImage(const PosedCamera& pc, const string& image_file)
-	: CalibratedImage(pc_.camera(), image_file), pc_(pc) { }
+	PosedImage(const toon::SE3<>& pose, const CameraBase* cam)
+		: CalibratedImage(cam), pc_(pose, cam) { }
+	PosedImage(const toon::SE3<>& pose,
+						 const CameraBase* cam,
+						 const string& image_file)
+		: CalibratedImage(cam, image_file), pc_(pose, cam) { }
 
 	// Get/set posed camera
+	PosedCamera& pc() { return pc_; }
 	const PosedCamera& pc() const { return pc_; }
-	void SetPC(const PosedCamera& pc) { pc_ = pc; }
 private:
 	PosedCamera pc_;
 };

@@ -26,8 +26,6 @@ public:
 	ImageBundle();
 	// Initialize from an image file
 	ImageBundle(const string& filename);
-	// Initialize from an image file
-	ImageBundle(const char* filename);
 	// Initialize from an image file -- commented for compile speed
 	//ImageBundle(const fs::path& filename);
 	// Get image width
@@ -40,8 +38,6 @@ public:
 	bool contains(const ImageRef& ir) const;
 	// Read an image file into this->rgb
 	void Load(const string& filename);
-	// Read an image file into this->rgb
-	void Load(const char* filename);
 	// Unload all images
 	void Unload();
 	// Returns true iff image is loaded

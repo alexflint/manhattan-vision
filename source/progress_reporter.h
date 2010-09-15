@@ -14,7 +14,7 @@ namespace indoor_context {
 		int report_interval;
 		int next_report;
 		clock_t start_clock;  // value of clock() at construction()
-		mutex mtx;
+		boost::mutex mtx;
 	public:
 		// Initialize a progress reporter with NN total steps
 		ProgressReporter(int nn, string title = "");

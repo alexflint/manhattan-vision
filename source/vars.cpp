@@ -2,11 +2,16 @@
 #include "common_types.h"
 
 namespace indoor_context {
+	static const string kDefaultConfigFile = "config/common.cfg";
+
 	string config_file;
-	string kDefaultConfigFile = "config/common.cfg";
 
 	void InitVars() {
-		config_file = kDefaultConfigFile;
+		InitVars(kDefaultConfigFile);
+	}
+
+	void InitVars(const string& file) {
+		config_file = file;
 		ReloadVars();
 	}
 
@@ -15,9 +20,8 @@ namespace indoor_context {
 		GVars3::GUI.parseArguments(argc, argv);
 		// Setup a var so that we can specify the config file with -config
 		GVars3::gvar3<string> gvConfigFile("config", kDefaultConfigFile, GVars3::SILENT);
-		config_file = *gvConfigFile;
 		// Now read the config file
-		ReloadVars();
+		InitVars(*gvConfigFile);
 	}
 
 	void ReloadVars() {

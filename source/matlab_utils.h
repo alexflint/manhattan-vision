@@ -17,11 +17,20 @@ namespace indoor_context {
 // Helper to initialize vars etc for MEX files
 void InitMex();
 
+// Copy a matlab array to a toon array
+	template <typename T>
+T MatlabArrayToScalar(const mxArray* p) {
+	CHECK(mxIsNumeric(p));
+	CHECK_EQ(mxGetM(p), 1);
+	CHECK_EQ(mxGetN(p), 1);
+	return static_cast<T>(*mxGetPr(p));
+}
+
 // Copy a matlab string to a std::string
 string MatlabArrayToString(const mxArray* p);
 
 // Copy a string to a matlab array
-mxArray* StringToMatlabArray(const string& s);
+mxArray* NewMatlabArrayFromString(const string& s);
 
 // Copy a matlab array to a toon array
 void MatlabArrayToMatrix(const mxArray* p, MatD& m);
@@ -48,10 +57,10 @@ void MatrixToMatlabArray(const Matrix& m, mxArray* p) {
 		mxSetN(p, m.num_cols());
 	}
 	double* pd = mxGetPr(p);
-	for (int y = 0; y < m.num_rows(); y++) {
-		const T* row = &m[y][0];
-		for (int x = 0; x < m.num_cols(); x++) {
-			*pd++ = static_cast<double>(row[x]);
+	// Note that matlab matrices are column-major
+	for (int x = 0; x < m.num_cols(); x++) {
+		for (int y = 0; y < m.num_rows(); y++) {
+			*pd++ = static_cast<double>(m[y][x]);
 		}
 	}
 }
@@ -66,10 +75,10 @@ void MatrixToMatlabArray(const VNL::Matrix<T>& m, mxArray* p) {
 		mxSetN(p, m.Cols());
 	}
 	double* pd = mxGetPr(p);
-	for (int y = 0; y < m.Rows(); y++) {
-		const T* row = m[y];
-		for (int x = 0; x < m.Cols(); x++) {
-			*pd++ = static_cast<double>(row[x]);
+	// Note that matlab matrices are column-major
+	for (int x = 0; x < m.Cols(); x++) {
+		for (int y = 0; y < m.Rows(); y++) {
+			*pd++ = static_cast<double>(m[y][x]);
 		}
 	}
 }
@@ -88,7 +97,5 @@ mxArray* NewMatlabArrayFromMatrix(const VNL::Matrix<T>& m) {
 	MatrixToMatlabArray(m, p);
 	return p;
 }
-
-//mxArray* NewMatlabArrayFromTable(const Table<2, ManhattanDPFeatures::Feature >& table);
 
 }  // namespace indoor_context

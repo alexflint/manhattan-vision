@@ -7,7 +7,7 @@
 namespace indoor_context {
 
 // Runs convolutions using special purpose graphics hardware.
-class HwConvolver : public noncopyable {
+class HwConvolver : public boost::noncopyable {
 	device_image input;
 	device_image temp;
 	device_image output;

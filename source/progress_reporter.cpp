@@ -44,7 +44,7 @@ namespace indoor_context {
 		// Don't worry about inefficiency of locking a mutex every time
 		// because we shouldn't be using a ProgressReporter at all if
 		// efficiency is a major issue!
-		mutex::scoped_lock lock(mtx);
+		boost::mutex::scoped_lock lock(mtx);
 		Update(i+1);
 	}
 

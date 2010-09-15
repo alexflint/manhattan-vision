@@ -75,7 +75,7 @@ void StructLearnDP::Predict(const Vector<>& w) {
 	}
 
 	// Run the DP
-	dp.Compute(scorefunc, input->pc, floorToCeil);
+	dp.Compute(scorefunc, input->pc(), floorToCeil);
 }
 
 // Pass the ground truth orientations as the initial orientations
@@ -83,7 +83,6 @@ void StructLearnDP::Predict(const Vector<>& w) {
 bool pass_gt_orients = false;
 
 // To be moved elsewhere?
-scoped_ptr<ManhattanML> recon;
 double sum_accuracy;
 int num_frames;
 
@@ -96,7 +95,7 @@ void ProcessFrame(Map& map, const proto::TruthedMap& gt_map, int index) {
 
 	Mat3 floorToCeil = GetFloorCeilHomology(*kf.pc, gt_map.floorplan());
 
-	ManhattanML recon;
+	StructLearnDP recon;
 	recon.Configure(pim, floorToCeil);
 
 	Vector<> w(18);

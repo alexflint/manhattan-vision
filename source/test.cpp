@@ -18,7 +18,7 @@ using namespace indoor_context;
 
 int main(int argc, char **argv) {
 	if (argc > 1) {
-		AssertionManager::ExceptionMode();
+		AssertionManager::ErrorMode(AssertionManager::kErrorModeThrow);
 	}
 
 	int x = 1, y = 2, z = 3;
@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
 		cout << "Caught exception:\n" << ex.what() << endl;
 	}
 
-	AssertionManager::ExitMode();
+	AssertionManager::ErrorMode(AssertionManager::kErrorModeExit);
 	CHECK(false) << "this bit exits";
 
 	cout << "Finished.\n";

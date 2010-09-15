@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include <cairomm/cairommconfig.h>
+#include <cairomm/cairomm.h>
 #include <cairomm/context.h>
 #include <cairomm/surface.h>
 

@@ -9,26 +9,36 @@
 
 #include <string>
 #include <mex.h>
+#include <boost/filesystem.hpp>
 
 #include "common_types.h"
 #include "vars.h"
 
 namespace indoor_context {
 
-static const string kWorkingDir = "/homes/50/alexf/work/indoor_context/build";  // ugly hack
-
 void InitMex() {
+	// Use exceptions so that MATLAB doesn't die
 	AssertionManager::SetExceptionMode();
 
-	// This is all horribly hacky and un-portable
-	if (chdir(kWorkingDir.c_str())) {  // ugly hack!
-		mexPrintf("Could not chdir to %s\n", kWorkingDir.c_str());
-		mexErrMsgTxt("Could not chdir, exiting.");
+	// Fix up paths
+	fs::path homedir;
+	try {
+		homedir = getenv("HOME");
+	} catch (const std::exception& ex) {
+		mexErrMsgTxt("Could not read PATH environment variable.\n");
 	}
-	scoped_array<char> cwd(get_current_dir_name());
-	cout << "changed working dir to " << cwd.get() << endl;
 
-	InitVars();
+	const fs::path basedir = homedir / "Code/indoor_context";  // ugly hack
+	const fs::path workingdir = basedir / "build";
+	try {
+		fs::current_path(workingdir);
+	} catch (...) {
+		mexPrintf("Could not chdir to %s\n", workingdir.string().c_str());
+		mexErrMsgTxt("Exiting.\n");
+	}
+
+	// Load vars
+	InitVars((basedir/"config/common.cfg").string());
 }
 
 string MatlabArrayToString(const mxArray* p) {
@@ -39,7 +49,7 @@ string MatlabArrayToString(const mxArray* p) {
 	return s;
 }
 
-mxArray* StringToMatlabArray(const string& s) {
+mxArray* NewMatlabArrayFromString(const string& s) {
 	return mxCreateString(s.c_str());
 }
 
@@ -94,18 +104,5 @@ mxArray* NewMatlabArray(int d0, int d1, int d2) {
 	mwSize dims[3] = {d0, d1, d2};
 	return mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);
 }
-
-/*mxArray* NewMatlabArrayFromTable(const Table<2, ManhattanDPFeatures::Feature >& table) {
-	mwSize dims[3] = { table.dim(0), table.dim(1), table(0,0).size() };
-	mxArray* arr = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);
-	double* pd = mxGetPr(arr);
-	Table<2, ManhattanDPFeatures::Feature>::const_iterator it;
-	for (it = table.begin(); it != table.end(); it++) {
-		for (int i = 0; i < it->size(); i++) {
-			*pd++ = (*it)[i];
-		}
-	}
-	return arr;
-}*/
 
 }  // namespace indoor_context

@@ -107,7 +107,7 @@ public:
 				pixel_scores[i].Resize(ny, nx);
 			}
 		}
-		MatF pixel_scores[3];  // cost of assigning pixel P orientation C, in image coordinates
+		MatF pixel_scores[3];  // score associated with assigning each label to each pixel
 		double wall_penalty;  // the cost per wall segment (for regularisation)
 	};
 
@@ -237,6 +237,13 @@ public:
 	GuidedLineDetector line_detector;
 	IsctGeomLabeller line_sweeper;
 	ManhattanDP::ScoreFunction scorefunc;
+
+	// Initialize empty
+	LineSweepDPCost() { }
+	// Initialize and compute
+	LineSweepDPCost(const PosedImage& image) {
+		Compute(image);
+	}
 
 	// Compute a DP score function by sweeping lines in the specified image
 	void Compute(const PosedImage& image);

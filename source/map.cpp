@@ -25,15 +25,15 @@ using namespace toon;
 lazyvar<int> gvBoundPercentile("Map.BoundPercentile");
 lazyvar<bool> gvLoadOriginalFrames("Map.LoadOriginalFrames");
 lazyvar<int> gvLinearizeCamera("Map.LinearizeCamera");
-lazyvar<string> gvPtamDir("Map.PtamDir");
-
+lazyvar<string> gvOrigFramesDir("Map.OrigFramesDir");
 
 void Frame::Configure(Map* m, int i, const string& im_file, const SE3<>& pose) {
 	map = m;
 	id = i;
 	image_file = im_file;
-	pc.reset(new PosedCamera(pose, *map->camera));
-	image.SetPC(*pc);
+	image.pc().SetPose(pose);
+	image.pc().SetCamera(map->camera.get());
+	pc = &image.pc();
 }
 
 void Frame::LoadImage(bool undistort) {
@@ -86,7 +86,7 @@ void Map::Load(const string& path) {
 	CHECK(doc.LoadFile(path.c_str()))
 	<< "Failed to load " << path;
 	fs::path xml_dir(fs::path(path).parent_path());
-	fs::path ptam_dir(*gvPtamDir);
+	fs::path frames_dir(*gvOrigFramesDir);
 	const TiXmlElement* root_elem = doc.RootElement();
 
 	// Read frame poses
@@ -96,7 +96,7 @@ void Map::Load(const string& path) {
 		for (const TiXmlElement* frame_elem = frames_elem->FirstChildElement("Frame");
 				frame_elem != NULL;
 				frame_elem = frame_elem->NextSiblingElement("Frame")) {
-			string image_file = (ptam_dir/frame_elem->Attribute("name")).string();
+			string image_file = (frames_dir/frame_elem->Attribute("name")).string();
 			Vec6 lnPose = stream_to<Vec6>(frame_elem->Attribute("pose"));
 			Frame* f = new Frame;  // will be owned by the ptr_vector
 			f->Configure(this, next_id++, image_file, SE3<>::exp(lnPose));
@@ -141,7 +141,7 @@ void Map::Load(const string& path) {
 			DLOG << "Falling back to monochrome image for keyframe "<<id;
 			image_file = xml_dir/kf_elem->FirstChildElement("Image")->Attribute("file");
 		} else {
-			image_file = ptam_dir/image_file;
+			image_file = frames_dir/image_file;
 		}
 
 		// Add the keyframe
@@ -176,11 +176,12 @@ void Map::Load(const string& path) {
 		kfs_by_id[id] = kf;
 	}
 
-	DLOG << "Loaded " << pts.size() << " map points and " << kfs.size() << " keyframes";
+	DLOG << "Loaded " << pts.size() << " points and " << kfs.size() << " frames";
 }
 
 void Map::LoadWithGroundTruth(const string& path, proto::TruthedMap& tru_map) {
 	ReadProto(path, tru_map);
+	cout << "Loading map from " << tru_map.spec_file() << endl;
 	Load(tru_map.spec_file());
 	RotateToSceneFrame(SO3<>::exp(asToon(tru_map.ln_scene_from_slam())));
 }

@@ -33,24 +33,31 @@ void ProcessFrame(Map& map, const proto::TruthedMap& gt_map, int frame_id) {
 	PosedImage pim(*kf.pc);
 	ImageCopy(kf.image.rgb, pim.rgb);
 
+	// Compute the cost function
+	LineSweepDPCost cost(kf.image);
+
 	// Perform the reconstruction
+	Mat3 fcmap = GetFloorCeilHomology(kf.image.pc(), gt_map.floorplan());
 	INDENTED TIMED("Reconstruction time") {
-		recon->Compute(pim, gt_map, pass_gt_orients);
+		recon->Compute(pim, fcmap, cost.scorefunc);
 	}
 	format filepat("out/frame%03d_%s");
 
 	// Compute accuracy
-	double accuracy = recon->GetAccuracy(recon->gt_orients);
+	MatI gt_orients;
+	GetTrueOrients(gt_map.floorplan(), kf.image.pc(), gt_orients);
+	double accuracy = recon->GetAccuracy(gt_orients);
 	sum_accuracy += accuracy;
 	num_frames++;
 	DLOG << format("Accuracy: %.2f%%") % (accuracy*100);
 
 	// Draw some vizualizations
-	WriteOrientationImage(str(filepat % frame_id % "gt.png"), recon->gt_orients);
+	WriteOrientationImage(str(filepat % frame_id % "gt.png"), gt_orients);
 	recon->OutputOrigViz(str(filepat % frame_id % "orig.png"));
-	recon->OutputOrientViz(str(filepat % frame_id % "dp_initial.png"));
 	recon->OutputSolutionOrients(str(filepat % frame_id % "dp_soln.png"));
 	//recon->OutputOppRowViz(str(filepat % frame_id % "opprows.png"));
+
+	cost.OutputOrientViz(str(filepat % frame_id % "dp_initial.png"));
 
 	kf.UnloadImage();
 }

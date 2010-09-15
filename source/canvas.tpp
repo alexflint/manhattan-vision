@@ -4,7 +4,7 @@
 
 #include <boost/range.hpp>
 
-#include <cairomm/cairommconfig.h>
+#include <cairommconfig.h>
 #include <cairomm/context.h>
 #include <cairomm/surface.h>
 
@@ -12,8 +12,11 @@
 #include "polygon.tpp"
 
 namespace indoor_context {
-	using namespace toon;
-	using namespace Cairo;
+	namespace {
+		using namespace boost;
+		using namespace toon;
+		using namespace Cairo;
+	}
 
 	template <typename T>
 	void Canvas::Attach(T surface) {

@@ -12,6 +12,7 @@
 
 #include "histogram.tpp"
 #include "io_utils.tpp"
+#include "counted_foreach.tpp"
 
 using namespace indoor_context;
 using namespace toon;
@@ -62,7 +63,9 @@ int main(int argc, char **argv) {
 		// Get ground truth orientations
 		gt_orient_maps.push_back(MatI());
 		MatI& gt_orients = gt_orient_maps.back();
-		LoadTrueOrients(gt_frame, gt_orients);
+		GetTrueOrients(gt_map.floorplan(),
+									 *kf->pc,
+									 gt_orients);
 
 
 		// The true orientations represent surface normals, but here we're interested in
@@ -77,7 +80,7 @@ int main(int argc, char **argv) {
 			int* surfrow = gt_surfs[y];
 			for (int x = 0; x < sz.x; x++) {
 				if (orientrow[x] == 2) {
-					Vec3 p = kf->pc->camera.ImToRet(makeVector(1.0*x,1.0*y,1.0));
+					Vec3 p = kf->pc->camera().ImToRet(makeVector(1.0*x,1.0*y,1.0));
 					surfrow[x] = p*horizon*HalfSign(p[2]) > 0 ? 1 : 2;
 				} else {
 					surfrow[x] = 0;

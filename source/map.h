@@ -10,6 +10,10 @@
 #include "guided_line_detector.h"
 
 namespace indoor_context {
+
+// Import boost for this file only
+namespace { using namespace boost; }
+
 // forward decls
 class Map;
 namespace proto { class TruthedMap; }
@@ -32,17 +36,18 @@ public:
 	// Index of this frame within the map
 	int id;
 
-	// The raw image from the camera
+	// The raw image from the camera together with its pose
 	PosedImage image;
+	// Pose of this keyframe, or null if the camera was lost
+	// Equal to &this->image.pc()
+	PosedCamera* pc;
+
 	// Path to the image file for this frame (if any)
 	string image_file;
 	// The MD5 hash from the map XML
 	string image_hash;
 	// The unwarped image
 	UnwarpedImage unwarped;
-
-	// Pose of this keyframe, or null if the camera was lost
-	scoped_ptr<PosedCamera> pc;
 
 	// True iff the camera was lost (or initializing) at this frame
 	bool lost;

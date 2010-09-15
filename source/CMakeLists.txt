@@ -1,31 +1,35 @@
 PROJECT( IndoorContext )
 SET( CMAKE_BUILD_TYPE RelWithDebInfo )
-CMAKE_MINIMUM_REQUIRED( VERSION 2.6 )
+CMAKE_MINIMUM_REQUIRED( VERSION 2.8 )
 
 # Eclipse settings
 # Set the message length to help Eclipse parse compiler messages
 SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmessage-length=0" )
-# Uncomment this to help Eclipse discover include paths 
-# SET( CMAKE_VERBOSE_MAKEFILE OFF )
 
 # Set the local version first
-SET( CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake_modules" )
-LIST( APPEND CMAKE_MODULE_PATH "${CMAKE_ROOT}/Modules" )
+SET( CMAKE_MODULE_PATH
+	${CMAKE_SOURCE_DIR}/../cmake_modules
+	${CMAKE_ROOT}/Modules )
 
 # Find required dependencies
 FIND_PACKAGE( OpenGL REQUIRED )
 FIND_PACKAGE( GLUT REQUIRED )
 FIND_PACKAGE( Protobuf REQUIRED )
+FIND_PACKAGE( Cairo REQUIRED )
 FIND_PACKAGE( Cairomm REQUIRED )
-FIND_PACKAGE( SigC++ REQUIRED )	# for cairo
+FIND_PACKAGE( Freetype REQUIRED )	# Required by Cairo
+FIND_PACKAGE( SigC++ REQUIRED )	# Required by Cairo
+FIND_PACKAGE( PythonLibs REQUIRED ) # Required by Boost.Python
+FIND_PACKAGE( ZLIB REQUIRED ) # Required by Python
 
+# Find VW
 SET( VW_USE_LIBS VW VNL )
 FIND_PACKAGE( VW REQUIRED )
 
-# Find optional dependencies
+# Find Matlab
 FIND_PACKAGE( Matlab )	# for mex stuff
 
-# Find TooN headers (TooN is just headers!)
+# Find TooN
 FIND_PATH( TOON_INCLUDE_DIR TooN.h
 	/usr/include/TooN /usr/local/include/TooN)
 IF( NOT TOON_INCLUDE_DIR )
@@ -34,8 +38,8 @@ ENDIF( NOT TOON_INCLUDE_DIR )
 
 # Find Boost
 SET( Boost_FIND_QUIETLY OFF )
-FIND_PACKAGE( Boost 1.42.0
-	COMPONENTS date_time filesystem iostreams thread
+FIND_PACKAGE( Boost 1.44.0
+	COMPONENTS date_time filesystem iostreams thread python system
 	REQUIRED )
 
 # Find CUDA if it's enabled
@@ -45,9 +49,20 @@ IF( USE_CUDA )
 	FIND_PACKAGE( Cuda )
 ENDIF( USE_CUDA )
 
-# Set up graph cuts
+# Find graph cuts
 SET( GraphCuts_INCLUDE_DIR /usr/local/include/graphcuts )
 SET( GraphCuts_LIBRARIES -lgraphcuts )
+
+# Configure CPU profiling
+IF ( USE_CPU_PROFILER )
+	MESSAGE( STATUS "Linking CPU Profiler" )
+  SET ( CPU_PROFILER_LIBRARIES -lprofiler )
+ENDIF (USE_CPU_PROFILER)
+
+IF ( USE_TCMALLOC )
+	MESSAGE( STATUS "Linking tcmalloc" )
+	SET( TCMALLOC_LIBRARY -ltcmalloc )
+ENDIF ( USE_TCMALLOC)
 
 # Include dirs
 INCLUDE_DIRECTORIES(
@@ -58,15 +73,48 @@ INCLUDE_DIRECTORIES(
 	${GLUT_INCLUDE_DIR}
 	${PROTOBUF_INCLUDE_DIR}
 	${Boost_INCLUDE_DIRS}
-	${Cairomm_INCLUDE_DIRS}
+	${Cairo_INCLUDE_DIR}
+	${Cairomm_INCLUDE_DIR}
+	/usr/lib/cairomm-1.0/include   # Cairomm seem to need this in addition to above!
+	${Freetype_INCLUDE_DIRS}
 	${SigC++_INCLUDE_DIRS}
 	${GraphCuts_INCLUDE_DIR}
+	${PYTHON_INCLUDE_DIRS}
+	${ZLIB_INCLUDE_DIRS}
 )
 
+# Setup linked libraries
+SET( EXTERNAL_LIBRARIES
+	-lGVars3
+	-lcvd
+	-lGKTools
+	-llapack
+	${VW_LIBRARIES}
+	${Cairomm_LIBRARIES}
+	${SigC++_LIBRARIES}
+	${GraphCuts_LIBRARIES}
+	${PROTOBUF_LIBRARY}
+	${GLUT_LIBRARIES}
+	${OPENGL_LIBRARIES}
+
+	# Enumerate specific libs to avoid linking Boost.Python to the core code
+	${Boost_system_LIBRARY_RELEASE}
+	${Boost_date_time_LIBRARY}
+	${Boost_filesystem_LIBRARY}
+	${Boost_iostreams_LIBRARY}
+	${Boost_thread_LIBRARY}
+
+	# Profiling libraries (empty unless USE_CPU_PROFILER / USE_TCMALLOC are true)
+	${CPU_PROFILER_LIBRARIES}
+	${TCMALLOC_LIBRARY}
+)
+	
 # Generate protos
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS map.proto)
 
-# Core library
+###############################################################################
+# BUILD CORE LIBRARY
+###############################################################################
 SET( CORE_HEADERS
 	tinyxml.h
 	tinystr.h
@@ -150,6 +198,7 @@ SET( CORE_HEADERS
 	manhattan_dp.h
 	manhattan_inference.h
 
+	#persistent_map.h
 )
 
 SET( CORE_SOURCES 
@@ -221,35 +270,16 @@ SET( CORE_SOURCES
 	
 	simple_renderer.cpp
 	floorplan_renderer.cpp
+
+	#persistent_map.cpp
 )
-
-# Optional CUDA components
-IF ( USE_CUDA )
-	MESSAGE( STATUS "Found CUDA" )
-
-	# The CUDA library
-	SET( CUDA_SDK_DIR /usr/local/NVIDIA_CUDA_SDK )
-	SET( CUDA_LIBRARIES
-		${CUDA_SDK_DIR}/lib/libcutil.a
-		${CUDA_TARGET_LINK}
-	)
-	CUDA_INCLUDE_DIRECTORIES(
-		${CMAKE_CURRENT_SOURCE_DIR}
-		${CUDA_SDK_DIR}/common/inc
-	)
-	CUDA_ADD_LIBRARY( cuda_conv cuda_conv.cu )
-
-	# Include the interface code in the main library
-	ADD_DEFINITIONS( -DHAVE_CUDA )
-
-ELSE( USE_CUDA )
-	MESSAGE( STATUS "Not using CUDA (USE_CUDA was not set)." )
-ENDIF( USE_CUDA )
 
 # Core library
 ADD_LIBRARY( core SHARED ${CORE_SOURCES} )
 
-# Executable targets
+###############################################################################
+# BUILD EXECUTABLES
+###############################################################################
 SET( EXECUTABLES
 	map_viewer
 
@@ -283,9 +313,10 @@ SET( EXECUTABLES
 	poster_sweeps
 	
 	draw_gt
+	draw_sweeps
 
 	monocular_bnb
-	multiview_bnb
+	#multiview_bnb
 	monocular_dp
 	multiview_dp
 	feature_dp
@@ -293,39 +324,59 @@ SET( EXECUTABLES
 	test
 )
 
-
-SET (USE_CPU_PROFILER FALSE)
-
-IF (USE_CPU_PROFILER)
-    SET( CPU_PROFILER_LIBRARIES -lprofiler )
-ENDIF (USE_CPU_PROFILER)
-
-# Setup linked libraries
-SET( EXTERNAL_LIBRARIES
-	-lGVars3
-	-lcvd
-	-lGKTools
-	-llapack
-	${VW_LIBRARIES}
-	${Cairomm_LIBRARIES}
-	${SigC++_LIBRARIES}
-	${GraphCuts_LIBRARIES}
-	${PROTOBUF_LIBRARY}
-	${GLUT_LIBRARIES}
-	${OPENGL_LIBRARIES}
-	${Boost_LIBRARIES}
-	${CPU_PROFILER_LIBRARIES}
-	)
-	
-MESSAGE(STATUS ${EXTERNAL_LIBRARIES})
-
 FOREACH( EXECUTABLE ${EXECUTABLES} )
 	ADD_EXECUTABLE( ${EXECUTABLE} ${EXECUTABLE}.cpp )
 	TARGET_LINK_LIBRARIES( ${EXECUTABLE} core ${EXTERNAL_LIBRARIES} )
 ENDFOREACH( EXECUTABLE )
 
 
-# Matlab entrypoints
+###############################################################################
+# BUILD CUDA COMPONENTS
+###############################################################################
+IF ( USE_CUDA )
+	# The CUDA library
+	SET( CUDA_SDK_DIR /usr/local/NVIDIA_CUDA_SDK )
+	SET( CUDA_LIBRARIES
+		${CUDA_SDK_DIR}/lib/libcutil.a
+		${CUDA_TARGET_LINK}
+	)
+	CUDA_INCLUDE_DIRECTORIES(
+		${CMAKE_CURRENT_SOURCE_DIR}
+		${CUDA_SDK_DIR}/common/inc
+	)
+	CUDA_ADD_LIBRARY( cuda_conv cuda_conv.cu )
+
+	# Include the interface code in the main library
+	ADD_DEFINITIONS( -DHAVE_CUDA )
+
+ENDIF( USE_CUDA )
+
+
+###############################################################################
+# BUILD PYTHON WRAPPERS
+###############################################################################
+IF ( PYTHON_FOUND )
+	SET( PYTHON_GENERATOR ${CMAKE_CURRENT_SOURCE_DIR}/generate_python_wrappers.py )
+	SET( PYTHON_EXPOSED_FILES
+		${CMAKE_CURRENT_SOURCE_DIR}/math_utils.h
+		)
+  ADD_CUSTOM_TARGET( OUTPUT python_wrappers.cpp
+		COMMAND python ${PYTHON_GENERATOR}
+		${PYTHON_EXPOSED_FILES} 
+		)
+
+	#TARGET_LINK_LIBRARIES( ... 
+	# ${Boost_LIBRARIES}
+	# ${PYTHON_LIBRARIES}
+	# ${ZLIB_LIBRARIES}
+	#)
+
+ENDIF ( PYTHON_FOUND )
+
+
+###############################################################################
+# BUILD MATLAB WRAPPERS
+###############################################################################
 IF ( MATLAB_FOUND )
     # Here we do some strange contortions due to mex/matlab setup:
     #    1. Build a normal static library called foo.mex.a for each foo.mex.cpp
@@ -341,7 +392,6 @@ IF ( MATLAB_FOUND )
     # to find a way to get mex to recognize all our CMake includes and linkages.
     # So we introduce a third piece that bridges the two: these are the .mex.cpp
     # files
-    
     INCLUDE_DIRECTORIES( ${MATLAB_INCLUDE_DIR} )
     
     # This library contains common matlab utilities
@@ -351,14 +401,15 @@ IF ( MATLAB_FOUND )
     # The code with the mexFunction(...) stub 
     SET( MEX_STUB_SOURCE mex_stub.cpp )
     # The code with the main(...) stub
-    SET( MAIN_STUB_SOURCE "main_stub.cpp" )
+    SET( MAIN_STUB_SOURCE main_stub.cpp )
 
     # The list of matlab targets    
     SET( MEX_OUTPUTS
-        discriminative_dp
-        load_training_data
-        compatibility
-        solve_dp
+        #discriminative_dp
+				mex_output_test
+        dp_load_cases
+        dp_compatibility
+        dp_solve
     )
     
     # The list of common libraries that they get linked to
@@ -367,35 +418,37 @@ IF ( MATLAB_FOUND )
     # Create the matlab targets
     FOREACH( MEX_OUTPUT ${MEX_OUTPUTS} )
         SET( EXECUTABLE_NAME ${MEX_OUTPUT} )
+				SET( MEX_NAME ${MEX_OUTPUT}.mexa64 )
         SET( BRIDGE_LIBRARY ${MEX_OUTPUT}.mex )
         SET( BRIDGE_SOURCE ${MEX_OUTPUT}.mex.cpp )
         
         # Build target as a static library
         ADD_LIBRARY( ${BRIDGE_LIBRARY} STATIC ${BRIDGE_SOURCE} )
         TARGET_LINK_LIBRARIES( ${BRIDGE_LIBRARY} core ${MATLAB_LIBRARIES} )
-    	
+    		
         # Build the matlab entry point to it
-    	ADD_CUSTOM_COMMAND(
-    	    TARGET ${BRIDGE_LIBRARY} POST_BUILD
-    		COMMAND	mex -g -output ${MEX_OUTPUT}
-    		    ${CMAKE_CURRENT_SOURCE_DIR}/${MEX_STUB_SOURCE}
-    		    ${CMAKE_CURRENT_BINARY_DIR}/lib${BRIDGE_LIBRARY}.a
-    		    ${CMAKE_CURRENT_BINARY_DIR}/libcore.so
-    		    ${CMAKE_CURRENT_BINARY_DIR}/libmatutils.a
-    		    ${EXTERNAL_LIBRARIES}
-    		DEPENDS ${MEX_STUB_SOURCE} ${BRIDGE_LIBRARY} ${INTERNAL_MATLAB_LIBRARIES}
-    		)
+				#    	ADD_CUSTOM_COMMAND(
+				#		  OUTPUT ${MEX_NAME}
+    		ADD_CUSTOM_TARGET( ${MEX_NAME}
+    			COMMAND mex -g -output ${MEX_OUTPUT}
+    			${CMAKE_CURRENT_SOURCE_DIR}/${MEX_STUB_SOURCE}
+    			${CMAKE_CURRENT_BINARY_DIR}/lib${BRIDGE_LIBRARY}.a
+    			${CMAKE_CURRENT_BINARY_DIR}/libcore.so
+    			${CMAKE_CURRENT_BINARY_DIR}/libmatutils.a
+    			${EXTERNAL_LIBRARIES}
+    			DEPENDS ${MEX_STUB_SOURCE} ${BRIDGE_LIBRARY} ${INTERNAL_MATLAB_LIBRARIES}
+    			)
 
-    	# Build the regular executable entry point to it
-    	ADD_EXECUTABLE( ${EXECUTABLE_NAME} ${MAIN_STUB_SOURCE} )
-    	TARGET_LINK_LIBRARIES( ${MEX_OUTPUT}
+    		# Build the regular executable entry point to it
+    		ADD_EXECUTABLE( ${EXECUTABLE_NAME} ${MAIN_STUB_SOURCE} )
+    		TARGET_LINK_LIBRARIES( ${EXECUTABLE_NAME}
     	    ${BRIDGE_LIBRARY}
     	    ${INTERNAL_MATLAB_LIBRARIES}
     	    ${EXTERNAL_LIBRARIES}
     	    )
 
-        # For convenience, always build the MEX target when building the binary target
-    	ADD_DEPENDENCIES( ${MEX_OUTPUT} ${BRIDGE_LIBRARY} )
+        # Always build the MEX target when building the binary target
+    	ADD_DEPENDENCIES( ${EXECUTABLE_NAME} ${MEX_NAME} )
     	
     ENDFOREACH( MEX_OUTPUT )
 ENDIF ( MATLAB_FOUND )

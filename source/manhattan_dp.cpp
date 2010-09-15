@@ -131,7 +131,6 @@ void ManhattanDP::Compute(const ScoreFunction& score_f,
 
 	ComputeGridTransform();  // note this _must_ come before everything else
 	ComputeScores();
-	//ComputeGridWarpOld()
 	ComputeOppositeRows();
 
 	// Reset the cache
@@ -165,9 +164,6 @@ void ManhattanDP::Compute(const ScoreFunction& score_f,
 }
 
 void ManhattanDP::ComputeGridTransform() {
-	// TODO: this produces slightly different results to
-	// ComputeGridWarpOld, find out why!
-
 	// Compute the rectification matrix
 	// should we use FromTightSize here???
 	imageToGrid = GetVerticalRectifier(*pc, Bounds2D<>::FromSize(grid_size));

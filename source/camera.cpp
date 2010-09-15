@@ -147,8 +147,8 @@ void LinearCamera::Linearize(const CameraBase& cam, Mat3& m) {
 
 
 ///// PosedCamera
-PosedCamera::PosedCamera(const toon::SE3<>& pose, const CameraBase& camera)
-: camera_(&camera) {
+PosedCamera::PosedCamera(const toon::SE3<>& pose, const CameraBase* camera)
+: camera_(camera) {
 	SetPose(pose);
 }
 

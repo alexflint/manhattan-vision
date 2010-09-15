@@ -18,7 +18,7 @@
 #include "map_widgets.h"
 #include "progress_reporter.h"
 #include "safe_stream.h"
-
+#include "manhattan_bnb.h"
 #include "line_detector.h"
 #include "vanishing_points.h"
 #include "bld_helpers.h"
@@ -58,17 +58,14 @@ void ProcessFrame(int id, const Map& map, const proto::TruthedMap& tru_map) {
 		return;
 	}
 
-	// Construct the posed image
-	PosedCamera pc(kf.pc->pose, *map.camera);
-	PosedImage pim(pc);
-	ImageCopy(kf.image.rgb, pim.rgb);
-
 	// Detect lines
 	GuidedLineDetector line_detector;
-	TIMED("Detect lines") WITHOUT_DLOG line_detector.Compute(pim);
+	TIMED("Detect lines")
+		WITHOUT_DLOG line_detector.Compute(kf.image);
 	// Compute line sweeps
 	IsctGeomLabeller labeller;
-	TIMED("Compute orientations") WITHOUT_DLOG labeller.Compute(pim, line_detector.detections);
+	TIMED("Compute orientations")
+		WITHOUT_DLOG labeller.Compute(kf.image, line_detector.detections);
 
 	// Copy the lines into structure recovery format
 	vector<ManhattanEdge> edges[3];

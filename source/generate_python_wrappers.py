@@ -10,7 +10,8 @@ import sys
 from pyplusplus import module_builder
 
 source_files = [];
-for (file in sys.argv):
+
+for file in sys.argv[1:]:
     if (os.path.exists(file)):
         source_files.append(file);
     else:
@@ -57,4 +58,4 @@ mb.build_code_creator(
 mb.code_creator.user_defined_directories.append( os.path.abspath('.') )
 
 #And finally we can write code to the disk
-mb.write_module( os.path.join( os.path.abspath('.'), 'py_wrappers.cpp' ) )
+mb.write_module( os.path.join( os.path.abspath('.'), 'python_wrappers.cpp' ) )

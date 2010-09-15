@@ -17,7 +17,7 @@ public:
 	const ImageF* prev_input;
 
 	// Outputs from the algorithm
-	ImageF smoothed;  // Gaussian smoothed image
+	//ImageF smoothed;  // Gaussian smoothed image
 	ImageF diffx, diffy;  // x- and y-sobel outputs
 	MatF magnitude_sqr;  // Gradient magnitude squared
 	MatF orient;  // Gradient orientation in radians

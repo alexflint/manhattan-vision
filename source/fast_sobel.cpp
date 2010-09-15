@@ -5,6 +5,8 @@
 #include "common_types.h"
 #include "worker.h"
 
+#include "functional_types.tpp"
+
 namespace indoor_context {
 
 // Binary flag indicating whether or not to parallelize sobel convolutions

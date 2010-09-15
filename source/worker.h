@@ -30,13 +30,13 @@ class Worker {
 	// Thread-safe queue (don't use shared_ptr due to threads)
 	concurrent_queue<job*> work_queue;
 	// The consumer thread
-	thread consumer_thread;
+	boost::thread consumer_thread;
 	// Used to wait for jobs to be completed
 	boost::barrier join_barrier;
 	// Flag indicating that Join() has not been called.
 	bool alive;
 	// Mutex for above
-	mutex alive_mutex;
+	boost::mutex alive_mutex;
 
 	// The consumer loop. Note that we exit if we pop a NULL, which is a
 	// special token sent from the producer thread.
@@ -57,7 +57,7 @@ class Worker {
 	// Add a job to the queue
 	template <typename Function>
 	void Add(Function f) {
-		mutex::scoped_lock lock(alive_mutex);
+		boost::mutex::scoped_lock lock(alive_mutex);
 		assert(alive);
 		work_queue.push(new function_job<Function>(f));
 	}
@@ -72,7 +72,7 @@ template <typename Function>
 void ParallelPartition(int num_jobs,
                        int num_threads,
                        Function jobfunc) {
-	thread_group threads;
+	boost::thread_group threads;
 	for (int i = 0; i < num_threads; i++) {
 		threads.create_thread(bind(jobfunc,
 				i*num_jobs/num_threads,

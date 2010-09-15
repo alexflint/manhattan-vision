@@ -130,26 +130,24 @@ void Gradients::ComputeOrients() {
 
 
 void Gradients::ComputeSobel(const ImageF& rawinput) {
-	const ImageRef& sz = rawinput.GetSize();
-	const int& w = rawinput.GetWidth();
-	const int& h = rawinput.GetHeight();
-	prev_input = &rawinput;
-
 	// Smooth the image
+	scoped_ptr<ImageF> smoothed;
 	if (*gvSmoothingSigma > 0.0) {
-		ImageCopy(rawinput, smoothed);
-		VW::SmoothUniform(smoothed, ceili(*gvSmoothingSigma)*2+1);
+		smoothed.reset(new ImageF);
+		ImageCopy(rawinput, *smoothed);
+		VW::SmoothUniform(*smoothed, ceili(*gvSmoothingSigma)*2+1);
 	}
-	const ImageF& input = *gvSmoothingSigma > 0 ? smoothed : rawinput;
+	const ImageF& input = *gvSmoothingSigma > 0 ? *smoothed : rawinput;
 
 	// Run sobel filters
-	ResizeImage(diffx, sz);
-	ResizeImage(diffy, sz);
+	ResizeImage(diffx, rawinput.GetSize());
+	ResizeImage(diffy, rawinput.GetSize());
 	FastSobel::ConvolveX(input, diffx);
 	FastSobel::ConvolveY(input, diffy);
 }
 
 void Gradients::Compute(const ImageF& rawinput) {
+	prev_input = &rawinput;
 	ComputeSobel(rawinput);
 	ComputeMagSqr();
 	ComputeOrients();
@@ -320,7 +318,9 @@ void MultiScaleCanny::Compute(const ImageF& input) {
 
 		// Downsample
 		if (i < gradients.size()-1) {
-			storage.reset(Downsample(gradients[i]->smoothed, 2));
+			CHECK(false)
+				<< "This part needs to be fixed: gradients.smoothed no longer exists";
+		//storage.reset(Downsample(gradients[i]->smoothed, 2));
 			cur_level = storage.get();
 		}
 	}

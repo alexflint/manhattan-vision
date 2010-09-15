@@ -117,17 +117,27 @@ LogManager::ScopedEnabler::~ScopedEnabler() {
 	LogManager::enabled = oldstate;
 }
 
-ostream& LogManager::GetLogStream() {
-	static scoped_ptr<ios::filtering_ostream> str;
-	static AutoNewlineFilter nlfilter;
-	static IndentFilter ifilter;
-	if (str.get() == NULL) {
-		str.reset(new ios::filtering_ostream);
-		str->push(nlfilter);
-		str->push(ifilter);
-		str->push(ios::file_descriptor_sink(kLogFileNo));
+// This function is not a member of LogManager because we do not want to expose
+// boost::isotreams in log.tpp, since that would slow down compile time considerably.
+ios::filtering_ostream& GetLogStreamImpl() {
+	static scoped_ptr<ios::filtering_ostream> stream;
+	static AutoNewlineFilter newline_filter;
+	static IndentFilter indent_filter;
+	if (stream.get() == NULL) {
+		stream.reset(new ios::filtering_ostream);
+		stream->push(newline_filter);
+		stream->push(indent_filter);
+		stream->push(ios::file_descriptor_sink(kLogFileNo, ios::never_close_handle));
 	}
-	return *str;
+	return *stream;
+}
+
+ostream& LogManager::GetLogStream() {
+	return GetLogStreamImpl();
+}
+
+bool LogManager::Flush() {
+	return GetLogStreamImpl().strict_sync();
 }
 
 LogManager::DelayedNewline::~DelayedNewline() {

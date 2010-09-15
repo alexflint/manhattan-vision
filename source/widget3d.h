@@ -7,9 +7,12 @@
 
 #include "common_types.h"
 #include "line_segment.h"
+
 #include "event.tpp"
 
 namespace indoor_context {
+
+namespace { using namespace boost; }
 
 class Viewer3D;
 class GluProjector;

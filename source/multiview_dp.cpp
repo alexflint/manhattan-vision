@@ -7,8 +7,9 @@
 #include "camera.h"
 #include "colors.h"
 #include "canvas.h"
-#include "floor_ceil_map.h"
+#include "bld_helpers.h"
 
+#include "integral_col_image.tpp"
 #include "vector_utils.tpp"
 #include "math_utils.tpp"
 
@@ -34,7 +35,7 @@ int main(int argc, char **argv) {
 	// Get the floor and ceiling positions
 	double zfloor = tru_map.floorplan().zfloor();
 	double zceil = tru_map.floorplan().zceil();
-	Vec3 vup = map.kfs[0].pc->pose.inverse() * makeVector(0,1,0);
+	Vec3 vup = map.kfs[0].pc->pose_inverse() * makeVector(0,1,0);
 	if (Sign(zceil-zfloor) == Sign(vup[2])) {
 		swap(zfloor, zceil);
 	}
@@ -52,21 +53,21 @@ int main(int argc, char **argv) {
 	Vec3 horizon = kf1.pc->GetImageHorizon();
 
 	// Compute integral col image for kf2
-	MatF aux_orients;
-	GetTrueOrients(tru_map.floorplan(), *kf2.pc, aux_orients);
-	IntegralColImage<3> integ_orients(aux_orients);
+	MatI aux_orients;
+	GetTrueOrients(tru_map.floorplan(), kf2.image.pc(), aux_orients);
+	//IntegralColImage<3> integ_orients(aux_orients);
 
 	// Transfer some quads
 	int x = 100;
 	int y = 45;
 	int axis = 1;
 
-	double opp_x
+	// TODO: finish
 
 
 
 	// Draw some points
-	BrightColors bc;
+	/*BrightColors bc;
 	FileCanvas canvas1("out/from_pts.png", kf1.image.rgb);
 	FileCanvas canvas2("out/to_pts.png", kf2.image.rgb);
 	for (int y = 0; y < kf1.image.ny(); y += 100) {
@@ -87,7 +88,7 @@ int main(int argc, char **argv) {
 			canvas2.DrawDot(project(hceil*q), 3.0, color);
 			canvas2.StrokeLine(project(hfloor*p), project(hceil*q), color);
 		}
-	}
+		}*/
 
 	return 0;
 }

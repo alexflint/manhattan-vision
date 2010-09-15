@@ -19,35 +19,15 @@ namespace indoor_context {
 		Load(filename);
 	}
 
-
-	ImageBundle::ImageBundle(const char* filename)
-		: hsvdirty(true), monodirty(true) {
-		Load(filename);
-	}
-
-	/*ImageBundle::ImageBundle(const fs::path& filename)
-		: hsvdirty(true), monodirty(true) {
-		Load(filename);
-	}*/
-
 	bool ImageBundle::contains(const ImageRef& ir) const {
 		return ir.x >= 0 && ir.y >= 0 && ir.x < nx() && ir.y < ny();
 	}
 
 	void ImageBundle::Load(const string& filename) {
-		ReadImage(filename, rgb);
+		CHECK(ReadImage(filename, rgb))
+			<< "Failed to read image from file: " << filename;
 		Invalidate();
 	}
-
-	void ImageBundle::Load(const char* filename) {
-		ReadImage(filename, rgb);
-		Invalidate();
-	}
-
-	/*void ImageBundle::Load(const fs::path& filename) {
-		ReadImage(filename.string(), rgb);
-		Invalidate();
-	}*/
 
 	void ImageBundle::Unload() {
 		if (rgb.IsAlloced()) rgb.FreeImageData();
@@ -61,6 +41,7 @@ namespace indoor_context {
 
 	void ImageBundle::BuildMono() const {
 		if (monodirty) {
+			CHECK(loaded());
 			ImageCopy(rgb, mono);
 			monodirty = false;
 		}
@@ -68,6 +49,7 @@ namespace indoor_context {
 
 	void ImageBundle::BuildHSV() const {
 		if (hsvdirty) {
+			CHECK(loaded());
 			DLOG << "Warning: using ImageCopy for RGB -> HSV, this doesn't work properly!";
 			ImageCopy(rgb, hsv);
 			hsvdirty = false;

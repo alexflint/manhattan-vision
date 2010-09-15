@@ -7,9 +7,10 @@
 #include "common_types.h"
 #include "vars.h"
 #include "manhattan_dp.h"
-#include "discriminative_manhattan_dp.h"
+#include "manhattan_inference.h"
 #include "map.h"
 #include "map.pb.h"
+#include "bld_helpers.h"
 
 namespace indoor_context {
 
@@ -20,7 +21,7 @@ class DiscriminativeDPDriver {
 public:
 	Map map;
 	proto::TruthedMap gt_map;
-	ManhattanDPFeatures recon;
+	ManhattanInference recon;
 
 	bool initialized;
 
@@ -28,18 +29,9 @@ public:
 	}
 
 	void Initialize() {
-		map.LoadWithGroundTruth(kMapPath, gt_map);
-		KeyFrame& kf = *map.KeyFrameByIdOrDie(kFrameIndex);
-		kf.LoadImage();  // leave the image loaded
-		Mat3 floorToCeil = GetFloorCeilHomology(*kf.pc, gt_map.floorplan());
-		recon.ComputeFeatures(kf.image, floorToCeil);
-		//kf.UnloadImage();  leave the image loaded because we will use it later
 	}
 
 	void Predict() {
-		toon::Vector<> w(18);
-		w[3] = w[10] = w[17] = 1.0;
-		recon.ComputeScores(w);
 	}
 };
 

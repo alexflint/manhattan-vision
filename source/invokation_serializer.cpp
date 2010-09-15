@@ -1,9 +1,11 @@
 #include "invokation_serializer.h"
 
 namespace indoor_context {
+	using boost::thread;
+
 	// Return true iff the current thread is the home thread
 	bool InvokationSerializer::InHomeThread() {
-		return this_thread::get_id() == home_thread;
+		return boost::this_thread::get_id() == home_thread;
 	}
 
 	// Set the home thread to the current thread

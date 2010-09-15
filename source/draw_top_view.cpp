@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
 	// Draw the camera trajectory
 	for (int i = 0; i < map.kfs.size(); i++) {
 		Vec2 camc = zproj * map.kfs[i].pc->world_centre();
-		Vec3 fwd = map.kfs[i].pc->invpose.get_rotation() * makeVector(0,0,1);
+		Vec3 fwd = map.kfs[i].pc->pose_inverse().get_rotation() * makeVector(0,0,1);
 		Vec2 side = zproj * (fwd ^ makeVector(0,0,1));
 		canvas.StrokeLine(s*(camc-side*0.3)+t, s*(camc+side*0.3)+t, Colors::black());
 		if (i+1 < map.kfs.size()) {

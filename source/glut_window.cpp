@@ -1,13 +1,14 @@
 #include <GL/gl.h>
 #include <GL/glut.h>
 
-#include "image_utils.tpp"
 #include "glut_window.h"
+#include "image_utils.tpp"
 
 #include <map>
 
 namespace indoor_context {
 using namespace toon;
+using namespace boost;
 
 // Time between successive clicks to generate a DoubleClick event (in seconds)
 lazyvar<float> gvDoubleClickTime("GlutWindow.DoubleClickTime");
