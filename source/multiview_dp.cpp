@@ -51,28 +51,30 @@ int main(int argc, char **argv) {
 		swap(zfloor, zceil);
 	}
 
-  //LineSweepDPScore objective;
-
 	// Set up the reconstruction
 	MultiViewReconstructor mv;
 	Frame* base_frame = map.KeyFrameByIdOrDie(base_id);
 	base_frame->LoadImage();
-	mv.Configure(base_frame->image, zfloor, zceil);
+	TITLED("Computing objective function for base frame")
+		mv.Configure(base_frame->image, zfloor, zceil);
+
 	BOOST_FOREACH(int aux_id, aux_ids) {
 		Frame* frame = map.KeyFrameByIdOrDie(aux_id);
 		frame->LoadImage();
-		mv.AddFrame(frame->image);
+		TITLED(str(format("Computing objective function for frame %d")%aux_id))
+			mv.AddFrame(frame->image);
 	}
-	mv.Reconstruct();
+	TITLED("Doing joint reconstruction")
+		mv.Reconstruct();
 
 	// Now do the monocular reconstruction
-	LineSweepDPScore objective;
+	LineSweepDPScore gen;
 	objective.Compute(*mv.base_frame);
 	ManhattanDPReconstructor mono;
 	TITLED("Doing monocular reconstruction")
-	mono.Compute(*mv.base_frame,
-							 mv.joint_payoffs.base_geom.floorToCeil,
-							 objective.score_func);
+		mono.Compute(*mv.base_frame,
+								 mv.joint_payoffs.base_geom.floorToCeil,
+								 gen.score_func);
 
 	// Report accuracy
 	MatI gt_orients;

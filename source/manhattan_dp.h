@@ -119,7 +119,7 @@ public:
 // TODO: make this more abstract so we can implement multiple views.
 class DPObjective {
 public:
-	DPObjective() : wall_penalty(-1) { }
+	DPObjective() : wall_penalty(-1), occl_penalty(-1) { }
 	DPObjective(int nx, int ny) {
 		Resize(nx, ny);
 	}
@@ -140,6 +140,7 @@ public:
 
 	MatF pixel_scores[3];  // score associated with assigning each label to each pixel (image coords)
 	double wall_penalty;  // the cost per wall segment (for regularisation)
+	double occl_penalty;  // the cost per occluding wall segment (_additional_ to wall_penalty)
 private:
 	// Disallow copy constructor, use CopyTo explicitly instead
 	DPObjective(const DPObjective& rhs);
@@ -156,6 +157,10 @@ public:
 	int vert_axis;
 	int max_corners;
 
+	// Copied from the DPObjective object passed to Compute for convenience
+	double wall_penalty;  // the cost per wall segment (for regularisation)
+	double occl_penalty;  // the cost per occluding wall segment (_additional_ to wall_penalty)
+
 	// Per-pixel scores. To be factored out.
 	//const DPObjective* score_func;  // Pointer to input object passed to Compute()
 
@@ -171,11 +176,6 @@ public:
 	// Geometry
 	const DPGeometry* geom; // an input parameter
 	MatI opp_rows;  // cache of floor<->ceil mapping as passed through floorToCeil
-	/*const PosedCamera* pc; // the camera that captured input_orients
-	int horizon_row, vpt_cols[3];  // the horizon and vanishing points in grid coordinates
-	Vec2I image_size, grid_size;  // size of input_orients and est_orients respective
-	Mat3 imageToGrid, gridToImage;  // mapping from image to rectified grid and back
-	Mat3 floorToCeil;  // planar homology from floor to ceiling in image coordinates*/
 
 	// The cache of DP evaluations
 	DPCache cache;
@@ -201,7 +201,7 @@ public:
 	// expresses the problem in terms of affinities between each
 	// pixel/label. This function transforms score_func into a matrix of
 	// "node scores" and then calls the implementation below.
-	void Compute(const DPObjective& score_func,
+	void Compute(const DPObjective& objective,
 							 const DPGeometry& geometry);
 
 	// Compute the optimal manhattan model from the per-node score
@@ -209,14 +209,17 @@ public:
 	// building walls of each orientation at each pixel.
 	void Compute(const boost::array<MatF,2>& node_scores,
 							 const DPGeometry& geometry,
-							 double wall_penalty);
+							 double wall_penalty,
+							 double occl_penalty);
 
-	// Now moved to DPGeometry class. TODO: remove
-	//void ComputeGeometry();
+	// The above two delegate here
+	void ComputeInternal();
+
 	// Populate integ_orients with rectified score data
-	void ComputePayoffs(const DPObjective& score_func);
+	void ComputePayoffs(const DPObjective& objective,
+											const DPGeometry& geometry);
 	// Populate opp_rows according to fcmap
-	void ComputeOppositeRows();
+	void ComputeOppositeRows(const DPGeometry& geometry);
 	// Backtrack through the evaluation graph from the solution
 	void ComputeBacktrack();
 
@@ -259,7 +262,8 @@ public:
 	void Compute(const PosedImage& image,
 							 const DPGeometry& geometry,
 	             const boost::array<MatF,2>& payoffs,
-							 double wall_penalty);
+							 double wall_penalty,
+							 double occl_penalty);
 
 	// Report the solution as a sequence of DP nodes
 	void ReportBacktrack();

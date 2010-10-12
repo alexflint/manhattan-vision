@@ -323,7 +323,8 @@ namespace indoor_context {
 		recon.Compute(*base_frame,
 									joint_payoffs.base_geom,
 									joint_payoffs.payoffs,
-									base_objective->wall_penalty);
+									base_objective->wall_penalty,
+									base_objective->occl_penalty);
 	}
 
 

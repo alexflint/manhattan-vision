@@ -28,6 +28,7 @@ lazyvar<int> gvMaxComplexity("ManhattanDP.MaxCorners");
 lazyvar<Vec2> gvGridSize("ManhattanDP.GridSize");
 lazyvar<float> gvLineJumpThreshold("ManhattanDP.LineJumpThreshold");
 lazyvar<float> gvWallPenalty("ManhattanDP.DefaultWallPenalty");
+lazyvar<float> gvOcclusionPenalty("ManhattanDP.DefaultOcclusionPenalty");
 
 DPState::DPState() : row(-1), col(-1), axis(-1), remaining(-1), dir(-1) { }
 DPState::DPState(int r, int c, int a, int b, int d)
@@ -179,59 +180,39 @@ ManhattanDP::ManhattanDP() : geom(NULL) {
 	max_corners = *gvMaxComplexity;
 }
 
-void ManhattanDP::Compute(const DPObjective& score_func,
+void ManhattanDP::Compute(const DPObjective& objective,
 													const DPGeometry& geometry) {
 	geom = &geometry;
-	double wall_penalty = score_func.wall_penalty;
+	wall_penalty = objective.wall_penalty;
+	occl_penalty = objective.occl_penalty;
 
-	ComputeOppositeRows();
-	ComputePayoffs(score_func);
-
-	// Reset the cache
-	cache_lookups = 0;
-	cache_hits = 0;
-	cache.reset(geom->grid_size, max_corners);
-
-	// Reset the profiling histograms
-	horiz_len_hist.Clear();
-	horiz_cutoff_hist.Clear();
-
-	CHECK_GE(wall_penalty, 0) <<
-		"This indicates DPObjective::wall_penalty was not changed from "
-		"the initial value provided in the constructor";
-
-	// Begin the search
-	DPSolution best(-INFINITY);
-	DPState init(-1, geom->grid_size[0]-1, -1, -1, DPState::DIR_OUT);
-	max_depth = cur_depth = 0;
-	VW::Timer dp_timer;
-	for (init.remaining = 1; init.remaining <= max_corners; init.remaining++) {
-		int penalty = wall_penalty * init.remaining;
-		for (init.axis = 0; init.axis <= 1; init.axis++) {
-			for (init.row = 0; init.row < geom->grid_size[1]; init.row++) {
-				best.ReplaceIfSuperior(Solve(init), init, -penalty);
-			}
-		}
-	}
-	solve_time = dp_timer.GetAsMilliseconds();
-	DLOG << "Forwards DP: " << solve_time << "ms";
-
-	// Backtrack from the solution
-	solution = best;
-	TIMED("Backtracking") ComputeBacktrack();
+	ComputeOppositeRows(geometry);
+	ComputePayoffs(objective, geometry);
+	ComputeInternal();
 }
 
 // This is mostly a copy of Compute() above. TODO: Factor out common elements of both.
-void ManhattanDP::Compute(const boost::array<MatF,2>& input_payoffs,
+void ManhattanDP::Compute(const boost::array<MatF,2>& the_payoffs,
 													const DPGeometry& geometry,
-													double wall_penalty) {  // TODO: deal with wall_penalty better
-	payoffs[0] = input_payoffs[0];  // copying, uh oh
-	payoffs[1] = input_payoffs[1];
+													double the_wall_penalty,
+													double the_occl_penalty) {  // TODO: deal with wall_penalty better
+	payoffs[0] = the_payoffs[0];  // copying, uh oh
+	payoffs[1] = the_payoffs[1];
 	geom = &geometry;
+	wall_penalty = the_wall_penalty;
+	occl_penalty = the_occl_penalty;
 
-	DREPORT(wall_penalty);
+	ComputeOppositeRows(geometry);
+	ComputeInternal();
+}
 
-	ComputeOppositeRows();
+void ManhattanDP::ComputeInternal() {
+	CHECK_GE(wall_penalty, 0) <<
+		"This indicates DPObjective::wall_penalty was not changed from "
+		"the initial value set by the constructor";
+	CHECK_GE(occl_penalty, 0) <<
+		"This indicates DPObjective::occl_penalty was not changed from "
+		"the initial value set by the constructor";
 
 	// Reset the cache
 	cache_lookups = 0;
@@ -256,57 +237,29 @@ void ManhattanDP::Compute(const boost::array<MatF,2>& input_payoffs,
 		}
 	}
 	solve_time = dp_timer.GetAsMilliseconds();
-	DLOG << "Solve DP: " << solve_time << "ms";
+	DLOG << "Core DP: " << solve_time << "ms";
 
 	// Backtrack from the solution
 	solution = best;
 	ComputeBacktrack();	
 }
 
-	/*void ManhattanDP::ComputeGeometry() {
-	// Compute the rectification matrix
-	// should we use FromTightSize here???
-	imageToGrid = GetVerticalRectifier(*pc, Bounds2D<>::FromSize(grid_size));
-	gridToImage = LU<>(imageToGrid).get_inverse();
-
-	// Locate the vanishing points in grid coordinates
-	for (int i = 0; i < 3; i++) {
-		vpt_cols[i] = ImageToGrid(pc->GetImageVpt(i))[0];
-	}
-
-	// Calculate the horizon row
-	// Note that H_canon breaks the orthogonality of the vanishing
-	// points, so the horzon is not guaranteed to be in the middle of
-	// the image even though the vertical vanishing point is
-	// guaranteed to be at infinity. The horizon is, however,
-	// guaranteed to be horizontal in the image.
-	double y0 = ImageToGrid(pc->GetImageVpt(0))[1];
-	double y1 = ImageToGrid(pc->GetImageVpt(1))[1];
-	CHECK_EQ_TOL(y0, y1, 1e-6) << "The horizon is not horizontal in the image.";
-	horizon_row = roundi((y0 + y1)/2.0);
-
-	// Check that image is not flipped. This should be guaranteed by GetVerticalRectifier
-	Vec2 floor_pt = makeVector(0, horizon_row+1);
-	// Note that PosedCamera::GetImageHorizon always returns a line with positive half on the floor...
-	CHECK_GT(GridToImage(floor_pt)*pc->GetImageHorizon(), 0)
-		<< "The matrix returned by GetVerticalRectifier flips the image upside down!";
-		}*/
-
-void ManhattanDP::ComputePayoffs(const DPObjective& score_func) {
+void ManhattanDP::ComputePayoffs(const DPObjective& score_func,
+																 const DPGeometry& geometry) {
 	// Compute per orientation, per pixel affinities
 	for (int i = 0; i < 3; i++) {
 		// Allocate memory
-		grid_scores[i].Resize(geom->grid_size[1], geom->grid_size[0], 0);
-		CHECK_EQ(score_func.pixel_scores[i].Rows(), geom->camera->image_size().y);
-		CHECK_EQ(score_func.pixel_scores[i].Cols(), geom->camera->image_size().x);
+		grid_scores[i].Resize(geometry.grid_size[1], geometry.grid_size[0], 0);
+		CHECK_EQ(score_func.pixel_scores[i].Rows(), geometry.camera->image_size().y);
+		CHECK_EQ(score_func.pixel_scores[i].Cols(), geometry.camera->image_size().x);
 
 		// Transform the scores according to ImageToGrid(.)
-		for (int y = 0; y < geom->camera->image_size().y; y++) {
+		for (int y = 0; y < geometry.camera->image_size().y; y++) {
 			const float* inrow = score_func.pixel_scores[i][y];
-			for (int x = 0; x < geom->camera->image_size().x; x++) {
-				Vec2I grid_pt = RoundVector(geom->ImageToGrid(makeVector(x, y, 1.0)));
-				if (grid_pt[0] >= 0 && grid_pt[0] < geom->grid_size[0] &&
-					grid_pt[1] >= 0 && grid_pt[1] < geom->grid_size[1]) {
+			for (int x = 0; x < geometry.camera->image_size().x; x++) {
+				Vec2I grid_pt = RoundVector(geometry.ImageToGrid(makeVector(x, y, 1.0)));
+				if (grid_pt[0] >= 0 && grid_pt[0] < geometry.grid_size[0] &&
+					grid_pt[1] >= 0 && grid_pt[1] < geometry.grid_size[1]) {
 					grid_scores[i][ grid_pt[1] ][ grid_pt[0] ] += inrow[x];
 				}
 			}
@@ -318,21 +271,21 @@ void ManhattanDP::ComputePayoffs(const DPObjective& score_func) {
 
 	// Compute the whole-column costs for each node
 	for (int i = 0; i < 2; i++) {
-		payoffs[i].Resize(geom->grid_size[1], geom->grid_size[0]);
-		for (int y = 0; y < geom->grid_size[1]; y++) {
+		payoffs[i].Resize(geometry.grid_size[1], geometry.grid_size[0]);
+		for (int y = 0; y < geometry.grid_size[1]; y++) {
 			float* row = payoffs[i][y];
-			for (int x = 0; x < geom->grid_size[0]; x++) {
+			for (int x = 0; x < geometry.grid_size[0]; x++) {
 				row[x] = MarginalWallScore(y, x, i);
 			}
 		}
 	}
 }
 
-void ManhattanDP::ComputeOppositeRows() {
-	opp_rows.Resize(geom->grid_size[1], geom->grid_size[0]);
-	for (int y = 0; y < geom->grid_size[1]; y++) {
-		const Mat3& m = y < geom->horizon_row ? geom->grid_ceilToFloor : geom->grid_floorToCeil;
-		for (int x = 0; x < geom->grid_size[0]; x++) {
+void ManhattanDP::ComputeOppositeRows(const DPGeometry& geometry) {
+	opp_rows.Resize(geometry.grid_size[1], geometry.grid_size[0]);
+	for (int y = 0; y < geometry.grid_size[1]; y++) {
+		const Mat3& m = y < geometry.horizon_row ? geometry.grid_ceilToFloor : geometry.grid_floorToCeil;
+		for (int x = 0; x < geometry.grid_size[0]; x++) {
 			Vec2 opp_grid_pos = project(m * makeVector(x,y,1.0));
 			opp_rows[y][x] = opp_grid_pos[1];
 		}
@@ -585,19 +538,20 @@ void ManhattanDP::DrawGridSolution(ImageRGB<byte>& canvas) const {
 
 void ManhattanDPReconstructor::Compute(const PosedImage& image,
                                        const Mat3& floorToCeil,
-                                       const DPObjective& scores) {
+                                       const DPObjective& objective) {
 	input_image = &image;
 	geometry.Configure(&image.pc(), floorToCeil);
-	TIMED("Complete DP") dp.Compute(scores, geometry);//image.pc(), floorToCeil);
+	TIMED("Complete DP") dp.Compute(objective, geometry);
 }
 
 void ManhattanDPReconstructor::Compute(const PosedImage& image,
 																			 const DPGeometry& geom,
 																			 const boost::array<MatF,2>& payoffs,
-																			 double wall_penalty) {
+																			 double wall_penalty,
+																			 double occl_penalty) {
 	input_image = &image;
 	geometry = geom;  // we're copying here, but nothing big (yet)
-	TIMED("Complete DP") dp.Compute(payoffs, geometry, wall_penalty);
+	TIMED("Complete DP") dp.Compute(payoffs, geometry, wall_penalty, occl_penalty);
 }
 
 void ManhattanDPReconstructor::ReportBacktrack() {
@@ -709,31 +663,7 @@ void LineSweepDPScore::Compute(const PosedImage& image) {
 		}
 	}
 	score_func.wall_penalty = *gvWallPenalty;
+	score_func.occl_penalty = *gvOcclusionPenalty;
 }
 
 }
-
-
-/*
-void ManhattanDPReconstructor::GetAuxOrients(const PosedCamera& aux,
-                                             double zfloor,
-                                             MatI& aux_orients) {
-	aux_orients.Resize(aux.image_size().y, aux.im_size().x);
-	dp.TransferBuilding(manhattan_bnb.soln, aux.pose, zfloor, aux_orients);
-}
-
-void ManhattanDPReconstructor::OutputSolutionInView(const string& path,
-                                                    const Frame& aux,
-                                                    double zfloor) {
-	// Generate the orientation map
-	MatI aux_orients;
-	GetAuxOrients(*aux.pc, zfloor, aux_orients);
-	CHECK(aux.image.loaded()) << "Auxiliary view not loaded";
-
-	// Draw the image
-	ImageRGB<byte> aux_canvas;
-	ImageCopy(aux.image.rgb, aux_canvas);
-	DrawOrientations(aux_orients, aux_canvas, 0.35);
-	WriteImage(path, aux_canvas);
-}
-*/
