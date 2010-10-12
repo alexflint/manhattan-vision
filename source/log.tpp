@@ -132,11 +132,11 @@ public:
 	static void SetIndent(int new_level);
 
 	// Increase current indent level
-	static void IncreaseIndent(int n) {
+	static void IncreaseIndent(int n=2) {
 		SetIndent(indent_level+n);
 	}
 	// Decrease current indent level
-	static void DecreaseIndent(int n) {
+	static void DecreaseIndent(int n=2) {
 		SetIndent(indent_level-n);
 	}
 

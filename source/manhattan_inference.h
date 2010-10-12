@@ -61,7 +61,7 @@ namespace indoor_context {
 		LineSweepFeatureGenerator feature_gen;
 
 		// Reconstruction
-		ManhattanDP::ScoreFunction score_func;
+		DPObjective score_func;
 		ManhattanDPReconstructor reconstructor;
 
 		// Default constructor

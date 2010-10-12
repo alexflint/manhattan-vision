@@ -19,7 +19,8 @@ using namespace toon;
 bool pass_gt_orients = false;
 
 // To be moved elsewhere?
-scoped_ptr<ManhattanDPReconstructor> recon;
+//scoped_ptr<ManhattanDPReconstructor> recon;
+ManhattanDPReconstructor* recon;
 
 double sum_accuracy;
 int num_frames;
@@ -29,17 +30,13 @@ void ProcessFrame(Map& map, const proto::TruthedMap& gt_map, int frame_id) {
 	KeyFrame& kf = *map.KeyFrameByIdOrDie(frame_id);
 	kf.LoadImage();
 
-	// Construct the posed image
-	PosedImage pim(*kf.pc);
-	ImageCopy(kf.image.rgb, pim.rgb);
-
 	// Compute the cost function
-	LineSweepDPCost cost(kf.image);
+	LineSweepDPScore scores(kf.image);
 
 	// Perform the reconstruction
 	Mat3 fcmap = GetFloorCeilHomology(kf.image.pc(), gt_map.floorplan());
 	INDENTED TIMED("Reconstruction time") {
-		recon->Compute(pim, fcmap, cost.scorefunc);
+		recon->Compute(kf.image, fcmap, scores.score_func);
 	}
 	format filepat("out/frame%03d_%s");
 
@@ -57,7 +54,7 @@ void ProcessFrame(Map& map, const proto::TruthedMap& gt_map, int frame_id) {
 	recon->OutputSolutionOrients(str(filepat % frame_id % "dp_soln.png"));
 	//recon->OutputOppRowViz(str(filepat % frame_id % "opprows.png"));
 
-	cost.OutputOrientViz(str(filepat % frame_id % "dp_initial.png"));
+	scores.OutputOrientViz(str(filepat % frame_id % "dp_initial.png"));
 
 	kf.UnloadImage();
 }
@@ -86,7 +83,9 @@ int main(int argc, char **argv) {
 	map.LoadWithGroundTruth(argv[1], tru_map);
 
 	// Set up the reconstruction
-	recon.reset(new ManhattanDPReconstructor);
+	//recon.reset(new ManhattanDPReconstructor);
+	ManhattanDPReconstructor* reconstructor = new ManhattanDPReconstructor;
+	recon = reconstructor;
 
 	sum_accuracy = 0;
 	num_frames = 0;

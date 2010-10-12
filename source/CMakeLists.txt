@@ -197,8 +197,7 @@ SET( CORE_HEADERS
 	manhattan_bnb.h
 	manhattan_dp.h
 	manhattan_inference.h
-
-	#persistent_map.h
+	multiview_reconstructor.h
 )
 
 SET( CORE_SOURCES 
@@ -255,6 +254,7 @@ SET( CORE_SOURCES
 	manhattan_bnb.cpp
 	manhattan_dp.cpp
 	manhattan_inference.cpp
+	multiview_reconstructor.cpp
 	
 	camera.cpp
 	glut_window.cpp
@@ -270,8 +270,6 @@ SET( CORE_SOURCES
 	
 	simple_renderer.cpp
 	floorplan_renderer.cpp
-
-	#persistent_map.cpp
 )
 
 # Core library
@@ -320,6 +318,7 @@ SET( EXECUTABLES
 	monocular_dp
 	multiview_dp
 	feature_dp
+	evaluate_mv
 	
 	test
 )

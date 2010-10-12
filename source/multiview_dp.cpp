@@ -1,3 +1,5 @@
+#include <boost/array.hpp>
+
 #include <LU.h>
 
 #include "entrypoint_types.h"
@@ -8,7 +10,10 @@
 #include "colors.h"
 #include "canvas.h"
 #include "bld_helpers.h"
+#include "manhattan_dp.h"
+#include "multiview_reconstructor.h"
 
+#include "io_utils.tpp"
 #include "integral_col_image.tpp"
 #include "vector_utils.tpp"
 #include "math_utils.tpp"
@@ -18,77 +23,98 @@ using indoor_context::Sign;
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
 	if (argc != 4) {
-		DLOG << "Usage: "<<argv[0]<<" truthed_map.pro INDEX1 INDEX2";
+		DLOG << "Usage: "<<argv[0]<<" truthed_map.pro BASE_INDEX AUX_RANGE";
 		return 0;
 	}
 
 	// Input arguments
 	const char* path = argv[1];
-	int frame1_id = atoi(argv[2]);
-	int frame2_id = atoi(argv[3]);
+	int base_id = atoi(argv[2]);
+	vector<int> aux_ids = ParseMultiRange<int>(string(argv[3]));
+	// Never use the base frame as an auxiliary frame
+	vector<int>::iterator new_end = remove(aux_ids.begin(), aux_ids.end(), base_id);
+	aux_ids.erase(new_end, aux_ids.end());
+
+	format filepat("out/%s");
+	DREPORT(base_id, iowrap(aux_ids));
 
 	// Load the map
 	Map map;
-	proto::TruthedMap tru_map;
-	map.LoadWithGroundTruth(path, tru_map);
+	proto::TruthedMap gt_map;
+	map.LoadWithGroundTruth(path, gt_map);
 
 	// Get the floor and ceiling positions
-	double zfloor = tru_map.floorplan().zfloor();
-	double zceil = tru_map.floorplan().zceil();
+	double zfloor = gt_map.floorplan().zfloor();
+	double zceil = gt_map.floorplan().zceil();
 	Vec3 vup = map.kfs[0].pc->pose_inverse() * makeVector(0,1,0);
 	if (Sign(zceil-zfloor) == Sign(vup[2])) {
 		swap(zfloor, zceil);
 	}
 
-	// Load the key frames
-	KeyFrame& kf1 = *map.KeyFrameByIdOrDie(frame1_id);
-	KeyFrame& kf2 = *map.KeyFrameByIdOrDie(frame2_id);
-	kf1.LoadImage();
-	kf2.LoadImage();
+  //LineSweepDPScore objective;
 
-	// Get the homographies
-	Mat3 hfloor = GetHomographyVia(*kf1.pc, *kf2.pc, makeVector(0, 0, -1, zfloor));
-	Mat3 hceil = GetHomographyVia(*kf1.pc, *kf2.pc, makeVector(0, 0, -1, zceil));
-	Mat3 floorToCeil = GetManhattanHomology(*kf1.pc, zfloor, zceil);
-	Vec3 horizon = kf1.pc->GetImageHorizon();
+	// Set up the reconstruction
+	MultiViewReconstructor mv;
+	Frame* base_frame = map.KeyFrameByIdOrDie(base_id);
+	base_frame->LoadImage();
+	mv.Configure(base_frame->image, zfloor, zceil);
+	BOOST_FOREACH(int aux_id, aux_ids) {
+		Frame* frame = map.KeyFrameByIdOrDie(aux_id);
+		frame->LoadImage();
+		mv.AddFrame(frame->image);
+	}
+	mv.Reconstruct();
 
-	// Compute integral col image for kf2
-	MatI aux_orients;
-	GetTrueOrients(tru_map.floorplan(), kf2.image.pc(), aux_orients);
-	//IntegralColImage<3> integ_orients(aux_orients);
+	// Now do the monocular reconstruction
+	LineSweepDPScore objective;
+	objective.Compute(*mv.base_frame);
+	ManhattanDPReconstructor mono;
+	TITLED("Doing monocular reconstruction")
+	mono.Compute(*mv.base_frame,
+							 mv.joint_payoffs.base_geom.floorToCeil,
+							 objective.score_func);
 
-	// Transfer some quads
-	int x = 100;
-	int y = 45;
-	int axis = 1;
+	// Report accuracy
+	MatI gt_orients;
+	GetTrueOrients(gt_map.floorplan(), base_frame->image.pc(), gt_orients);
+	double mono_accuracy = mono.GetAccuracy(gt_orients);
+	double mv_accuracy = mv.recon.GetAccuracy(gt_orients);
+	DLOG << format("Accuracy (monocular):  %.2f%%") % (mono_accuracy*100);
+	DLOG << format("Accuracy (multiview):  %.2f%%") % (mv_accuracy*100);
 
-	// TODO: finish
+	// Produce visualisations
+	mv.recon.OutputSolutionOrients(str(filepat % "mv_soln.png"));
+	mono.OutputSolutionOrients(str(filepat % "mono_soln.png"));
+
+	DLOG << "Done outputting solutions";
+
+	mv.base_gen.line_sweeper.OutputOrientViz("out/base_sweeps.png");
+
+	WriteMatrixImageRescaled("out/base_raw_L.png", mv.joint_payoffs.base_payoffs[0]);
+	WriteMatrixImageRescaled("out/base_raw_R.png", mv.joint_payoffs.base_payoffs[1]);
+
+	WriteMatrixImageRescaled("out/joint_raw_L.png", mv.joint_payoffs.payoffs[0]);
+	WriteMatrixImageRescaled("out/joint_raw_R.png", mv.joint_payoffs.payoffs[1]);
+
+	mv.OutputBasePayoffs("out/base_payoffs.png");
+	mv.OutputAuxPayoffs("out/");
+	mv.OutputJointPayoffs("out/joint_payoffs.png");
 
 
+	OutputPayoffsViz("out/mono_payoffs.png",
+									 mv.base_frame->rgb,
+									 mono.dp.payoffs,
+									 *mono.dp.geom);
 
-	// Draw some points
-	/*BrightColors bc;
-	FileCanvas canvas1("out/from_pts.png", kf1.image.rgb);
-	FileCanvas canvas2("out/to_pts.png", kf2.image.rgb);
-	for (int y = 0; y < kf1.image.ny(); y += 100) {
-		for (int x = 0; x < kf2.image.nx(); x += 100) {
-			Vec3 p = makeVector(x,y,1.0);
-			if (horizon*p <= 0) continue;  // check that point is below horizon
+	// Do the joint reconstruction
+	/*ManhattanDPReconstructor recon;
+	TITLED("Doing joint reconstruction")
+	recon.Compute(base_kf.image,
+								base_payoffs.geom,
+								po.payoffs,
+								base_scores.score_func.wall_penalty);*/
 
-			Vec3 q = floor2ceil * p;
-
-			PixelRGB<byte> color = bc.Next();
-			canvas1.DrawDot(project(p), 4.0, Colors::white());
-			canvas1.DrawDot(project(p), 3.0, color);
-			canvas1.DrawDot(project(q), 3.0, color);
-			canvas1.StrokeLine(project(p), project(q), color);
-
-			canvas2.DrawDot(project(hfloor*p), 4.0, Colors::white());
-			canvas2.DrawDot(project(hfloor*p), 3.0, color);
-			canvas2.DrawDot(project(hceil*q), 3.0, color);
-			canvas2.StrokeLine(project(hfloor*p), project(hceil*q), color);
-		}
-		}*/
+	
 
 	return 0;
 }

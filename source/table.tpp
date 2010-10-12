@@ -154,13 +154,17 @@ private:
 
 	// Initialize the table.
 	void Init(toon::Vector<N, int> dims) {
-		dim_lens = dims;
-		w[N-1] = 1;
-		for (int i = N-2; i >= 0; i--) {
-			w[i] = w[i+1] * dim_lens[i+1];
+		// Must also check whether data is NULL since when this is called
+		// from the constructor dim_lens contains random bytes.
+		if (!data || dim_lens != dims) {
+			dim_lens = dims;
+			w[N-1] = 1;
+			for (int i = N-2; i >= 0; i--) {
+				w[i] = w[i+1] * dim_lens[i+1];
+			}
+			n = w[0]*dim_lens[0];
+			data.reset(new T[n]);
 		}
-		n = w[0]*dim_lens[0];
-		data.reset(new T[n]);
 	}
 };
 
