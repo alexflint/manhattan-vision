@@ -4,7 +4,6 @@
 
 #include "common_types.h"
 #include "camera.h"
-#include "floor_ceil_map.h"
 #include "guided_line_detector.h"
 #include "line_sweeper.h"
 #include "map.pb.h"
@@ -45,7 +44,7 @@ struct ManhattanWall {
 // reasons.
 struct DPState {
 	enum { DIR_IN, DIR_OUT, DIR_UP, DIR_DOWN };
-	short row, col, axis, remaining, dir;
+	short row, col, axis, dir;
 	DPState();
 	DPState(int r, int c, int a, int b, int d);
 	static const DPState none;
@@ -78,7 +77,7 @@ ostream& operator<<(ostream& s, const DPSolution& x);
 class DPCache {
 public:
 	typedef DPSolution* iterator;
-	Table<5, DPSolution> table;
+	Table<4, DPSolution> table;
 	void reset(const Vec2I& grid_size, int max_corners);
 	void clear();
 	iterator begin();

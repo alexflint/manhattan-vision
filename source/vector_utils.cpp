@@ -70,10 +70,6 @@ proto::Vec6 asProto(const Vector<6>& v) {
 	return u;
 }
 
-Vector<2> asToon(const ImageRef& ir) {
-	return makeVector(ir.x, ir.y);
-}
-
 toon::Matrix<3,4> as_matrix(const toon::SE3<>& se3) {
 	toon::Matrix<3,4> m;
 	m.slice<0,0,3,3>() = se3.get_rotation().get_matrix();

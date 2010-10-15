@@ -179,9 +179,9 @@ public:
 	// Get the i-th vanishing point in image coords
 	Vec3 GetImageVpt(int axis) const;
 
-	// Get the horizon line in retina coords (positive side is above horizon)
+	// Get the horizon line in retina coords (positive side is below horizon)
 	Vec3 GetRetinaHorizon() const;
-	// Get the horizon line in image coords (positive side is above horizon)
+	// Get the horizon line in image coords (positive side is below horizon)
 	Vec3 GetImageHorizon() const;
 
 private:

@@ -43,19 +43,6 @@ bool PointInQuad(const Vec2& a,
 	return Sign(A) == Sign(B) && Sign(B) == Sign(C) && Sign(C) == Sign(D);
 }
 
-/*void ClipLineToImage(Vec2& a,
-                     Vec2& b,
-                     const ImageRef& size) {
-	CvSize sz = cvSize(size.x, size.y);
-	CvPoint cva = cvPoint(a[0], a[1]);
-	CvPoint cvb = cvPoint(b[0], b[1]);
-	cvClipLine(sz, &cva, &cvb);
-	a[0] = cva.x;
-	a[1] = cva.y;
-	b[0] = cvb.x;
-	b[1] = cvb.y;
-}*/
-
 Vec3 HMidpoint(const Vec3& a, const Vec3& b) {
 	return makeVector(a[0]*b[2] + b[0]*a[2],
 			a[1]*b[2] + b[1]*a[2],
@@ -192,6 +179,10 @@ Mat3 GetManhattanHomology(const Matrix<3,4>& cam, double z0, double z1) {
 
 Mat3 GetManhattanHomology(const PosedCamera& pc, double z0, double z1) {
 	return GetManhattanHomology(pc.Linearize(), z0, z1);
+}
+
+Mat3 GetVerticalRectifier(const PosedCamera& pc) {
+	return GetVerticalRectifier(pc, pc.image_bounds());
 }
 
 Mat3 GetVerticalRectifier(const PosedCamera& pc,

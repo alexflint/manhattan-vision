@@ -11,6 +11,7 @@
 #include "common_types.h"
 #include "map.pb.h"
 
+#include "math_utils.tpp"
 #include "range_utils.tpp"
 
 namespace indoor_context {
@@ -67,31 +68,32 @@ toon::Vector<-1,int> RoundVector(const toon::Vector<-1,T>& v) {
 
 // For speed:
 template <typename T>
-toon::Vector<1,int> RoundVector(const toon::Vector<1,T>& v) {
+inline toon::Vector<1,int> RoundVector(const toon::Vector<1,T>& v) {
 	return toon::makeVector(roundi(v[0]));
 }
 
 // For speed:
 template <typename T>
-toon::Vector<2,int> RoundVector(const toon::Vector<2,T>& v) {
+inline toon::Vector<2,int> RoundVector(const toon::Vector<2,T>& v) {
 	return toon::makeVector(roundi(v[0]), roundi(v[1]));
 }
 
 // For speed:
 template <typename T>
-toon::Vector<3,int> RoundVector(const toon::Vector<3,T>& v) {
+inline toon::Vector<3,int> RoundVector(const toon::Vector<3,T>& v) {
 	return toon::makeVector(roundi(v[0]), roundi(v[1]), roundi(v[2]));
 }
 
 // toon::Vector -> ImageRef
 template <typename T>
-ImageRef asIR(const toon::Vector<2,T>& v) {
+inline ImageRef asIR(const toon::Vector<2,T>& v) {
 	return ImageRef(roundi(v[0]), roundi(v[1]));
 }
 
 // ImageRef -> toon::Vector
-toon::Vector<2> asToon(const ImageRef& ir);
-
+inline Vec2 asToon(const ImageRef& v) {
+	return toon::makeVector(v.x, v.y);
+}
 // VNL -> toon for fixed size vectors
 template <int N, typename T>
 toon::Vector<N,T> asToon(const VNL::VectorFixed<N,T>& v) {
@@ -219,14 +221,14 @@ inline toon::Vector<4> atretina(const toon::Vector<4>& x) {
 
 // Get the column of an SO3<>
 template <typename T>
-toon::Vector<3,T> col(const toon::SO3<T>& r, int i) {
+inline toon::Vector<3,T> col(const toon::SO3<T>& r, int i) {
 	return r.get_matrix().T()[i];
 }
 
 // Get a unit vector with positive Z coordinate in the specified
 // direction
 template <typename T>
-toon::Vector<3,T> pve_unit(const toon::Vector<3,T>& x) {
+inline toon::Vector<3,T> pve_unit(const toon::Vector<3,T>& x) {
 	return x * Sign(x[2]) / norm(x);
 }
 

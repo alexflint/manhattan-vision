@@ -169,7 +169,6 @@ SET( CORE_HEADERS
 	
 	event.h
 	floorplan_editor.h
-	floor_ceil_map.h
 	
 	manhattan_bnb.h
 	manhattan_dp.h
@@ -259,7 +258,6 @@ SET( CORE_SOURCES
 	camera.cpp
 	glut_window.cpp
 	floorplan_editor.cpp
-	floor_ceil_map.cpp
 	bld_helpers.cpp
 	histogram.cpp
 	
@@ -314,13 +312,11 @@ SET( EXECUTABLES
 	draw_sweeps
 
 	monocular_bnb
-	#multiview_bnb
 	monocular_dp
 	multiview_dp
 	feature_dp
 	evaluate_mv
-	
-	test
+	photoconsistency
 )
 
 FOREACH( EXECUTABLE ${EXECUTABLES} )

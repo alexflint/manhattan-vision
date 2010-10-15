@@ -68,8 +68,7 @@ int main(int argc, char **argv) {
 		mv.Reconstruct();
 
 	// Now do the monocular reconstruction
-	LineSweepDPScore gen;
-	objective.Compute(*mv.base_frame);
+	LineSweepDPScore gen(*base_frame);
 	ManhattanDPReconstructor mono;
 	TITLED("Doing monocular reconstruction")
 		mono.Compute(*mv.base_frame,

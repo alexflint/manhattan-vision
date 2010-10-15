@@ -18,6 +18,10 @@ public:
 		Compute(m);
 	}
 
+	// Get the size
+	inline int nx() const { return m_int.Cols(); }
+	inline int ny() const { return m_int.Rows(); }
+
 	// Compute the integral image: O(N)
 	void Compute(const VNL::Matrix<T>& m) {
 		// Allocate and copy the first row

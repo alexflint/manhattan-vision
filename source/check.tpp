@@ -38,7 +38,7 @@
 
 // Check that |x-y| < eps
 #define CHECK_EQ_TOL(x,y,eps) \
-		CHECK(abs((x)-(y))<eps) << EXPR_STR(x) << EXPR_STR(y)
+		CHECK(abs((x)-(y))<=eps) << EXPR_STR(x) << EXPR_STR(y)
 
 // Check that f(x) returns true. Will report the value of x on failure
 #define CHECK_PRED1(f,x)												\

@@ -7,7 +7,6 @@
 #include "map.h"
 #include "camera.h"
 #include "timer.h"
-#include "floor_ceil_map.h"
 #include "clipping.h"
 #include "canvas.h"
 #include "bld_helpers.h"
@@ -30,15 +29,14 @@ lazyvar<float> gvLineJumpThreshold("ManhattanDP.LineJumpThreshold");
 lazyvar<float> gvWallPenalty("ManhattanDP.DefaultWallPenalty");
 lazyvar<float> gvOcclusionPenalty("ManhattanDP.DefaultOcclusionPenalty");
 
-DPState::DPState() : row(-1), col(-1), axis(-1), remaining(-1), dir(-1) { }
+	DPState::DPState() : row(-1), col(-1), axis(-1), dir(-1) { }
 DPState::DPState(int r, int c, int a, int b, int d)
-: row(r), col(c), axis(a), remaining(b), dir(d) {	}
+	: row(r), col(c), axis(a), dir(d) {	}
 bool DPState::operator==(const DPState& other) const {
 	return
 	row == other.row &&
 	col == other.col &&
 	axis == other.axis &&
-	remaining == other.remaining &&
 	dir == other.dir;
 }
 bool DPState::operator!=(const DPState& other) const {
@@ -46,7 +44,6 @@ bool DPState::operator!=(const DPState& other) const {
 	row != other.row ||
 	col != other.col ||
 	axis != other.axis ||
-	remaining != other.remaining ||
 	dir != other.dir;
 }
 const DPState DPState::none;
@@ -73,8 +70,10 @@ void DPSolution::ReplaceIfSuperior(const DPSolution& other,
 }
 
 ostream& operator<<(ostream& s, const DPState& x) {
-	s << "{r=" << x.row << ",c=" << x.col << ",axis=" << x.axis
-			<< ",nr=" << x.remaining << ",dir=" << (x.dir==DPState::DIR_IN?"DIR_IN":"DIR_OUT") << "}";
+	s << "{r=" << x.row
+		<< ",c=" << x.col
+		<< ",axis=" << x.axis
+		<< ",dir=" << (x.dir==DPState::DIR_IN?"DIR_IN":"DIR_OUT") << "}";
 	return s;
 }
 
@@ -86,7 +85,7 @@ ostream& operator<<(ostream& s, const DPSolution& x) {
 
 void DPCache::reset(const Vector<2,int>& grid_size, int max_corners) {
 	// This ordering helps the OS to do locality-based caching
-	table.Resize(max_corners+1, grid_size[0], grid_size[1], 2, 4);
+	table.Resize(grid_size[0], grid_size[1], 2, 4);
 	// Resize is a no-op if the size is the same as last time, so do a clear()
 	clear();
 }
@@ -110,7 +109,7 @@ inline DPCache::iterator DPCache::find(const DPState& x) {
 
 inline DPSolution& DPCache::operator[](const DPState& x) {
 	// This ordering helps the OS to do locality-based caching
-	return table(x.remaining, x.col, x.row, x.axis, x.dir);
+	return table(x.col, x.row, x.axis, x.dir);
 }
 
 
@@ -219,21 +218,14 @@ void ManhattanDP::ComputeInternal() {
 	cache_hits = 0;
 	cache.reset(geom->grid_size, max_corners);
 
-	// Reset the profiling histograms
-	horiz_len_hist.Clear();
-	horiz_cutoff_hist.Clear();
-
 	// Begin the search
 	DPSolution best(-INFINITY);
 	DPState init(-1, geom->grid_size[0]-1, -1, -1, DPState::DIR_OUT);
 	max_depth = cur_depth = 0;
 	VW::Timer dp_timer;
-	for (init.remaining = 1; init.remaining <= max_corners; init.remaining++) {
-		int penalty = wall_penalty * init.remaining;
-		for (init.axis = 0; init.axis <= 1; init.axis++) {
-			for (init.row = 0; init.row < geom->grid_size[1]; init.row++) {
-				best.ReplaceIfSuperior(Solve(init), init, -penalty);
-			}
+	for (init.axis = 0; init.axis <= 1; init.axis++) {
+		for (init.row = 0; init.row < geom->grid_size[1]; init.row++) {
+			best.ReplaceIfSuperior(Solve(init), init/*, -penalty*/);
 		}
 	}
 	solve_time = dp_timer.GetAsMilliseconds();
@@ -284,7 +276,8 @@ void ManhattanDP::ComputePayoffs(const DPObjective& score_func,
 void ManhattanDP::ComputeOppositeRows(const DPGeometry& geometry) {
 	opp_rows.Resize(geometry.grid_size[1], geometry.grid_size[0]);
 	for (int y = 0; y < geometry.grid_size[1]; y++) {
-		const Mat3& m = y < geometry.horizon_row ? geometry.grid_ceilToFloor : geometry.grid_floorToCeil;
+		const Mat3& m = y < geometry.horizon_row ?
+			geometry.grid_ceilToFloor : geometry.grid_floorToCeil;
 		for (int x = 0; x < geometry.grid_size[0]; x++) {
 			Vec2 opp_grid_pos = project(m * makeVector(x,y,1.0));
 			opp_rows[y][x] = opp_grid_pos[1];
@@ -320,27 +313,23 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 		// base case 1
 		best.score = 0;
 
-	} else if (state.remaining == 0) {
-		// base case 2
-		best.score = -INFINITY;
-
 	} else if (state.dir == DPState::DIR_IN) {
 		DPState next = state;
 		for (next.axis = 0; next.axis <= 1; next.axis++) {
 			// Try going out from this point directly
 			next.dir = DPState::DIR_OUT;
-			best.ReplaceIfSuperior(Solve(next), next);
+			best.ReplaceIfSuperior(Solve(next), next, -wall_penalty);
 
 			// Try going up from here
 			next.dir = DPState::DIR_UP;
 			if (CanMoveVert(state, next)) {
-				best.ReplaceIfSuperior(Solve(next), next);
+				best.ReplaceIfSuperior(Solve(next), next, -wall_penalty-occl_penalty);
 			}
 
 			// Try going down from here
 			next.dir = DPState::DIR_DOWN;
 			if (CanMoveVert(state, next)) {
-				best.ReplaceIfSuperior(Solve(next), next);
+				best.ReplaceIfSuperior(Solve(next), next, -wall_penalty-occl_penalty);
 			}
 		}
 
@@ -365,7 +354,6 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 	} else if (state.dir == DPState::DIR_OUT) {
 		DPState next = state;
 		next.dir = DPState::DIR_IN;
-		next.remaining = state.remaining-1;
 
 		double delta_score = 0.0;
 		double vpt_x = geom->vpt_cols[state.axis];
@@ -373,7 +361,6 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 		double m = (state.row-geom->horizon_row)/(state.col-vpt_x);
 		double c = geom->horizon_row - m*vpt_x;
 
-		//horiz_len_hist.Add(state.col-1); // for profiling
 		for (next.col = state.col-1; next.col >= 0; next.col--) {
 			// Check that we don't cross the vpt
 			if (abs(vpt_x - next.col) < 1.0) break;
@@ -389,7 +376,6 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 			CHECK_INTERVAL(next.row, 0, geom->grid_size[1]-1);
 			CHECK_INTERVAL(next.col, 0, geom->grid_size[0]-1);
 			delta_score += payoffs[next.axis][next.row][next.col];
-			//delta_score += MarginalWallScore(next.row, next.col, next.axis);
 
 			// Recurse
 			best.ReplaceIfSuperior(Solve(next), next, delta_score);
@@ -403,10 +389,8 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 			// continue with a slight "kink". This approximation
 			// reduces overall complexity from O( W*H*(W+H) ) to O(W*H)
 			if (rel_jump_error < jump_thresh) {
-				horiz_cutoff_hist.Add(state.col - next.col);
 				// we just continue from this point -- don't add an intersection
 				next.dir = DPState::DIR_OUT;
-				next.remaining = state.remaining;
 				best.ReplaceIfSuperior(Solve(next), next, delta_score);
 				// The above recursion has already (approximately)
 				// considered all further points along the line so there is
@@ -417,7 +401,6 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 				// do so.
 				break;
 			}
-
 		}
 	}
 

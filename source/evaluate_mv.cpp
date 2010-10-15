@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
 	InitVars(argc, argv);
 	if (argc != 4) {
 		DLOG << "Usage: "<<argv[0]<<" truthed_map.pro TEST_IDS NUM_AUX_VIEWS";
-		return 0;
+		return -1;
 	}
 
 	// Input arguments
