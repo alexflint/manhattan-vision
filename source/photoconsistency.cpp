@@ -1,3 +1,4 @@
+#include <boost/array.hpp>
 #include <LU.h>
 
 #include "entrypoint_types.h"
@@ -5,6 +6,7 @@
 #include "colors.h"
 #include "canvas.h"
 #include "timer.h"
+#include "manhattan_dp.h"
 
 #include "integral_col_image.tpp"
 #include "io_utils.tpp"
@@ -13,6 +15,31 @@
 #include "vector_utils.tpp"
 
 using namespace indoor_context;
+
+
+void OutputTransformedImage(const string& file,
+														const ImageRGB<byte>& image,
+														const Mat3& h,
+														Vec2I bounds) {
+	Mat3 hinv = LU<3>(h).get_inverse();
+	ImageRGB<byte> canvas(bounds[0], bounds[1]);
+	for (int y = 0; y < bounds[1]; y++) {
+		PixelRGB<byte>* row = canvas[y];
+		for (int x = 0; x < bounds[0]; x++) {
+			ImageRef p = asIR(project(hinv * makeVector(x,y,1.0)));
+			if (p.x >= 0 && p.x < image.GetWidth() &&
+					p.y >= 0 && p.y < image.GetHeight()) {
+				row[x] = image[p];
+			} else {
+				row[x] = Colors::white();
+			}
+		}
+	}
+	WriteImage(file, canvas);
+}
+
+
+
 
 // Computes NCC from five statistics of the two datasets
 class NCCStatistics {
@@ -163,8 +190,8 @@ void FastNCC::ComputeInternal(const MatF& a, const MatF& b, const MatI* mask) {
 				ab_row[x] = a_row[x] * b_row[x];
 				sample_row[x] = 1;
 			} else {
-				CHECK_EQ(a_row[x], 0);
-				CHECK_EQ(b_row[x], 0);
+				CHECK_EQ(a_row[x], 0) << "inputs must be zero whereever mask is zero";
+				CHECK_EQ(b_row[x], 0) << "inputs must be zero whereever mask is zero";
 			}
 		}
 	}
@@ -206,6 +233,207 @@ inline void toImageRef(const Vec3& v, ImageRef& p) {
 	p.y = v[1]/v[2];
 }
 
+
+
+
+
+class NCCPayoffs {
+public:
+	const PosedImage* l_input;
+	const PosedImage* r_input;
+
+	// The left vertical-rectification homography
+	Mat3 l_vrect;
+	Mat3 l_vrect_inv;
+
+	// Internal buffers
+	MatI mask;  // binary mask, in rectified left image coordinates
+	MatF l_vrect_vals;  // intensities from left image, vertically rectified
+	MatF l_vrect_xfered_vals;  // intensities from right image, transformed to the left image
+	
+	// Object responsible for quickly computing NCC using integral images
+	FastNCC ncc_comp;
+
+	// The final payoff matrix
+	MatF payoffs;
+
+	// Compute Payoffs
+	void Compute(const PosedImage& left_image,
+							 const PosedImage& right_image,
+							 double zfloor,
+							 double zceil);
+
+	// Visualization
+	void OutputRectifiedLeft(const string& file);
+	void OutputTransferredRight(const string& file);
+	void OutputMask(const string& file);
+	void OutputPayoffs(const string& file);
+};
+
+void NCCPayoffs::Compute(const PosedImage& l_image,
+												 const PosedImage& r_image,
+												 double zfloor,
+												 double zceil) {
+	l_input = &l_image;
+	r_input = &r_image;
+	ImageRef l_sample, r_sample;
+
+	// Compute transfer homographies
+	Mat3 ltr_hfloor = GetHomographyVia(l_image.pc(),
+																		 r_image.pc(),
+																		 makeVector(0, 0, -1, zfloor));
+	Mat3 ltr_hceil = GetHomographyVia(l_image.pc(),
+																		r_image.pc(),
+																		makeVector(0, 0, -1, zceil));
+
+	// Compute manhattan homologies
+	Mat3 l_fToC = GetManhattanHomology(l_image.pc(), zfloor, zceil);
+	Mat3 l_cToF = LU<3>(l_fToC).get_inverse();
+
+	// Compute vertical rectifiers
+	l_vrect = GetVerticalRectifier(l_image.pc());
+	l_vrect_inv = LU<3>(l_vrect).get_inverse();
+
+	// Compute manhattan homologies in rectified domain
+	Mat3 l_vrect_fToC = l_vrect * l_fToC * l_vrect_inv;
+	Mat3 l_vrect_cToF = l_vrect * l_cToF * l_vrect_inv;
+
+	// Compute vertical rectifiers
+	Mat3 r_vrect = GetVerticalRectifier(r_image.pc());
+	Mat3 r_vrect_inv = LU<3>(r_vrect).get_inverse();
+
+	// Compute horizon
+	Vec3 l_horizon = l_image.pc().GetImageHorizon();
+	Vec3 l_vrect_horizon = l_horizon * l_vrect_inv;
+	double l_vrect_horizon_y = -l_vrect_horizon[2] / l_vrect_horizon[1];
+
+	// Rectify the intensity images
+	l_vrect_vals.Resize(l_image.ny(), l_image.nx(), 0.0);  // important to initialize to zero here
+	l_vrect_xfered_vals.Resize(l_image.ny(), l_image.nx(), 0.0);  // important to initialize to zero here
+	mask.Resize(l_image.ny(), l_image.nx(), 0.0);  // important to initialize to zero here
+	for (int y = 0; y < l_image.ny(); y++) {
+		float* l_row = l_vrect_vals[y];
+		float* xfered_row = l_vrect_xfered_vals[y];
+		int* mask_row = mask[y];
+		const Mat3& horiz_xfer = y < l_vrect_horizon_y ? ltr_hceil : ltr_hfloor;
+		Mat3 vrect_xfer = horiz_xfer * l_vrect_inv;  // Don't pre-multiply by r_vrect as we access the orig image
+		for (int x = 0; x < l_image.nx(); x++) {
+			toImageRef(l_vrect_inv * makeVector(x,y,1.0), l_sample);
+			// TODO: bilinear interpolation here
+			if (l_image.contains(l_sample)) {
+				toImageRef(vrect_xfer * makeVector(x,y,1.0), r_sample);
+				if (r_image.contains(r_sample)) {
+					// important to only set these when mask is also being set to 1
+					l_row[x] = l_image.mono[l_sample].y;
+					xfered_row[x] = r_image.mono[r_sample].y;
+					mask_row[x] = 1.0;
+				}
+			}
+		}
+	}
+
+	// Precompute statics for fast NCC calculation
+	// Note that where mask is 0, l_vrect_vals and lvrect_xfered_vals *must* also be 0
+	ncc_comp.Compute(l_vrect_vals, l_vrect_xfered_vals, mask);
+
+	// Compute the NCC payoffs
+	payoffs.Resize(l_image.ny(), l_image.nx());
+	TIMED("Compute payoffs") INDENTED
+	for (int y = 0; y < l_image.ny(); y++) {
+		float* payoffs_row = payoffs[y];
+
+		// Compute the vertical transfer function for this image row
+		const PosedCamera& l_pc = l_image.pc();
+		const Mat3 l_intr = reinterpret_cast<const LinearCamera&>(l_pc.camera()).intrinsics();
+		Vec3 vrect_p = makeVector(0,y,1.0);  // this can be any point along the current image row
+		double surf_z = (y < l_vrect_horizon_y) ? zceil : zfloor;
+		Vec4 surf_plane = makeVector(0,0,-1.0,surf_z);
+		toon::Matrix<3,4> l_cam = l_image.pc().Linearize();
+		Vec3 surf_p = IntersectRay(l_vrect_inv * vrect_p, l_cam, surf_plane);
+		const SO3<>& l_rot = l_pc.pose().get_rotation();
+		Vec3 line_nrm = l_rot.inverse() * l_intr.T() * l_vrect.T() * makeVector(0,-1.0,y);
+		Vec3 plane_nrm = unit(makeVector(line_nrm[0], line_nrm[1], 0));
+		Vec4 plane_eqn = concat(plane_nrm, -plane_nrm*surf_p);
+		Mat3 vert_xfer = GetHomographyVia(l_image.pc(), r_image.pc(), plane_eqn);
+		Mat3 l_vrect_to_r = vert_xfer * l_vrect_inv;  // Don't pre-multiply by r_vrect as we access the orig image
+
+		// Compute NCCs for this row
+		if (y%100==0) DLOG << "Computing correspondences for row " << y;
+		for (int x = 0; x < l_image.nx(); x++) {
+
+			// Calculate floor and ceiling points
+			Vec3 p = makeVector(x,y,1.0);
+			int y0, y1;
+			if (y < l_vrect_horizon_y) {  // on ceiling, TODO: use cached opp_rows
+				y0 = y;
+				y1 = Clamp<int>(project(l_vrect_cToF * p)[1], 0, l_image.ny()-1);
+			} else {
+				y1 = y;
+				y0 = Clamp<int>(project(l_vrect_fToC * p)[1], 0, l_image.ny()-1);
+			}
+			CHECK_LE(y0, y1);
+
+			// Compute contributions from the horizontal component
+			NCCStatistics stats;
+			ncc_comp.AddStats(x, 0, y0, stats);  // portion above the ceiling point
+			ncc_comp.AddStats(x, y1, l_image.ny()-1, stats);  // portion below the floor point
+
+			// Compute contributions from the vertical component
+			for (int yy = y0; yy < y1; yy++) {
+				double l_val = l_vrect_vals[yy][x];
+				if (l_val >= 0) {  // l_val < 0 indicates there was no corresponding pixel in the original image
+					toImageRef(l_vrect_to_r*makeVector(x,yy,1.0), r_sample);  // implicitly uses floor() for speed
+					if (r_image.contains(r_sample)) {
+						stats.Add(l_val, r_image.mono[r_sample].y);
+					}
+				}
+			}
+
+			if (stats.nsamples == 0) {
+				payoffs_row[x] = -1;
+			} else {
+				// NOTE: I think it makes sense to take the absolute NCC since
+				// a large negative NCC suggests an anti-correlation, which
+				// indicates a good match. But I'm not sure...
+				payoffs_row[x] = abs(stats.CalculateNCC());
+				CHECK_PRED1(isfinite, payoffs_row[x]) << "[x="<<x<<",y="<<y<<"], stats:"<<stats;
+			}
+		}
+	}
+}
+
+
+void NCCPayoffs::OutputRectifiedLeft(const string& file) {
+	WriteMatrixImageRescaled(file, l_vrect_vals);
+}
+
+void NCCPayoffs::OutputTransferredRight(const string& file) {
+	WriteMatrixImageRescaled(file, l_vrect_xfered_vals);
+}
+
+void NCCPayoffs::OutputMask(const string& file) {
+	WriteMatrixImageRescaled(file, mask);
+}
+
+void NCCPayoffs::OutputPayoffs(const string& file) {
+	FileCanvas payoffs_canvas(file, l_input->rgb);
+	for (int y = 0; y < l_input->ny(); y += 3) {
+		for (int x = 0; x < l_input->nx(); x += 3) {
+			Vec2 vrect_p = project(l_vrect * makeVector(x,y,1.0));
+			double payoff = payoffs[ roundi(vrect_p[1]) ][ roundi(vrect_p[0]) ];
+			if (payoff >= 0) {
+				PixelRGB<byte> color(0,payoff*255,0);  // payoffs are in [0,1]
+				payoffs_canvas.DrawDot(makeVector(x,y), color);
+			}
+		}
+	}
+	WriteMatrixImageRescaled("out/payoffs_raw.png", payoffs);
+}
+
+
+
+
+
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
 	if (argc != 4) {
@@ -230,7 +458,6 @@ int main(int argc, char **argv) {
 	const PosedImage& r_image = r_frame->image;
 	l_image.BuildMono();
 	r_image.BuildMono();
-	ImageRef l_sample, r_sample;
 
 	// Get the floor and ceiling positions
 	double zfloor = gt_map.floorplan().zfloor();
@@ -238,189 +465,38 @@ int main(int argc, char **argv) {
 	Vec3 vup = map.kfs[0].pc->pose_inverse() * makeVector(0,1,0);
 	if (Sign(zceil-zfloor) == Sign(vup[2])) {
 		swap(zfloor, zceil);
-		DLOG << "swapping zfloor and zceil";
 	}
 
-	// Compute transfer homographies
-	Mat3 ltr_hfloor = GetHomographyVia(l_image.pc(),
-																			 r_image.pc(),
-																			 makeVector(0, 0, -1, zfloor));
-	Mat3 ltr_hceil = GetHomographyVia(l_image.pc(),
-																			r_image.pc(),
-																			makeVector(0, 0, -1, zceil));
+	// Compute payoffs
+	NCCPayoffs payoff_gen;
+	payoff_gen.Compute(l_image, r_image, zfloor, zceil);
+	payoff_gen.OutputRectifiedLeft("out/input_left.png");
+	payoff_gen.OutputTransferredRight("out/input_right.png");
 
-	// Compute manhattan homologies
-	Mat3 l_fToC = GetManhattanHomology(l_image.pc(), zfloor, zceil);
-	Mat3 l_cToF = LU<3>(l_fToC).get_inverse();
+	// TODO: need to extrapolate payoffs beyond the image bounds. Need
+	// to put transformation to grid directly into NCCPayoffs.
 
-	// Compute vertical rectifiers
-	Mat3 l_vrect = GetVerticalRectifier(l_image.pc());
-	Mat3 l_vrect_inv = LU<3>(l_vrect).get_inverse();
-
-	// Compute manhattan homologies in rectified domain
-	Mat3 l_vrect_fToC = l_vrect * l_fToC * l_vrect_inv;
-	Mat3 l_vrect_cToF = l_vrect * l_cToF * l_vrect_inv;
-
-	// Compute vertical rectifiers
-	Mat3 r_vrect = GetVerticalRectifier(r_image.pc());
-	Mat3 r_vrect_inv = LU<3>(r_vrect).get_inverse();
-
-	// Compute horizon
-	Vec3 l_horizon = l_image.pc().GetImageHorizon();
-	Vec3 l_vrect_horizon = l_horizon * l_vrect_inv;
-	double l_vrect_horizon_y = -l_vrect_horizon[2] / l_vrect_horizon[1];
-	DREPORT(l_vrect_horizon_y);
-
-	// Setup visualization canvases
-	FileCanvas lsamples_canvas("out/samples_l.png", l_image.rgb);
-	FileCanvas rsamples_canvas("out/samples_r.png", r_image.rgb);
-	BrightColors bc;
-
-	// Specify some points to visualize
-	MatI viz_mask(l_image.ny(), l_image.nx(), 0);
-	int vizp[] = {44,282,  99,214,  210,195,  260,234};
-	for (int i = 0; i < 8; i += 2) {
-		ImageRef p = asIR(project(l_vrect * makeVector(vizp[i],vizp[i+1],1.0)));
-		viz_mask[p.y][p.x] = 1;
-	}
-
-	// Rectify the intensity images
-	MatF l_vrect_vals(l_image.ny(), l_image.nx(), 0.0);  // important to initialize to zero here
-	MatF l_vrect_xfered_vals(l_image.ny(), l_image.nx(), 0.0);  // important to initialize to zero here
-	MatI mask(l_image.ny(), l_image.nx(), 0.0);  // important to initialize to zero here
-	for (int y = 0; y < l_image.ny(); y++) {
-		float* l_row = l_vrect_vals[y];
-		float* xfered_row = l_vrect_xfered_vals[y];
-		int* mask_row = mask[y];
-		const Mat3& horiz_xfer = y < l_vrect_horizon_y ? ltr_hceil : ltr_hfloor;
-		Mat3 vrect_xfer = horiz_xfer * l_vrect_inv;  // Don't pre-multiply by r_vrect as we access the orig image
-		for (int x = 0; x < l_image.nx(); x++) {
-			toImageRef(l_vrect_inv * makeVector(x,y,1.0), l_sample);
-			// TODO: bilinear interpolation here
-			if (l_image.contains(l_sample)) {
-				toImageRef(vrect_xfer * makeVector(x,y,1.0), r_sample);
-				if (r_image.contains(r_sample)) {
-					// important to only set these when mask is also being set to 1
-					l_row[x] = l_image.mono[l_sample].y;
-					xfered_row[x] = r_image.mono[r_sample].y;
-					mask_row[x] = 1.0;
-				}
-			}
+	// Transform to grid
+	Mat3 fToC = GetManhattanHomology(l_image.pc(), zfloor, zceil);
+	DPGeometry geom(&l_image.pc(), fToC);
+	boost::array<MatF,2> payoffs;
+	payoffs[0].Resize(geom.grid_size[1], geom.grid_size[0], 0);
+	payoffs[1].Resize(geom.grid_size[1], geom.grid_size[0], 0);
+	Mat3 xform = geom.imageToGrid * payoff_gen.l_vrect_inv;
+	for (int y = 0; y < payoff_gen.payoffs.Rows(); y++) {
+		const float* inrow = payoff_gen.payoffs[y];
+		for (int x = 0; x < payoff_gen.payoffs.Cols(); x++) {
+			Vec2I p = project(xform * makeVector(x,y,1.0));
+			payoffs[0][ p[1] ][ p[0] ] += inrow[x];
+			payoffs[1][ p[1] ][ p[0] ] += inrow[x];  // for now both orientations are identical
 		}
 	}
 
-	// Precompute statics for fast NCC calculation
-	// Note that where mask is 0, l_vrect_vals and lvrect_xfered_vals *must* also be 0
-	FastNCC ncc_comp;
-	ncc_comp.Compute(l_vrect_vals, l_vrect_xfered_vals, mask);
-
-	// Compute the NCC payoffs
-	MatF payoffs(l_image.ny(), l_image.nx());
-	TIMED("Compute payoffs")
-	for (int y = 0; y < l_image.ny(); y++) {
-		float* payoffs_row = payoffs[y];
-
-		// Compute the vertical transfer function for this image row
-		const PosedCamera& l_pc = l_image.pc();
-		const Mat3 l_intr = reinterpret_cast<const LinearCamera&>(l_pc.camera()).intrinsics();
-		Vec3 vrect_p = makeVector(0,y,1.0);  // this can be any point along the current image row
-		double surf_z = (y < l_vrect_horizon_y) ? zceil : zfloor;
-		Vec4 surf_plane = makeVector(0,0,-1.0,surf_z);
-		toon::Matrix<3,4> l_cam = l_image.pc().Linearize();
-		Vec3 surf_p = IntersectRay(l_vrect_inv * vrect_p, l_cam, surf_plane);
-		const SO3<>& l_rot = l_pc.pose().get_rotation();
-		Vec3 line_nrm = l_rot.inverse() * l_intr.T() * l_vrect.T() * makeVector(0,-1.0,y);
-		Vec3 plane_nrm = unit(makeVector(line_nrm[0], line_nrm[1], 0));
-		Vec4 plane_eqn = concat(plane_nrm, -plane_nrm*surf_p);
-		Mat3 vert_xfer = GetHomographyVia(l_image.pc(), r_image.pc(), plane_eqn);
-		Mat3 l_vrect_to_r = vert_xfer * l_vrect_inv;  // Don't pre-multiply by r_vrect as we access the orig image
-
-		// Compute NCCs for this row
-		if (y%25==0) DLOG << "Computing correspondences for row " << y;
-		for (int x = 0; x < l_image.nx(); x++) {
-
-			// Calculate floor and ceiling points
-			Vec3 p = makeVector(x,y,1.0);
-			int y0, y1;
-			if (y < l_vrect_horizon_y) {  // on ceiling, TODO: use cached opp_rows
-				y0 = y;
-				y1 = Clamp<int>(project(l_vrect_cToF * p)[1], 0, l_image.ny()-1);
-			} else {
-				y1 = y;
-				y0 = Clamp<int>(project(l_vrect_fToC * p)[1], 0, l_image.ny()-1);
-			}
-			CHECK_LE(y0, y1);
-
-			// Visualize
-			bool special = viz_mask[y][x];
-			PixelRGB<byte> color;
-			if (special) {
-				color = bc.Next();
-				lsamples_canvas.DrawDot(project(l_vrect_inv * p), 3.0, color);
-				rsamples_canvas.DrawDot(project(ltr_hfloor * l_vrect_inv * p), 3.0, color);
-			}
-
-			// Compute contributions from the horizontal component
-			NCCStatistics stats;
-			ncc_comp.AddStats(x, 0, y0, stats);  // portion above the ceiling point
-			ncc_comp.AddStats(x, y1, l_image.ny()-1, stats);  // portion below the floor point
-
-			// Compute contributions from the vertical component
-			for (int yy = y0; yy < y1; yy++) {
-				double l_val = l_vrect_vals[yy][x];
-				if (l_val > 0) {  // l_val < 0 indicates there was no corresponding pixel in the original image
-					toImageRef(l_vrect_to_r*makeVector(x,yy,1.0), r_sample);  // implicitly uses floor() for speed
-					if (r_image.contains(r_sample)) {
-						stats.Add(l_val, r_image.mono[r_sample].y);
-					}
-
-					// Visualize
-					if (special && yy%4==0) {
-						Vec3 pp = makeVector(x,yy,1.0);
-						lsamples_canvas.DrawDot(project(l_vrect_inv * pp), 1.0, color);
-						rsamples_canvas.DrawDot(project(l_vrect_to_r * pp), 1.0, color);
-					}
-				}
-			}
-
-			if (stats.nsamples == 0) {
-				payoffs_row[x] = -1;
-			} else {
-				// NOTE: I think it makes sense to take the absolute NCC since
-				// a large negative NCC suggests an anti-correlation, which
-				// indicates a good match. But I'm not sure...
-				payoffs_row[x] = abs(stats.CalculateNCC());
-				CHECK_PRED1(isfinite, payoffs_row[x]) << stats;
-				if (special) {
-					DLOG << x << "," << y << ":";
-					INDENTED DREPORT(payoffs_row[x], stats.nsamples);
-				}
-			}
-		}
-	}
-
-	// Save the payoffs matrix
-	WriteMatrix("payoffs.dat", payoffs);
-	WriteMatrixImageRescaled("out/vrect_l.png", l_vrect_vals);
-	WriteMatrixImageRescaled("out/xfered.png", l_vrect_xfered_vals);
-	WriteMatrixImageRescaled("out/mask.png", mask);
-
-	WriteImage("out/orig_l.png", l_image.mono);
-	WriteImage("out/orig_r.png", r_image.mono);
-
-	// Visualize vertical cross-correlations
-	FileCanvas payoffs_canvas("out/payoffs.png", l_image.rgb);
-	for (int y = 0; y < l_image.ny(); y += 3) {
-		for (int x = 0; x < l_image.nx(); x += 3) {
-			Vec2 vrect_p = project(l_vrect * makeVector(x,y,1.0));
-			double payoff = payoffs[ roundi(vrect_p[1]) ][ roundi(vrect_p[0]) ];
-			if (payoff >= 0) {
-				PixelRGB<byte> color(0,payoff*255,0);  // payoffs are in [0,1]
-				payoffs_canvas.DrawDot(makeVector(x,y), color);
-			}
-		}
-	}
-	WriteMatrixImageRescaled("out/payoffs_raw.png", payoffs);
-
+	// Do reconstruction
+	ManhattanDPReconstructor recon;
+	recon.Compute(l_image, geom, payoffs, 20, 30);  // per-pixel *payoff* is now in [0,1]
+	recon.OutputSolutionOrients("out/soln.png");
+	OutputTransformedImage("out/grid.png", l_image.rgb, geom.imageToGrid, geom.grid_size);
+	WriteMatrixImageRescaled("out/raw_payoffs.png", payoffs[0]);
 	return 0;
 }

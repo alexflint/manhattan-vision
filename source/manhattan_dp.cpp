@@ -29,7 +29,7 @@ lazyvar<float> gvLineJumpThreshold("ManhattanDP.LineJumpThreshold");
 lazyvar<float> gvWallPenalty("ManhattanDP.DefaultWallPenalty");
 lazyvar<float> gvOcclusionPenalty("ManhattanDP.DefaultOcclusionPenalty");
 
-	DPState::DPState() : row(-1), col(-1), axis(-1), dir(-1) { }
+DPState::DPState() : row(-1), col(-1), axis(-1), dir(-1) { }
 DPState::DPState(int r, int c, int a, int b, int d)
 	: row(r), col(c), axis(a), dir(d) {	}
 bool DPState::operator==(const DPState& other) const {
