@@ -28,6 +28,7 @@ bool ClipAgainstBounds(Vec3& start, Vec3& end, const Bounds2D<>& bounds) {
 	if (!ClipAgainstLine(start, end, bounds.right_eqn(), 1)) return false;
 	if (!ClipAgainstLine(start, end, bounds.top_eqn(), 1)) return false;
 	if (!ClipAgainstLine(start, end, bounds.bottom_eqn(), 1)) return false;
+	return true;
 }
 
 int PointSign(const Vec3& point, const Vec3& line) {

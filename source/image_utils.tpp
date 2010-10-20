@@ -157,14 +157,35 @@ Image* Downsample(const Image& input, int k) {
 template<typename T, typename S>
 void MatrixToImage(const VNL::Matrix<T>& mat, ImageMono<S>& image) {
 	if (image.IsAlloced()) {
-		assert(image.GetWidth() == mat.Cols());
-		assert(image.GetHeight() == mat.Rows());
+		CHECK_EQ(image.GetWidth(), mat.Cols());
+		CHECK_EQ(image.GetHeight(), mat.Rows());
 	} else {
 		image.AllocImageData(mat.Cols(), mat.Rows());
 	}
 	for (int r = 0; r < image.GetHeight(); r++) {
+		const T* matrow = mat[r];
+		PixelMono<S>* imrow = image[r]; 
 		for (int c = 0; c < image.GetWidth(); c++) {
-			image[r][c].y = mat[r][c];
+			imrow[c].y = matrow[c];
+		}
+	}
+}
+
+
+template<typename T, typename S>
+void MatrixToImageRescaled(const VNL::Matrix<T>& mat, ImageRGB<S>& image) {
+	T scale = 255.0 / mat.MaxValue();
+	if (image.IsAlloced()) {
+		CHECK_EQ(image.GetWidth(), mat.Cols());
+		CHECK_EQ(image.GetHeight(), mat.Rows());
+	} else {
+		image.AllocImageData(mat.Cols(), mat.Rows());
+	}
+	for (int r = 0; r < image.GetHeight(); r++) {
+		const T* matrow = mat[r];
+		PixelRGB<S>* imrow = image[r]; 
+		for (int c = 0; c < image.GetWidth(); c++) {
+			imrow[c].r = imrow[c].g = imrow[c].b = matrow[c]*scale;
 		}
 	}
 }

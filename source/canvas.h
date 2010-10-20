@@ -101,6 +101,8 @@ public:
 	               const Mat2& m,
 	               const Vec2& t,
 	               double alpha=1.0);
+	// Draw a greyscale image, rescaled so that the maximum value is white
+	void DrawImageRescaled(const MatF& image, double alpha=1.0);
 protected:
 	// Protected so that this class cannot be instantiated directly
 	Canvas() { };
@@ -124,9 +126,11 @@ public:
 	// which must be one of .png, .pdf, .svg, .ps, or .eps.
 	FileCanvas(const string& filename, const Vec2I& size);
 	FileCanvas(const string& filename, const ImageRGB<byte>& bg);
+	FileCanvas(const string& filename, const MatF& bg_greyscale);
 	// Construct an empty canvas that will write to the specified file.
 	FileCanvas(Format format, const string& filename, const Vec2I& size);
 	FileCanvas(Format format, const string& filename, const ImageRGB<byte>& bg);
+	FileCanvas(Format format, const string& filename, const MatF& bg_greyscale);
 	// Destructor
 	~FileCanvas();
 	// Write the canvas to the file specified at construction

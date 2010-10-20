@@ -106,7 +106,7 @@ public:
 	// Simple heuristic to guess whether a given string represents a
 	// literal C++ expression
 	static inline bool IsLiteral(const string& expr) {
-		return !isalpha(expr[0]) && expr[0] != '_';
+		return expr[0] == '"' || expr[0] == '\'' || expr[0] == '-' || isdigit(expr[0]);
 	}
 
 	// Report a failed check

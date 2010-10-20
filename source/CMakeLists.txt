@@ -197,6 +197,7 @@ SET( CORE_HEADERS
 	manhattan_dp.h
 	manhattan_inference.h
 	multiview_reconstructor.h
+	stereo_payoffs.h
 )
 
 SET( CORE_SOURCES 
@@ -254,6 +255,7 @@ SET( CORE_SOURCES
 	manhattan_dp.cpp
 	manhattan_inference.cpp
 	multiview_reconstructor.cpp
+	stereo_payoffs.cpp
 	
 	camera.cpp
 	glut_window.cpp

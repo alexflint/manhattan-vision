@@ -369,7 +369,7 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 			double next_y = m*next.col + c;
 			next.row = roundi(next_y);
 
-			// Check bounds.
+			// Check bounds
 			if (next.row < 0 || next.row >= geom->grid_size[1]) continue;
 
 			// Compute cost
@@ -499,12 +499,9 @@ bool ManhattanDP::CanMoveVert(const DPState& cur, const DPState& next) {
 
 void ManhattanDP::DrawWalls(ImageRGB<byte>& canvas,
                             const vector<ManhattanWall>& walls) const {
-	BrightColors bc;
 	BOOST_FOREACH(const ManhattanWall& wall, walls) {
-		// Draw a quad
-		PixelRGB<byte> color = bc.Next();
 		for (int i = 0; i < 4; i++) {
-			DrawLineClipped(canvas, wall.poly.edge(i), color);
+			DrawLineClipped(canvas, wall.poly.edge(i), Colors::red());
 		}
 	}
 }
@@ -525,6 +522,12 @@ void ManhattanDPReconstructor::Compute(const PosedImage& image,
 	input_image = &image;
 	geometry.Configure(&image.pc(), floorToCeil);
 	TIMED("Complete DP") dp.Compute(objective, geometry);
+}
+
+void ManhattanDPReconstructor::Compute(const PosedImage& image,
+																			 const DPGeometry& geom,
+																			 const boost::array<MatF,2>& payoffs) {
+	Compute(image, geom, payoffs, *gvWallPenalty, *gvOcclusionPenalty);
 }
 
 void ManhattanDPReconstructor::Compute(const PosedImage& image,
@@ -571,7 +574,8 @@ void ManhattanDPReconstructor::OutputSolutionOrients(const string& path) {
 }
 
 void ManhattanDPReconstructor::OutputGridViz(const string& path) {
-	ImageRGB<byte> grid_canvas;
+	ImageRGB<byte> grid_canvas(geometry.grid_size[0], geometry.grid_size[1]);
+	grid_canvas.Clear(Colors::white());
 	dp.DrawGridSolution(grid_canvas);
 	WriteImage(path, grid_canvas);
 }
@@ -596,10 +600,8 @@ void ManhattanDPReconstructor::OutputOppRowViz(const string& path) {
 	}
 
 	// Draw the horizon line
-	Vec2 horizon_l = project(dp.geom->GridToImage(makeVector(0,
-																													 dp.geom->horizon_row)));
-	Vec2 horizon_r = project(dp.geom->GridToImage(makeVector(input_image->nx(),
-																													 dp.geom->horizon_row)));
+	Vec2 horizon_l = project(dp.geom->GridToImage(makeVector(0, dp.geom->horizon_row)));
+	Vec2 horizon_r = project(dp.geom->GridToImage(makeVector(input_image->nx(), dp.geom->horizon_row)));
 	canvas.StrokeLine(horizon_l, horizon_r, Colors::white());
 }
 

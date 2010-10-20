@@ -257,7 +257,13 @@ public:
 	void Compute(const PosedImage& image,
 	             const Mat3& floorToCeil,
 	             const DPObjective& scores);
-	// Compute the reconstruction for the given input and cost
+	// Compute the reconstruction for the given payoff matrix, using
+	// GVar values for the penalty terms.
+	void Compute(const PosedImage& image,
+							 const DPGeometry& geometry,
+	             const boost::array<MatF,2>& payoffs);
+	// Compute the reconstruction for the given payoff matrix and
+	// penalty terms.
 	void Compute(const PosedImage& image,
 							 const DPGeometry& geometry,
 	             const boost::array<MatF,2>& payoffs,
@@ -280,12 +286,6 @@ public:
 	void OutputGridViz(const string& path);
 	// Vizualize the opp_rows matrix
 	void OutputOppRowViz(const string& path);
-	// Transfer the solution to an auxilliary view
-	//void GetAuxOrients(const PosedCamera& aux, double zfloor, MatI& aux_orients);
-	// Draw the solution in an auxilliary view
-	/*void OutputSolutionInView(const string& path,
-		                          const Frame& aux,
-		                          double zfloor);*/
 };
 
 // Compute costs by sweeping lines

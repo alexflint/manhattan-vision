@@ -143,6 +143,19 @@ void Canvas::StrokeLine(const LineSeg& seg, const PixelRGB<byte>& color) {
 	StrokeLine(project(seg.start), project(seg.end), color);
 }
 
+void Canvas::DrawImageRescaled(const MatF& image, double alpha) {
+	float scale = 255 / image.MaxValue();
+	ImageRGB<byte> canvas(image.Cols(), image.Rows());
+	for (int y = 0; y < image.Rows(); y++) {
+		const float* in = image[y];
+		PixelRGB<byte>* out = canvas[y];
+		for (int x = 0; x < image.Cols(); x++) {
+			out->r = out->g = out->b = scale * in[x];
+		}
+	}
+	DrawImage(canvas);
+}	
+
 void Canvas::DrawImage(const ImageRGB<byte>& image, double alpha) {
 	PushState();
 
@@ -219,6 +232,14 @@ FileCanvas::FileCanvas(const string& filename,
 	DrawImage(bg);
 }
 
+FileCanvas::FileCanvas(const string& filename,
+                       const MatF& bg)
+	: filename_(filename), size_(makeVector(bg.Cols(), bg.Rows())), written_(false) {
+	format_ = GetFormat(filename);
+	InitSurface();
+	DrawImageRescaled(bg);
+}
+
 FileCanvas::FileCanvas(Format format,
                        const string& filename,
                        const Vec2I& size)
@@ -232,6 +253,17 @@ FileCanvas::FileCanvas(Format format,
 : filename_(filename), format_(format), size_(asToon(bg.GetSize())), written_(false) {
 	InitSurface();
 	DrawImage(bg);
+}
+
+FileCanvas::FileCanvas(Format format,
+                       const string& filename,
+                       const MatF& bg)
+	: filename_(filename),
+		format_(format),
+		size_(makeVector(bg.Cols(), bg.Rows())),
+		written_(false) {
+	InitSurface();
+	DrawImageRescaled(bg);
 }
 
 FileCanvas::~FileCanvas() {

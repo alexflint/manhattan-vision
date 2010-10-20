@@ -23,14 +23,14 @@ public:
 	inline int ny() const { return m_int.Rows(); }
 
 	// Compute the integral image: O(N)
-	void Compute(const VNL::Matrix<T>& m) {
+	template <typename S>
+	void Compute(const VNL::Matrix<S>& m) {
 		// Allocate and copy the first row
 		m_int.Resize(m.Rows()+1, m.Cols(), 0);
-		m_int.Fill(0);  // TODO: is this necessary given third param above?
 
 		// Build the integral-col images
 		for (int y = 0; y < m.Rows(); y++) {
-			const T* inrow = m[y];
+			const S* inrow = m[y];
 			const T* prevrow = m_int[y];
 			T* outrow = m_int[y+1];
 			for (int x = 0; x < m.Cols(); x++) {
