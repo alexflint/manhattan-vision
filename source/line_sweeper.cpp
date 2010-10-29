@@ -4,16 +4,15 @@
 
 #include "line_sweeper.h"
 #include "common_types.h"
-#include "vanishing_points.h"
-#include "clipping.h"
-#include "image_bundle.h"
-#include "timer.h"
-#include "math_utils.h"
+//#include "vanishing_points.h"
+//#include "clipping.h"
+//#include "image_bundle.h"
+//#include "math_utils.h"
+#include "guided_line_detector.h"
 
-#include "range_utils.tpp"
+//#include "range_utils.tpp"
 #include "fill_polygon.tpp"
-#include "image_utils.tpp"
-#include "io_utils.tpp"
+//#include "image_utils.tpp"
 
 namespace indoor_context {
 using namespace toon;
@@ -179,6 +178,11 @@ void GeomLabellerBase::DrawOrientViz(ImageRGB<byte>& canvas) const {
 
 
 IsctGeomLabeller::IsctGeomLabeller() {
+}
+
+IsctGeomLabeller::IsctGeomLabeller(const PosedImage& image) {
+	GuidedLineDetector line_detector(image);
+	Compute(image, line_detector.detections);
 }
 
 IsctGeomLabeller::IsctGeomLabeller(const PosedImage& image,

@@ -22,7 +22,6 @@
 namespace indoor_context {
 using namespace toon;
 
-lazyvar<int> gvBoundPercentile("Map.BoundPercentile");
 lazyvar<bool> gvLoadOriginalFrames("Map.LoadOriginalFrames");
 lazyvar<int> gvLinearizeCamera("Map.LinearizeCamera");
 lazyvar<string> gvOrigFramesDir("Map.OrigFramesDir");
@@ -83,8 +82,7 @@ Map::Map() {
 void Map::Load(const string& path) {
 	// Read the keyframe files one-by-one
 	TiXmlDocument doc;
-	CHECK(doc.LoadFile(path.c_str()))
-	<< "Failed to load " << path;
+	CHECK(doc.LoadFile(path.c_str())) << "Failed to load " << path;
 	fs::path xml_dir(fs::path(path).parent_path());
 	fs::path frames_dir(*gvOrigFramesDir);
 	const TiXmlElement* root_elem = doc.RootElement();
@@ -181,7 +179,6 @@ void Map::Load(const string& path) {
 
 void Map::LoadWithGroundTruth(const string& path, proto::TruthedMap& tru_map) {
 	ReadProto(path, tru_map);
-	cout << "Loading map from " << tru_map.spec_file() << endl;
 	Load(tru_map.spec_file());
 	RotateToSceneFrame(SO3<>::exp(asToon(tru_map.ln_scene_from_slam())));
 }

@@ -65,7 +65,7 @@ int main(int argc, char **argv) {
 		INDENTED TIMED("Compute objectives") INDENTED {
 			gen.Compute(frame->image);
 			objectives.insert(id, new DPObjective);
-			gen.score_func.CopyTo(objectives[id]);  // ugh, copying large matrices :(
+			gen.objective.CopyTo(objectives[id]);  // ugh, copying large matrices :(
 		}
 	}
 
@@ -78,26 +78,24 @@ int main(int argc, char **argv) {
 	BOOST_FOREACH(int base_id, test_ids) {
 		TITLE(str(format("Reconstructing frame %d")%base_id));
 
-		// Set up the reconstruction
-
 		// Add the base frame
 		Frame* base_frame = map.KeyFrameByIdOrDie(base_id);
 		base_frame->LoadImage();
 		mv.Configure(base_frame->image, objectives[base_id], zfloor, zceil);
 
 		// Add the auxiliary frames
-		DLOG_N << "Using auxiliary frames: ";
+		vector<int> aux_ids;
 		for (int aux_id = max(0, base_id-num_aux_views);
 				 aux_id <= min(map.kfs.size()-1, base_id+num_aux_views);
 				 aux_id++) {
 			if (aux_id == base_id) continue;
 
-			DLOG_N << aux_id << " ";
 			Frame* frame = map.KeyFrameByIdOrDie(aux_id);
 			frame->LoadImage();
 			mv.AddFrame(frame->image, objectives[aux_id]);
+			aux_ids.push_back(aux_id);
 		}
-		DLOG << endl;
+		DLOG << "Using auxiliary frames: " << iowrap(aux_ids);
 
 		// Joint reconstruction
 		TITLED("Doing joint reconstruction")
@@ -121,19 +119,6 @@ int main(int argc, char **argv) {
 		// Produce visualisations
 		mv.recon.OutputSolutionOrients(str(filepat % base_id % "mv_soln.png"));
 		mono.OutputSolutionOrients(str(filepat % base_id % "mono_soln.png"));
-
-		/*mv.base_objective.line_sweeper.OutputOrientViz("out/base_sweeps.png");
-		WriteMatrixImageRescaled("out/base_raw_L.png", mv.joint_payoffs.base_payoffs[0]);
-		WriteMatrixImageRescaled("out/base_raw_R.png", mv.joint_payoffs.base_payoffs[1]);
-		WriteMatrixImageRescaled("out/joint_raw_L.png", mv.joint_payoffs.payoffs[0]);
-		WriteMatrixImageRescaled("out/joint_raw_R.png", mv.joint_payoffs.payoffs[1]);
-		mv.OutputBasePayoffs("out/base_payoffs.png");
-		mv.OutputAuxPayoffs("out/");
-		mv.OutputJointPayoffs("out/joint_payoffs.png");
-		OutputPayoffsViz("out/mono_payoffs.png",
-										 mv.base_frame->rgb,
-										 mono.dp.payoffs,
-										 *mono.dp.geom);*/
 	}
 
 	double av_acc_mono = sum_acc_mono / test_ids.size();

@@ -37,15 +37,6 @@ public:
 	void RenderOrients(const proto::FloorPlan& floorplan,
 	                   const PosedCamera& cam,
 										 MatI& orients);
-
-	// Render surface labels (swap 0<->1 in above)
-	/*void RenderSurfs(const proto::FloorPlan& floorplan,
-	                 const toon::Matrix<3,4>& cam,
-	                 const Vec2I& viewport,
-	                 MatI& surfs);
-	void RenderSurfs(const proto::FloorPlan& floorplan,
-	                 const PosedCamera& cam,
-	                 MatI& surfs);*/
 private:
 	SimpleRenderer renderer_;
 

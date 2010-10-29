@@ -181,12 +181,25 @@ Mat3 GetManhattanHomology(const PosedCamera& pc, double z0, double z1) {
 	return GetManhattanHomology(pc.Linearize(), z0, z1);
 }
 
+Mat3 GetVerticalRectifierInRetina(const PosedCamera& pc) {
+	Vec3 up = pc.GetRetinaVpt(2);
+	if (up[1] < 0) up = -up;
+
+	Mat3 R_up;
+	R_up[0] = up ^ GetAxis<3>(2);
+	R_up[1] = up;
+	R_up[2] = R_up[0] ^ R_up[1];
+
+	return R_up;
+}
+
 Mat3 GetVerticalRectifier(const PosedCamera& pc) {
 	return GetVerticalRectifier(pc, pc.image_bounds());
 }
 
 Mat3 GetVerticalRectifier(const PosedCamera& pc,
                           const Bounds2D<>& out_bounds) {
+	/*
 	// Here we assume that the Z axis represents the vertical direction
 	Vec3 up = pc.GetRetinaVpt(2);
 	if (up[1] < 0) up = -up;
@@ -200,12 +213,14 @@ Mat3 GetVerticalRectifier(const PosedCamera& pc,
 	R_up[0] = up ^ GetAxis<3>(2);
 	R_up[1] = up;
 	R_up[2] = R_up[0] ^ R_up[1];
+	*/
+	Mat3 H_ret = GetVerticalRectifierInRetina(pc);
 
 	// Compose it with the camera transform
 	// NOTE: perhaps we could just use the image vanishing points and avoid this.
 	Mat3 C = pc.camera().Linearize();
 	Mat3 C_inv = LU<>(C).get_inverse();
-	Mat3 H_rect = C * R_up * C_inv;
+	Mat3 H_rect = C * H_ret/*R_up*/ * C_inv;
 
 	// Compute the image bounds after transformation
 	Polygon<4> outline = pc.camera().image_bounds().GetPolygon();

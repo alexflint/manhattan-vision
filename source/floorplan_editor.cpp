@@ -6,6 +6,7 @@
 #include "map_widgets.h"
 #include "glut_window.h"
 #include "map.pb.h"
+#include "geom_utils.h"
 
 #include "counted_foreach.tpp"
 #include "gl_utils.tpp"

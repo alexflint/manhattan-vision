@@ -10,6 +10,7 @@
 #include "clipping.h"
 #include "canvas.h"
 #include "bld_helpers.h"
+#include "geom_utils.h"
 
 #include "fill_polygon.tpp"
 #include "integral_col_image.tpp"
@@ -26,8 +27,11 @@ using namespace toon;
 lazyvar<int> gvMaxComplexity("ManhattanDP.MaxCorners");
 lazyvar<Vec2> gvGridSize("ManhattanDP.GridSize");
 lazyvar<float> gvLineJumpThreshold("ManhattanDP.LineJumpThreshold");
-lazyvar<float> gvWallPenalty("ManhattanDP.DefaultWallPenalty");
-lazyvar<float> gvOcclusionPenalty("ManhattanDP.DefaultOcclusionPenalty");
+
+	namespace {
+		lazyvar<float> gvWallPenalty("ManhattanDP.DefaultWallPenalty");
+		lazyvar<float> gvOcclusionPenalty("ManhattanDP.DefaultOcclusionPenalty");
+	}
 
 DPState::DPState() : row(-1), col(-1), axis(-1), dir(-1) { }
 DPState::DPState(int r, int c, int a, int b, int d)
@@ -222,32 +226,31 @@ void ManhattanDP::ComputeInternal() {
 	DPSolution best(-INFINITY);
 	DPState init(-1, geom->grid_size[0]-1, -1, -1, DPState::DIR_OUT);
 	max_depth = cur_depth = 0;
-	VW::Timer dp_timer;
+	TIMED("Core DP")
 	for (init.axis = 0; init.axis <= 1; init.axis++) {
-		for (init.row = 0; init.row < geom->grid_size[1]; init.row++) {
-			best.ReplaceIfSuperior(Solve(init), init/*, -penalty*/);
+		for (init.row = geom->horizon_row; init.row < geom->grid_size[1]; init.row++) {
+			best.ReplaceIfSuperior(Solve(init), init);
 		}
 	}
-	solve_time = dp_timer.GetAsMilliseconds();
-	DLOG << "Core DP: " << solve_time << "ms";
+	//DREPORT(max_depth);
 
 	// Backtrack from the solution
 	solution = best;
 	ComputeBacktrack();	
 }
 
-void ManhattanDP::ComputePayoffs(const DPObjective& score_func,
+void ManhattanDP::ComputePayoffs(const DPObjective& objective,
 																 const DPGeometry& geometry) {
 	// Compute per orientation, per pixel affinities
 	for (int i = 0; i < 3; i++) {
 		// Allocate memory
 		grid_scores[i].Resize(geometry.grid_size[1], geometry.grid_size[0], 0);
-		CHECK_EQ(score_func.pixel_scores[i].Rows(), geometry.camera->image_size().y);
-		CHECK_EQ(score_func.pixel_scores[i].Cols(), geometry.camera->image_size().x);
+		CHECK_EQ(objective.pixel_scores[i].Rows(), geometry.camera->image_size().y);
+		CHECK_EQ(objective.pixel_scores[i].Cols(), geometry.camera->image_size().x);
 
 		// Transform the scores according to ImageToGrid(.)
 		for (int y = 0; y < geometry.camera->image_size().y; y++) {
-			const float* inrow = score_func.pixel_scores[i][y];
+			const float* inrow = objective.pixel_scores[i][y];
 			for (int x = 0; x < geometry.camera->image_size().x; x++) {
 				Vec2I grid_pt = RoundVector(geometry.ImageToGrid(makeVector(x, y, 1.0)));
 				if (grid_pt[0] >= 0 && grid_pt[0] < geometry.grid_size[0] &&
@@ -288,6 +291,7 @@ void ManhattanDP::ComputeOppositeRows(const DPGeometry& geometry) {
 const DPSolution& ManhattanDP::Solve(const DPState& state) {
 	cache_lookups++;
 	max_depth = max(max_depth, cur_depth);
+	//CHECK_GE(state.row, geom->horizon_row);
 
 	// unordered_map::insert actually does a lookup first and returns
 	// an existing element if there is one, or returns an iterator
@@ -356,50 +360,55 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 		next.dir = DPState::DIR_IN;
 
 		double delta_score = 0.0;
-		double vpt_x = geom->vpt_cols[state.axis];
+		int vpt_col = geom->vpt_cols[state.axis];
+		if (state.col != vpt_col) {  // don't try to reconstruct perfectly oblique surfaces
 
-		double m = (state.row-geom->horizon_row)/(state.col-vpt_x);
-		double c = geom->horizon_row - m*vpt_x;
+			// *** To implement nonlinear spacing of grid rows, need to
+			// replace state.row here with the corresponding y coordinate
+			double m = (state.row-geom->horizon_row)/static_cast<double>(state.col-vpt_col);
+			double c = geom->horizon_row - m*vpt_col;
 
-		for (next.col = state.col-1; next.col >= 0; next.col--) {
-			// Check that we don't cross the vpt
-			if (abs(vpt_x - next.col) < 1.0) break;
+			for (next.col = state.col-1; next.col >= 0; next.col--) {
+				// Check that we don't cross the vpt
+				if (next.col == vpt_col) break;
 
-			// Compute the new row
-			double next_y = m*next.col + c;
-			next.row = roundi(next_y);
+				// Compute the new row
+				double next_y = m*next.col + c;
 
-			// Check bounds
-			if (next.row < 0 || next.row >= geom->grid_size[1]) continue;
+				// *** To implement nonlinear spacing of grid rows, need to
+				// replace roundi() here with something that finds the closest
+				// row to next_y
+				next.row = roundi(next_y);
 
-			// Compute cost
-			CHECK_INTERVAL(next.row, 0, geom->grid_size[1]-1);
-			CHECK_INTERVAL(next.col, 0, geom->grid_size[0]-1);
-			delta_score += payoffs[next.axis][next.row][next.col];
+				// Check bounds and that we don't cross the horizon
+				if (next.row < 0 || next.row >= geom->grid_size[1] || next.row == geom->horizon_row) break;
 
-			// Recurse
-			best.ReplaceIfSuperior(Solve(next), next, delta_score);
+				// Compute cost
+				delta_score += payoffs[next.axis][next.row][next.col];
 
-			// Compute the error associated with jumping to the nearest (integer-valued) pixel
-			double jump_error = abs(next.row - next_y);
-			double dist = abs(next.row-state.row)+abs(next.col-state.col);  // L1 norm for efficiency
-			double rel_jump_error = jump_error / dist;
-
-			// If the error is sufficiently small then allow the line to
-			// continue with a slight "kink". This approximation
-			// reduces overall complexity from O( W*H*(W+H) ) to O(W*H)
-			if (rel_jump_error < jump_thresh) {
-				// we just continue from this point -- don't add an intersection
-				next.dir = DPState::DIR_OUT;
+				// Recurse
 				best.ReplaceIfSuperior(Solve(next), next, delta_score);
-				// The above recursion has already (approximately)
-				// considered all further points along the line so there is
-				// no need to continue. Note that we break here
-				// regardless of whether this solution replaced the
-				// best so far because if this solution did not replace
-				// the best so far then nothing along this line will
-				// do so.
-				break;
+
+				// Compute the error associated with jumping to the nearest (integer-valued) pixel
+				double jump_error = abs(next.row - next_y); // *** for nonlinear spacing, replace next.row here and below
+				double dist = abs(next.row-state.row)+abs(next.col-state.col);  // L1 norm for efficiency
+				double rel_jump_error = jump_error / dist;
+
+				// If the error is sufficiently small then allow the line to
+				// continue with a slight "kink". This approximation
+				// reduces overall complexity from O( W*H*(W+H) ) to O(W*H)
+				if (rel_jump_error < jump_thresh) {
+					// we just continue from this point -- don't add an intersection
+					next.dir = DPState::DIR_OUT;
+					best.ReplaceIfSuperior(Solve(next), next, delta_score);
+					// The above recursion has already (approximately)
+					// considered all further points along the line so there is
+					// no need to continue. Note that we break here regardless
+					// of whether this solution replaced the best so far because
+					// if this solution did not replace the best so far then
+					// nothing along this line will do so.
+					break;
+				}
 			}
 		}
 	}
@@ -426,12 +435,20 @@ void ManhattanDP::ComputeBacktrack() {
 	soln_orients.Resize(geom->camera->image_size().y, geom->camera->image_size().x, kVerticalAxis);
 
 	// Trace the solution
+	soln_num_walls = 0;
+	soln_num_occlusions = 0;
 	const DPState* cur = &solution.src;
 	const DPState* out = NULL;
 	do {
-		full_backtrack.push_back(cur);
+		const DPState& next = cache[*cur].src;
 
+		full_backtrack.push_back(cur);
 		if (cur->dir == DPState::DIR_IN && out != NULL) {
+			soln_num_walls++;
+			if (next.dir == DPState::DIR_UP || next.dir == DPState::DIR_DOWN) {
+				soln_num_occlusions++;
+			}
+
 			Vec2 tl = makeVector(cur->col, cur->row);  // check this! was: cur->position()
 			Vec2 tr = makeVector(out->col, out->row);  // check this! was: out->position
 			Vec2 bl = makeVector(tl[0], opp_rows[ cur->row ][ cur->col ]);
@@ -460,7 +477,8 @@ void ManhattanDP::ComputeBacktrack() {
 			out = cur;
 		}
 
-		cur = &cache[*cur].src;
+		//cur = &cache[*cur].src;
+		cur = &next;
 	} while (*cur != DPState::none);
 }
 
@@ -603,52 +621,6 @@ void ManhattanDPReconstructor::OutputOppRowViz(const string& path) {
 	Vec2 horizon_l = project(dp.geom->GridToImage(makeVector(0, dp.geom->horizon_row)));
 	Vec2 horizon_r = project(dp.geom->GridToImage(makeVector(input_image->nx(), dp.geom->horizon_row)));
 	canvas.StrokeLine(horizon_l, horizon_r, Colors::white());
-}
-
-
-
-void LineSweepDPScore::OutputOrientViz(const string& path) {
-	ImageRGB<byte> orient_canvas;
-	ImageCopy(input_image->rgb, orient_canvas);
-	line_sweeper.DrawOrientViz(orient_canvas);
-	line_detector.DrawSegments(orient_canvas);
-	WriteImage(path, orient_canvas);
-}
-
-void LineSweepDPScore::OutputLineViz(const string& path) {
-	FileCanvas canvas(path, asToon(input_image->sz()));
-	canvas.DrawImage(input_image->rgb);
-	canvas.SetLineWidth(3.0);
-	for (int i = 0; i < 3; i++) {
-		BOOST_FOREACH(const LineDetection& det, line_detector.detections[i]) {
-			canvas.StrokeLine(det.seg, Colors::primary(i));
-		}
-	}
-}
-
-
-
-void LineSweepDPScore::Compute(const PosedImage& image) {
-	input_image = &image;
-
-	// Detect lines and guess initial orientation
-	TIMED("Detect lines") line_detector.Compute(image);
-	TIMED("Estimate orientations")
-		line_sweeper.Compute(image, line_detector.detections);
-
-	// Convert the line sweeper labels to a score matrix
-	score_func.Resize(image.nx(), image.ny());
-	for (int y = 0; y < image.ny(); y++) {
-		const int* inrow = line_sweeper.orient_map[y];
-		for (int i = 0; i < 3; i++) {
-			float* outrow = score_func.pixel_scores[i][y];
-			for (int x = 0; x < image.nx(); x++) {
-				outrow[x] = (inrow[x] == i ? 1.0 : 0.0);
-			}
-		}
-	}
-	score_func.wall_penalty = *gvWallPenalty;
-	score_func.occl_penalty = *gvOcclusionPenalty;
 }
 
 }

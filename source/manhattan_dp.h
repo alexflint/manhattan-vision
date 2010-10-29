@@ -135,6 +135,7 @@ public:
 			rhs.pixel_scores[i] = pixel_scores[i];
 		}
 		rhs.wall_penalty = wall_penalty;
+		rhs.occl_penalty = occl_penalty;
 	}
 
 	MatF pixel_scores[3];  // score associated with assigning each label to each pixel (image coords)
@@ -186,6 +187,8 @@ public:
 	vector<ManhattanWall> soln_walls; // series of quads representing the solution in image coords
 	vector<ManhattanWall> soln_grid_walls; // series of quads representing the solution in grid coords
 	MatI soln_orients;  // orientation map as predicted by the optimal model
+	int soln_num_walls;  // number of walls in the solution (both normal and occluding)
+	int soln_num_occlusions;  // number of occlusions in the solution
 
 	// Performance statistics
 	double solve_time;
@@ -286,31 +289,6 @@ public:
 	void OutputGridViz(const string& path);
 	// Vizualize the opp_rows matrix
 	void OutputOppRowViz(const string& path);
-};
-
-// Compute costs by sweeping lines
-// TODO: move to a different file
-class LineSweepDPScore {
-public:
-	const PosedImage* input_image;
-	GuidedLineDetector line_detector;
-	IsctGeomLabeller line_sweeper;
-	DPObjective score_func;
-
-	// Initialize empty
-	LineSweepDPScore() { }
-	// Initialize and compute
-	LineSweepDPScore(const PosedImage& image) {
-		Compute(image);
-	}
-
-	// Compute a DP score function by sweeping lines in the specified image
-	void Compute(const PosedImage& image);
-
-	// Draw lines and line sweeps
-	void OutputOrientViz(const string& path);
-	// Draw the line detections
-	void OutputLineViz(const string& path);
 };
 
 }

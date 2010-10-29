@@ -9,66 +9,103 @@
 #include <string>
 
 #include <boost/format.hpp>
+#include <google/profiler.h>
 
 #include "common_types.h"
 #include "image_utils.h"
-#include "matlab_utils.h"
-#include "bld_helpers.h"
-#include "manhattan_inference.h"
 #include "map.h"
 #include "map.pb.h"
-#include "dp_mex_helpers.h"
+#include "manhattan_dp.h"
+#include "bld_helpers.h"
+#include "dp_structures.h"
+#include "matlab_utils.h"
+#include "timer.h"
 
+#include "counted_foreach.tpp"
+#include "io_utils.tpp"
 #include "vector_utils.tpp"
 
 using namespace indoor_context;
 using namespace toon;
 using boost::format;
 
+lazyvar<float> gvWallPenalty("ManhattanDP.DefaultWallPenalty");
+lazyvar<float> gvOcclusionPenalty("ManhattanDP.DefaultOcclusionPenalty");
+
 void _mexFunction(int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[]) {
-	InitMex();
-	if (nlhs > 2 || nrhs < 1 || nrhs > 3) {
-		mexErrMsgTxt("Usage: [orients gt_orients] = "
-								 "dp_solve(case, weights, do_most_violated)\n");
-	}
+	TIMED("Complete MEX execution (inner)") {
+		//ProfilerStart("/tmp/dp_solve.prof");
+		InitMex();
+		if (nlhs > 1 || nrhs != 2) {
+			mexErrMsgTxt("Usage: orients=dp_solve(case, objective)\n");
+		}
 
-	// Deal with params
-	string case_name = MatlabArrayToString(prhs[0]);
-	DLOG << "Performing inference for for case " << case_name;
+		ConstMatlabStructure frame = FrameProto.From(prhs[0]);
+		ConstMatlabStructure objective = ObjectiveProto.From(prhs[1]);
 
-	VecD weights;
-	if (nrhs < 2) {
-		DLOG << "Warning: initializing with dummy weight vector filled with zeros";
-		weights.Resize(ManhattanInference::kFeatureLength*3, 0);
-	} else {
-		weights = MatlabArrayToVector(prhs[1]);
-	}
-	toon::Vector<> w = asToon(weights);
-	CHECK_EQ(weights.Size(), ManhattanInference::kFeatureLength*3);
+		// Get camera intrinsics
+		MatD intr_;
+		MatlabArrayToMatrix(frame(0, "camera_intrinsics"), intr_);
+		Mat3 intr = asToon(intr_);
 
-	bool find_most_violated = false;
-	if (nrhs >= 3) {
-		find_most_violated = MatlabArrayToScalar<bool>(prhs[2]);
-	}
+		// Get camera extrinsics
+		Vec6 ln_extr = asToon(MatlabArrayToVector(frame(0, "camera_extrinsics")));
 
-	// Get the frame data
-	ManhattanInference& inf = FrameStore::instance().Get(case_name);
-	CHECK(inf.input_image) << "Case " << case_name << " not initialized. "
-		"Please make sure to call dp_load_cases first";
+		// Build the posed image
+		VecI dims = GetMatlabArrayDims(frame(0, "image"));
+		LinearCamera camera(intr, ImageRef(dims[1], dims[0]));
+		PosedImage image(SE3<>::exp(ln_extr), &camera);
+		MatlabArrayToImage(frame(0, "image"), image.rgb);
 
-	// Do inference
-	if (find_most_violated) {
-		DLOG << "Performing most violated constraint inference...\n";
-		inf.ComputeMostViolated(w);
-	} else {
-		DLOG << "Performing test-time inference...\n";
-		inf.ComputeReconstruction(w);
-	}
+		// Get the manhattan homology
+		MatD fToC_;
+		MatlabArrayToMatrix(frame(0, "floor_to_ceil"), fToC_);
+		Mat3 fToC = asToon(fToC_);
 
-	// Copy the result back to matlab format
-	plhs[0] = NewMatlabArrayFromMatrix(inf.reconstructor.dp.soln_orients);
-	if (nrhs > 1) {
-		plhs[1] = NewMatlabArrayFromMatrix(inf.gt_labels);
+		// Get the objective function
+		DPObjective obj(dims[1], dims[0]);
+		double* scoredata = mxGetPr(objective(0, "scores"));
+		for (int i = 0; i < 3; i++) {
+			// matlab arrays are stored column-major
+			for (int x = 0; x < image.nx(); x++) {
+				for (int y = 0; y < image.ny(); y++) {
+					obj.pixel_scores[i][y][x] = *scoredata++;
+				}
+			}
+		}
+
+		obj.wall_penalty = MatlabArrayToScalar(objective(0, "wall_penalty"));
+		obj.occl_penalty = MatlabArrayToScalar(objective(0, "occlusion_penalty"));
+
+		if (obj.wall_penalty == -1) {
+			obj.wall_penalty = *gvWallPenalty;
+		}
+		if (obj.occl_penalty == -1) {
+			obj.occl_penalty = *gvOcclusionPenalty;
+		}
+		CHECK_GE(obj.wall_penalty, 0);
+		CHECK_GE(obj.occl_penalty, 0);
+
+		for (int i = 0; i < 3; i++) {
+			CHECK_EQ(obj.pixel_scores[i].Rows(), image.ny());
+			CHECK_EQ(obj.pixel_scores[i].Cols(), image.nx());
+		}
+
+		// Do the reconstruction
+		ManhattanDPReconstructor recon;
+		recon.Compute(image, fToC, obj);
+
+		// Create the solution
+		MatlabStructure soln = SolutionProto.New(1);
+		soln.put(0, "orients", NewMatlabArrayFromMatrix(recon.dp.soln_orients));
+		soln.put(0, "num_walls", NewMatlabArrayFromScalar(recon.dp.soln_num_walls));
+		soln.put(0, "num_occlusions", NewMatlabArrayFromScalar(recon.dp.soln_num_occlusions));
+
+		// Copy the results back
+		if (nlhs > 0) {
+			plhs[0] = soln.get();
+		}
+		//ProfilerStop();
 	}
 }

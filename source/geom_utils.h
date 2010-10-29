@@ -111,4 +111,8 @@ Mat3 GetVerticalRectifier(const PosedCamera& pc);
 // (aspect ratio will be preserved as much as possible).
 Mat3 GetVerticalRectifier(const PosedCamera& pc, const Bounds2D<>& out_bounds);
 
+// Get a homogrphy that makes vertical lines in the world appear
+// vertical in the camera frame (working in retina coordinates).
+Mat3 GetVerticalRectifierInRetina(const PosedCamera& pc);
+
 }

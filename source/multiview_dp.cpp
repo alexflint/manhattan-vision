@@ -18,8 +18,6 @@
 #include "vector_utils.tpp"
 #include "math_utils.tpp"
 
-using indoor_context::Sign;
-
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
 	if (argc != 4) {
@@ -73,7 +71,7 @@ int main(int argc, char **argv) {
 	TITLED("Doing monocular reconstruction")
 		mono.Compute(*mv.base_frame,
 								 mv.joint_payoffs.base_geom.floorToCeil,
-								 gen.score_func);
+								 gen.objective);
 
 	// Report accuracy
 	MatI gt_orients;
@@ -106,16 +104,5 @@ int main(int argc, char **argv) {
 									 mv.base_frame->rgb,
 									 mono.dp.payoffs,
 									 *mono.dp.geom);
-
-	// Do the joint reconstruction
-	/*ManhattanDPReconstructor recon;
-	TITLED("Doing joint reconstruction")
-	recon.Compute(base_kf.image,
-								base_payoffs.geom,
-								po.payoffs,
-								base_scores.score_func.wall_penalty);*/
-
-	
-
 	return 0;
 }

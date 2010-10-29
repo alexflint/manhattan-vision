@@ -5,6 +5,7 @@
 #include "camera.h"
 #include "canvas.h"
 #include "manhattan_dp.h"
+#include "line_sweep_features.h"
 
 #include "integral_col_image.tpp"
 

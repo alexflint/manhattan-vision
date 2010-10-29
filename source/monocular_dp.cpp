@@ -19,7 +19,6 @@ using namespace toon;
 bool pass_gt_orients = false;
 
 // To be moved elsewhere?
-//scoped_ptr<ManhattanDPReconstructor> recon;
 ManhattanDPReconstructor* recon;
 
 double sum_accuracy;
@@ -31,12 +30,12 @@ void ProcessFrame(Map& map, const proto::TruthedMap& gt_map, int frame_id) {
 	kf.LoadImage();
 
 	// Compute the cost function
-	LineSweepDPScore scores(kf.image);
+	LineSweepDPScore gen(kf.image);
 
 	// Perform the reconstruction
 	Mat3 fcmap = GetFloorCeilHomology(kf.image.pc(), gt_map.floorplan());
 	INDENTED TIMED("Reconstruction time") {
-		recon->Compute(kf.image, fcmap, scores.score_func);
+		recon->Compute(kf.image, fcmap, gen.objective);
 	}
 	format filepat("out/frame%03d_%s");
 
@@ -54,7 +53,7 @@ void ProcessFrame(Map& map, const proto::TruthedMap& gt_map, int frame_id) {
 	recon->OutputSolutionOrients(str(filepat % frame_id % "dp_soln.png"));
 	//recon->OutputOppRowViz(str(filepat % frame_id % "opprows.png"));
 
-	scores.OutputOrientViz(str(filepat % frame_id % "dp_initial.png"));
+	gen.OutputOrientViz(str(filepat % frame_id % "dp_initial.png"));
 
 	kf.UnloadImage();
 }
@@ -63,7 +62,7 @@ int main(int argc, char **argv) {
 	InitVars(argc, argv);
 
 	if (argc < 2 || argc > 4) {
-		DLOG << "Usage: " << argv[0] << " truthed_map.pro [INDEX] [--from_gt]";
+		DLOG << "Usage: " << argv[0] << " SEQUENCE [INDEX] [--from_gt]";
 		return 0;
 	}
 
@@ -79,24 +78,22 @@ int main(int argc, char **argv) {
 
 	// Load the map
 	Map map;
-	proto::TruthedMap tru_map;
-	map.LoadWithGroundTruth(argv[1], tru_map);
+	proto::TruthedMap gt_map;
+	map.LoadWithGroundTruth(GetMapPath(argv[1]), gt_map);
 
 	// Set up the reconstruction
-	//recon.reset(new ManhattanDPReconstructor);
-	ManhattanDPReconstructor* reconstructor = new ManhattanDPReconstructor;
-	recon = reconstructor;
+	recon = new ManhattanDPReconstructor;
 
 	sum_accuracy = 0;
 	num_frames = 0;
 	if (indices.empty()) {
 		for (int i = 0; i < map.kfs.size(); i++) {
 			DLOG << format("Processing frame %d of %d") % i % map.kfs.size();
-			INDENTED TIMED("Processing time") ProcessFrame(map, tru_map, i);
+			INDENTED TIMED("Processing time") ProcessFrame(map, gt_map, i);
 		}
 	} else {
 		BOOST_FOREACH(int index, indices) {
-			TIMED("Processing time") ProcessFrame(map, tru_map, index);
+			TIMED("Processing time") ProcessFrame(map, gt_map, index);
 		}
 	}
 

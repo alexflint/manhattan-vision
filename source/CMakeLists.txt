@@ -57,11 +57,15 @@ SET( GraphCuts_LIBRARIES -lgraphcuts )
 IF ( USE_CPU_PROFILER )
 	MESSAGE( STATUS "Linking CPU Profiler" )
   SET ( CPU_PROFILER_LIBRARIES -lprofiler )
+ELSE ( USE_TCMALLOC )
+	SET( TCMALLOC_LIBRARY "" )	
 ENDIF (USE_CPU_PROFILER)
 
 IF ( USE_TCMALLOC )
 	MESSAGE( STATUS "Linking tcmalloc" )
 	SET( TCMALLOC_LIBRARY -ltcmalloc )
+ELSE ( USE_TCMALLOC )
+	SET( TCMALLOC_LIBRARY "" )	
 ENDIF ( USE_TCMALLOC)
 
 # Include dirs
@@ -108,7 +112,7 @@ SET( EXTERNAL_LIBRARIES
 	${CPU_PROFILER_LIBRARIES}
 	${TCMALLOC_LIBRARY}
 )
-	
+
 # Generate protos
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS map.proto)
 
@@ -198,6 +202,7 @@ SET( CORE_HEADERS
 	manhattan_inference.h
 	multiview_reconstructor.h
 	stereo_payoffs.h
+	line_sweep_features.h
 )
 
 SET( CORE_SOURCES 
@@ -232,6 +237,7 @@ SET( CORE_SOURCES
 	vars.cpp
 	colors.cpp
 	mean_shift.cpp
+	line_segment.cpp
 	
 	geom_utils.cpp
 	image_utils.cpp
@@ -256,6 +262,7 @@ SET( CORE_SOURCES
 	manhattan_inference.cpp
 	multiview_reconstructor.cpp
 	stereo_payoffs.cpp
+	line_sweep_features.cpp
 	
 	camera.cpp
 	glut_window.cpp
@@ -319,6 +326,9 @@ SET( EXECUTABLES
 	feature_dp
 	evaluate_mv
 	photoconsistency
+
+	inspect_geometry
+	test_gt_walls
 )
 
 FOREACH( EXECUTABLE ${EXECUTABLES} )
@@ -392,7 +402,11 @@ IF ( MATLAB_FOUND )
     INCLUDE_DIRECTORIES( ${MATLAB_INCLUDE_DIR} )
     
     # This library contains common matlab utilities
-    SET( MATUTILS_SOURCES matlab_utils.cpp )
+    SET( MATUTILS_SOURCES
+			matlab_utils.h matlab_utils.cpp
+			matlab_structure.h matlab_structure.cpp
+			dp_structures.h
+			)
     ADD_LIBRARY( matutils ${MATUTILS_SOURCES} )
     
     # The code with the mexFunction(...) stub 

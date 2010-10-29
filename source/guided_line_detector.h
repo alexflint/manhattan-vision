@@ -4,7 +4,6 @@
 
 #include "line_detector.h"
 #include "common_types.h"
-#include "line_sweeper.h"
 #include "canny.h"
 #include "camera.h"
 

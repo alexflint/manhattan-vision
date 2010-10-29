@@ -137,6 +137,10 @@ public:
 	void Write();
 	// Deduce a format from a file extension
 	static Format GetFormat(const string& filename);
+	// Get size
+	int nx() const { return size_[0]; }
+	int ny() const { return size_[1]; }
+	Vec2I sz() const { return size_; }
 private:
 	// The filename passed to the constructor
 	string filename_;

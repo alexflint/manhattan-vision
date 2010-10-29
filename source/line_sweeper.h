@@ -54,6 +54,8 @@ public:
 	LineSweeper sweeper;
 	// Initialize empty
 	IsctGeomLabeller();
+	// Initialize and compute, use GuidedLineDetector
+	IsctGeomLabeller(const PosedImage& pim);
 	// Initialize and compute
 	IsctGeomLabeller(const PosedImage& pim,
 	                 const vector<LineDetection> lines[3]);

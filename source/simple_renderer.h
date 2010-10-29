@@ -19,8 +19,8 @@ public:
 	SimpleRenderer(const toon::Matrix<3,4>& cam, Vec2I viewport);
 	// Configure the renderer with the given pose and viewport
 	void Configure(const toon::Matrix<3,4>& cam, Vec2I viewport);
-	// Render a triangle
-	void Render(Vec3 p, Vec3 q, Vec3 r, int label);
+	// Render a triangle. Return true if at least one pixel was affected.
+	bool Render(Vec3 p, Vec3 q, Vec3 r, int label);
 	// Clear all buffers
 	void Clear(int bg);
 	// Get the frame buffer

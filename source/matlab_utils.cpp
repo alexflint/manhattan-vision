@@ -41,6 +41,29 @@ void InitMex() {
 	InitVars((basedir/"config/common.cfg").string());
 }
 
+
+int GetFieldNumOrDie(const mxArray* array, const char* fieldName) {
+	CHECK_NOT_NULL(array);
+	int n = mxGetFieldNumber(array, fieldName);
+	CHECK_GE(n, 0) << "No such field: '" << fieldName << "'";
+	return n;
+}
+
+
+mxArray* GetFieldOrDie(const mxArray* array, mwIndex index, int field) {
+	CHECK_NOT_NULL(array);
+	mxArray* m = mxGetFieldByNumber(array, index, field);
+	CHECK_NOT_NULL(m) << "Invalid field number: " << field;
+	return m;
+}
+
+double MatlabArrayToScalar(const mxArray* p) {
+	CHECK(mxIsNumeric(p));
+	CHECK_EQ(mxGetM(p), 1);
+	CHECK_EQ(mxGetN(p), 1);
+	return *mxGetPr(p);
+}
+
 string MatlabArrayToString(const mxArray* p) {
 	char* z = mxArrayToString(p);
 	assert(z != NULL);
@@ -49,34 +72,62 @@ string MatlabArrayToString(const mxArray* p) {
 	return s;
 }
 
+VecI GetMatlabArrayDims(const mxArray* m) {
+	mwSize n = mxGetNumberOfDimensions(m);
+	const mwSize* size = mxGetDimensions(m);
+	VecI dims(n);
+	for (int i = 0; i < n; i++) {
+		dims[i] = size[i];
+	}
+	return dims;
+}
+
+void MatlabArrayToImage(const mxArray* m, ImageRGB<byte>& image) {
+	CHECK(mxIsDouble(m)) << "Only images of double type are supported at present";
+	VecI dims = GetMatlabArrayDims(m);
+	CHECK_EQ(dims.Size(), 3) << "MatlabArrayToImage expects a H x W x 3 array";
+	CHECK_EQ(dims[2], 3) << "MatlabArrayToImage expects a H x W x 3 array";
+	image.AllocImageData(dims[1], dims[0]);
+	double* p = mxGetPr(m);
+	for (int x = 0; x < dims[1]; x++)
+		for (int y = 0; y < dims[0]; y++)
+			image[y][x].r = *p++ * 255;  // pixels of type double are in [0,1] under matlab
+	for (int x = 0; x < dims[1]; x++)
+		for (int y = 0; y < dims[0]; y++)
+			image[y][x].g = *p++ * 255;  // pixels of type double are in [0,1] under matlab
+	for (int x = 0; x < dims[1]; x++)
+		for (int y = 0; y < dims[0]; y++)
+			image[y][x].b = *p++ * 255;  // pixels of type double are in [0,1] under matlab
+	for (int x = 0; x < dims[1]; x++)
+		for (int y = 0; y < dims[0]; y++)
+			image[y][x].alpha = 0;
+}
+
+mxArray* NewMatlabArrayFromScalar(double x) {
+	mxArray* p = NewMatlabArray(1,1);
+	*mxGetPr(p) = x;
+	return p;
+}
+
+mxArray* NewMatlabArrayFromImage(const ImageRGB<byte>& image) {
+	mxArray* m = NewMatlabArray(image.GetHeight(), image.GetWidth(), 3);
+	// matlab arrays are column-major
+	// note that matlab interprets images of type double as values in [0,1] not [0,255]
+	double* p = mxGetPr(m);
+	for (int x = 0; x < image.GetWidth(); x++)
+		for (int y = 0; y < image.GetHeight(); y++)
+			*p++ = 1.0 * image[y][x].r / 255;
+	for (int x = 0; x < image.GetWidth(); x++)
+		for (int y = 0; y < image.GetHeight(); y++)
+			*p++ = 1.0 * image[y][x].g / 255;
+	for (int x = 0; x < image.GetWidth(); x++)
+		for (int y = 0; y < image.GetHeight(); y++)
+			*p++ = 1.0 * image[y][x].b / 255;
+	return m;
+}
+
 mxArray* NewMatlabArrayFromString(const string& s) {
 	return mxCreateString(s.c_str());
-}
-
-void MatlabArrayToMatrix(const mxArray* p, MatD& m) {
-	CHECK(mxIsNumeric(p));
-	m.Resize(mxGetM(p), mxGetN(p));
-	const double* pd = mxGetPr(p);
-	CHECK(pd);
-	for (int y = 0; y < m.Rows(); y++) {
-		double* row = m[y];
-		for (int x = 0; x < m.Cols(); x++) {
-			row[x] = *pd++;
-		}
-	}
-}
-
-void MatlabArrayToMatrix(const mxArray* p, MatI& m) {
-	CHECK(mxIsNumeric(p));
-	m.Resize(mxGetM(p), mxGetN(p));
-	const double* pd = mxGetPr(p);
-	CHECK(pd);
-	for (int y = 0; y < m.Rows(); y++) {
-		int* row = m[y];
-		for (int x = 0; x < m.Cols(); x++) {
-			row[x] = static_cast<int>(*pd++);
-		}
-	}
 }
 
 VecD MatlabArrayToVector(const mxArray* p) {

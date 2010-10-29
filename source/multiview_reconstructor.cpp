@@ -9,10 +9,10 @@
 #include "bld_helpers.h"
 #include "manhattan_dp.h"
 #include "canvas.h"
+#include "geom_utils.h"
 
 #include "integral_col_image.tpp"
 #include "vector_utils.tpp"
-//#include "math_utils.tpp"
 
 namespace indoor_context {
 	using namespace toon;
@@ -295,7 +295,7 @@ namespace indoor_context {
 																				 double zf,
 																				 double zc) {
 		base_gen.Compute(frame);
-		Configure(frame, base_gen.score_func, zf, zc);
+		Configure(frame, base_gen.objective, zf, zc);
 	}
 
 	void MultiViewReconstructor::AddFrame(const PosedImage& frame,
@@ -311,7 +311,7 @@ namespace indoor_context {
 	void MultiViewReconstructor::AddFrame(const PosedImage& frame) {
 		CHECK(base_frame) << "AddFrame() was called before Configure()";
 		aux_gen.push_back(new LineSweepDPScore(frame));
-		AddFrame(frame, aux_gen.back().score_func);
+		AddFrame(frame, aux_gen.back().objective);
 	}
 
 	void MultiViewReconstructor::Reconstruct() {

@@ -23,43 +23,6 @@ namespace indoor_context {
 
 	lazyvar<double> gvPerPixelLoss("ManhattanInference.PerPixelLoss");
 
-
-
-
-
-	void LineSweepFeatureGenerator::Compute(const PosedImage& image) {
-		input_image = &image;
-
-		// Compute line sweeps
-		line_detector.Compute(image);
-		line_sweeper.Compute(image, line_detector.detections);
-
-		// We must never overwrite old features if !features.unique()
-		// because that means another object is holding a reference to the
-		// old features and may wish to still use them.
-		int n = image.nx()*image.ny();
-		if (feature_count != n || !features.unique()) {
-			feature_count = n;
-			features.reset(new FeatureVec[n]);
-		}
-
-		// Generate the features
-		int i = 0;
-		for (int y = 0; i < image.ny(); y++) {
-			const PixelRGB<byte>* imrow = image.rgb[y];
-			const int* sweeprow = line_sweeper.orient_map[y];
-			for (int x = 0; x < image.nx(); x++) {
-				FeatureVec& ftr = features[i++];
-				ftr[0] = imrow[x].r;
-				ftr[1] = imrow[x].g;
-				ftr[2] = imrow[x].b;
-				ftr[3] = sweeprow[x] == 0 ? 1.0 : 0.0;
-				ftr[4] = sweeprow[x] == 1 ? 1.0 : 0.0;
-				ftr[5] = sweeprow[x] == 2 ? 1.0 : 0.0;
-			}
-		}
-	}
-
 	void ManhattanInference::Prepare(const PosedImage& image,
 																	 const proto::FloorPlan& floorplan,
 																	 shared_array<FeatureVec> features) {

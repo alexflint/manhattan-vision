@@ -1,15 +1,10 @@
 #include "guided_line_detector.h"
 
 #include "common_types.h"
-#include "line_sweeper.h"
-#include "timer.h"
-#include "geom_utils.h"
+//#include "geom_utils.h"
 #include "clipping.h"
 
 #include "counted_foreach.tpp"
-#include "image_utils.tpp"
-#include "io_utils.tpp"
-#include "math_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {

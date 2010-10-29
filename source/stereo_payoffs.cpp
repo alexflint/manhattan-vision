@@ -8,6 +8,7 @@
 #include "image_utils.h"
 #include "canvas.h"
 #include "timer.h"
+#include "geom_utils.h"
 
 #include "vector_utils.tpp"
 #include "integral_col_image.tpp"
@@ -261,8 +262,8 @@ namespace indoor_context {
 		// Rectify and transpose the intensity images
 		Mat3 tr = Zeros;
 		tr[0][1] = tr[1][0] = tr[2][2] = 1.0;
-		l_vrect_im_tr.Resize(l_image.nx(), l_image.ny(), -1);  // dimensions here are for *transposed* image
-		r_vrect_im_tr.Resize(l_image.nx(), l_image.ny(), -1);  // dimensions here are for *transposed* image
+		l_vrect_im_tr.Resize(l_image.nx(), l_image.ny(), -1);  // *transposed* image
+		r_vrect_im_tr.Resize(l_image.nx(), l_image.ny(), -1);  // *transposed* image
 		HomographyTransform(l_image.mono, l_vrect_im_tr, tr*l_vrect);
 		HomographyTransform(r_image.mono, r_vrect_im_tr, tr*r_vrect);
 
@@ -292,24 +293,20 @@ namespace indoor_context {
 		//FileCanvas l_samples("out/samples_l.png", l_image.rgb);
 		//FileCanvas r_samples("out/samples_r.png", r_image.rgb);
 
-		/*MatF floor_contrib(geom.grid_size[1], geom.grid_size[0], 0);
-			MatF wall_contrib(geom.grid_size[1], geom.grid_size[0], 0);
-			MatF ceil_contrib(geom.grid_size[1], geom.grid_size[0], 0);*/
-
 		// Compute the NCC payoffs
 		payoffs[0].Resize(geom.grid_size[1], geom.grid_size[0]);
 		payoffs[1].Resize(geom.grid_size[1], geom.grid_size[0]);
 		TIMED("Compute payoffs") INDENTED
-			for (int y = 0; y < geom.grid_size[1] /*l_image.ny()*/; y++) {
+			for (int y = 0; y < geom.grid_size[1]; y++) {
 				float* payoffs0_row = payoffs[0][y];
 				float* payoffs1_row = payoffs[1][y];
 
 				// Compute the vertical transfer function for this image row
-				const Vec4& surf_plane = (y < geom.horizon_row /*l_vrect_horizon_y*/) ? ceil_plane : floor_plane;
+				const Vec4& surf_plane = (y < geom.horizon_row) ? ceil_plane : floor_plane;
 				Vec3 pt = makeVector(0,y,1.0);  // this can be any point along the current image row
-				Vec3 surf_pt = IntersectRay(geom.gridToImage/*l_vrect_inv*/*pt, l_cam, surf_plane);
+				Vec3 surf_pt = IntersectRay(geom.gridToImage*pt, l_cam, surf_plane);
 				const SO3<>& l_rot = l_pc.pose().get_rotation();
-				Vec3 line_nrm = l_rot.inverse() * l_intr.T() * geom.imageToGrid/*l_vrect*/.T() * makeVector(0,-1.0,y);
+				Vec3 line_nrm = l_rot.inverse() * l_intr.T() * geom.imageToGrid.T() * makeVector(0,-1.0,y);
 				Vec3 plane_nrm = unit(makeVector(line_nrm[0], line_nrm[1], 0));
 				Vec4 plane_eqn = concat(plane_nrm, -plane_nrm*surf_pt);
 				Mat3 ltr_wall = GetHomographyVia(l_image.pc(), r_image.pc(), plane_eqn);
@@ -320,7 +317,7 @@ namespace indoor_context {
 
 				// Compute vrect coords
 				int grid_y0, grid_y1;
-				if (y < geom.horizon_row/*l_vrect_horizon_y*/) {
+				if (y < geom.horizon_row) {
 					grid_y0 = y;
 					grid_y1 = Clamp<int>((y-grid_fToC_ty)/grid_fToC_sy, 0, geom.grid_size[1]-1);
 				} else {
@@ -331,23 +328,22 @@ namespace indoor_context {
 
 				// Compute NCCs for this row
 				for (int x = 0; x < geom.grid_size[0]; x++) {
-					// Compute the remaining transform after x is given
 					//bool special = viz_mask[y][x];
-
 					curry_x[0][1] = x;
 
+					// Compute the remaining transform after x is given
 					toon::Matrix<3,2> grid_to_ly = grid_to_l * curry_x;
 					grid_to_ly /= grid_to_ly[2][1];
-					CHECK_LE(abs(grid_to_ly[0][0]), 1e-8);  // require output x independent of input y
-					CHECK_LE(abs(grid_to_ly[2][0]), 1e-8);  // require output x independent of input y
+					CHECK_LE(abs(grid_to_ly[0][0]), 1e-8);  // require output x-coord independent of input y
+					CHECK_LE(abs(grid_to_ly[2][0]), 1e-8);  // require output x-coord independent of input y
 					int lx = roundi(grid_to_ly[0][1]);
 					float l_m = grid_to_ly[1][0];
 					float l_c = grid_to_ly[1][1];
 
 					toon::Matrix<3,2> grid_to_ry = grid_to_r * curry_x;
 					grid_to_ry /= grid_to_ry[2][1];
-					CHECK_LE(abs(grid_to_ry[0][0]), 1e-8);  // require output x independent of input y
-					CHECK_LE(abs(grid_to_ry[2][0]), 1e-8);  // require output x independent of input y
+					CHECK_LE(abs(grid_to_ry[0][0]), 1e-8);  // require output x-coord independent of input y
+					CHECK_LE(abs(grid_to_ry[2][0]), 1e-8);  // require output x-coord independent of input y
 					int rx = roundi(grid_to_ry[0][1]);
 					float r_m = grid_to_ry[1][0];
 					float r_c = grid_to_ry[1][1];
@@ -359,12 +355,6 @@ namespace indoor_context {
 					NCCStatistics stats;
 					ceil_ncc.AddStats(vrect_x, 0, vrect_y0-1, stats);  // portion above the ceiling point
 					floor_ncc.AddStats(vrect_x, vrect_y1, l_image.ny()-1, stats);  // portion below the floor point
-
-					// debugging...
-					/*Vec2 true_l = project(l_vrect * geom.gridToImage * makeVector(x,y,1.0));
-						Vec2 true_r = project(r_vrect * ltr_wall * geom.gridToImage * makeVector(x,y,1.0));
-						CHECK_EQ(lx, roundi(true_l[0]));
-						CHECK_EQ(rx, roundi(true_r[0]));*/
 
 					// visualization...
 					/*if (special) {
@@ -409,10 +399,6 @@ namespace indoor_context {
 						}
 					}
 
-					/*ceil_contrib[y][x] = 1.0 + ceil_ncc.CalculateNCC(vrect_x, 0, vrect_y0-1);
-						floor_contrib[y][x] = 1.0 + floor_ncc.CalculateNCC(vrect_x, vrect_y1, l_image.ny()-1);
-						wall_contrib[y][x] = 1.0 + wall_stats.CalculateNCC();*/
-
 					if (stats.sum_wts == 0) {
 						payoffs0_row[x] = payoffs1_row[x] = 0;
 					} else {
@@ -425,10 +411,6 @@ namespace indoor_context {
 					}
 				}
 			}
-
-		/*WriteMatrixImageRescaled("out/contrib_ceil.png", ceil_contrib);
-			WriteMatrixImageRescaled("out/contrib_floor.png", floor_contrib);
-			WriteMatrixImageRescaled("out/contrib_wall.png", wall_contrib);*/
 	}
 
 

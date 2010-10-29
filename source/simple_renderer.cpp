@@ -29,7 +29,7 @@ void SimpleRenderer::Configure(const toon::Matrix<3,4>& camera, Vec2I viewport) 
 	Clear(0);
 }
 
-void SimpleRenderer::Render(Vec3 p, Vec3 q, Vec3 r, int label) {
+bool SimpleRenderer::Render(Vec3 p, Vec3 q, Vec3 r, int label) {
 	// Do 3D clipping
 	Vec3 vs[] = {p,q,r};
 	vector<Vec3> clipped;
@@ -52,6 +52,7 @@ void SimpleRenderer::Render(Vec3 p, Vec3 q, Vec3 r, int label) {
 	Vec3 depth_eqn = PlaneToDepthEqn(camera_, plane);
 
 	// Do the rendering
+	bool affected = false;
 	for (int i = 0; i < scanlines.size(); i++) {
 		// Pre-compute the first bit of the depth equation
 		double depth_base = depth_eqn * makeVector(0, y0+i, 1);
@@ -66,9 +67,12 @@ void SimpleRenderer::Render(Vec3 p, Vec3 q, Vec3 r, int label) {
 			if (depth < depth_row[x]) {
 				depth_row[x] = depth;
 				label_row[x] = label;
+				affected = true;
 			}
 		}
 	}
+
+	return affected;
 }
 
 void SimpleRenderer::Clear(int bg) {

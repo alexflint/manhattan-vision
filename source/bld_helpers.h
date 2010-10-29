@@ -1,3 +1,5 @@
+#pragma once
+
 #include "common_types.h"
 
 namespace indoor_context {
@@ -9,10 +11,14 @@ namespace indoor_context {
 	class TruthedFrame;
 	}
 
+	// Get the path to the truthed_map.pro file for a sequence, or die
+	// if the sequence is not found.
+	string GetMapPath(const string& sequence_name);
+
 	// Get the ground truth orientation map for a frame by rendering the floorplan.
 	void GetTrueOrients(const proto::FloorPlan& floorplan,
 	                    const PosedCamera& pc,
-	                    MatI& gt_orients);
+	                    MatI& out_orients);
 
 	// Get the number of agreeing pixels
 	int ComputeAgreement(const MatI& a, const MatI& b);
@@ -30,4 +36,11 @@ namespace indoor_context {
 
 	// Get the floor->ceiling homology
 	Mat3 GetFloorCeilHomology(const PosedCamera& pc, const proto::FloorPlan& fp);
+
+	// Get the number of visible walls and occlusions given a particular
+	// view of a floorplan.
+	void CountVisibleWalls(const proto::FloorPlan& fp,
+												 const PosedCamera& pc,
+												 int& num_walls,
+												 int& num_occlusions);
 }
