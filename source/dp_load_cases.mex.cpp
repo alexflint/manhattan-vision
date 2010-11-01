@@ -77,6 +77,12 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 		// Compute manhattan homology
 		Mat3 fToC = GetFloorCeilHomology(kf.image.pc(), gt_map.floorplan());
 
+		// Compute ground truth
+		MatI gt_orients;
+		int gt_num_walls, gt_num_occlusions;
+		GetGroundTruth(gt_map.floorplan(), kf.image.pc(),
+									 gt_orients, gt_num_walls, gt_num_occlusions);
+
 		// Generate features
 		mxArray* ftrs = NULL;
 		if (feature_set == "default" || feature_set == "line_sweep") {
@@ -121,16 +127,6 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 
 		CHECK_NOT_NULL(ftrs) << "Unrecognised feature set: '" << feature_set << "'";
 
-
-		// Compute ground truth
-		MatI gt_orients;
-		int gt_num_walls, gt_num_occlusions;
-		GetTrueOrients(gt_map.floorplan(),
-									 kf.image.pc(),
-									 gt_orients,
-									 gt_num_walls,
-									 gt_num_occlusions);
-
 		// Create geometry object
 		const PosedCamera& pc = kf.image.pc();
 		MatlabStructure frame = FrameProto.New(1);
@@ -140,10 +136,10 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 		frame.put(0, "image", NewMatlabArrayFromImage(kf.image.rgb));
 
 		// Create ground truth
-		MatlabStructure soln = SolutionProto.New(1);
-		soln.put(0, "orients", NewMatlabArrayFromMatrix(gt_orients));
-		soln.put(0, "num_walls", NewMatlabArrayFromScalar(gt_num_walls));
-		soln.put(0, "num_occlusions", NewMatlabArrayFromScalar(gt_num_occlusions));
+		MatlabStructure gt = SolutionProto.New(1);
+		gt.put(0, "orients", NewMatlabArrayFromMatrix(gt_orients));
+		gt.put(0, "num_walls", NewMatlabArrayFromScalar(gt_num_walls));
+		gt.put(0, "num_occlusions", NewMatlabArrayFromScalar(gt_num_occlusions));
 
 		// Set fields
 		cases.put(i, "sequence_name", NewMatlabArrayFromString(sequence_name));

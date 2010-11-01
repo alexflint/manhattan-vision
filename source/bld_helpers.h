@@ -20,6 +20,13 @@ namespace indoor_context {
 	                    const PosedCamera& pc,
 	                    MatI& out_orients);
 
+	// Get the ground truth orientation map for a frame by rendering the floorplan.
+	void GetGroundTruth(const proto::FloorPlan& floorplan,
+	                    const PosedCamera& pc,
+	                    MatI& out_orients,
+											int& out_num_walls,
+											int& out_num_occlusions);
+
 	// Get the number of agreeing pixels
 	int ComputeAgreement(const MatI& a, const MatI& b);
 	// Get percentage of agreeing pixels

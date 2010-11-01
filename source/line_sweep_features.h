@@ -31,7 +31,7 @@ namespace indoor_context {
 	// Generates features for each pixel
 	class LineSweepFeatureGenerator {
 	public:
-		static const int kFeatureLength = 3;
+		static const int kFeatureLength = 8;
 		// FeatureVec constitutes most of the heap usage, so make it floats	
 		typedef toon::Vector<kFeatureLength,float> FeatureVec;
 

@@ -156,4 +156,10 @@ mxArray* NewMatlabArray(int d0, int d1, int d2) {
 	return mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);
 }
 
+MatD MatlabArrayToMatrix(const mxArray* p) {
+	MatD m;
+	MatlabArrayToMatrix(p, m);
+	return m;
+}
+
 }  // namespace indoor_context

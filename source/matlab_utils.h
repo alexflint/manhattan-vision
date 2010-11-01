@@ -51,6 +51,9 @@ namespace indoor_context {
 	mxArray* NewMatlabArray(int d0, int d1);
 	mxArray* NewMatlabArray(int d0, int d1, int d2);
 
+	// Convert a matlab array to a matrix
+	MatD MatlabArrayToMatrix(const mxArray* p);
+
 	// Copy a toon matrix to a matlab array
 	template <typename Matrix>
 	void MatrixToMatlabArray(const Matrix& m, mxArray* p) {
@@ -118,5 +121,4 @@ namespace indoor_context {
 			}
 		}
 	}
-
 }  // namespace indoor_context

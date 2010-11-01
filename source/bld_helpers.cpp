@@ -37,6 +37,17 @@ namespace indoor_context {
 		re.RenderOrients(floorplan, pc, gt_orients);
 	}
 
+
+	// Get the ground truth orientation map for a frame by rendering the floorplan.
+	void GetGroundTruth(const proto::FloorPlan& fp,
+	                    const PosedCamera& pc,
+	                    MatI& orients,
+											int& nw,
+											int& no) {
+		GetTrueOrients(fp, pc, orients);
+		CountVisibleWalls(fp, pc, nw, no);
+	}
+
 	void DownsampleOrients(const MatI& in, MatI& out, const Vec2I& res) {
 		MatI votes[3];
 		out.Resize(res[1], res[0]);
