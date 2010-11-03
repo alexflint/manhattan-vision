@@ -14,7 +14,7 @@
 
 #include "fill_polygon.tpp"
 #include "integral_col_image.tpp"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "io_utils.tpp"
 #include "image_utils.tpp"
 #include "range_utils.tpp"

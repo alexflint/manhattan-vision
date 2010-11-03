@@ -7,7 +7,7 @@
 #include "colors.h"
 #include "image_utils.h"
 
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "io_utils.tpp"
 #include "quaternion.tpp"
 

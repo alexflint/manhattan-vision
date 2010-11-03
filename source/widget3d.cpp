@@ -12,7 +12,7 @@
 #include "image_utils.h"
 
 #include "gl_utils.tpp"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 
 namespace indoor_context {
 using namespace toon;

@@ -11,11 +11,10 @@
 #include "glut_window.h"
 
 namespace indoor_context {
-	ImageBundle::ImageBundle() : hsvdirty(true), monodirty(true), texdirty(true) {
+	ImageBundle::ImageBundle() : monodirty(true), texdirty(true) {
 	}
 
-	ImageBundle::ImageBundle(const string& filename)
-		: hsvdirty(true), monodirty(true) {
+	ImageBundle::ImageBundle(const string& filename) : monodirty(true) {
 		Load(filename);
 	}
 
@@ -31,7 +30,6 @@ namespace indoor_context {
 
 	void ImageBundle::Unload() {
 		if (rgb.IsAlloced()) rgb.FreeImageData();
-		if (hsv.IsAlloced()) hsv.FreeImageData();
 		if (mono.IsAlloced()) mono.FreeImageData();
 	}
 
@@ -47,13 +45,9 @@ namespace indoor_context {
 		}
 	}
 
-	void ImageBundle::BuildHSV() const {
-		if (hsvdirty) {
-			CHECK(loaded());
-			DLOG << "Warning: using ImageCopy for RGB -> HSV, this doesn't work properly!";
-			ImageCopy(rgb, hsv);
-			hsvdirty = false;
-		}
+	// Save the current image in this->mono
+	void ImageBundle::SaveMono() {
+		monodirty = false;
 	}
 
 	// Load this image as a texture into GL
@@ -94,7 +88,6 @@ namespace indoor_context {
 	}
 
 	void ImageBundle::Invalidate() {
-		hsvdirty = true;
 		monodirty = true;
 		texdirty = true;
 	}

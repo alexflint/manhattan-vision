@@ -5,7 +5,7 @@
 #include <VW/Image/imagergb.h>
 #include <VNL/vector.h>
 
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 
 void mexFunction(int nlhs, mxArray *plhs[],
 								 int nrhs, const mxArray *prhs[]) {

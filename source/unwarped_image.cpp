@@ -9,7 +9,7 @@
 #include "unwarped_image.h"
 
 #include "image_utils.tpp"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 
 // TODO: the use of "retina" is completely wrong, it should be "retina"
 // TODO: use SL<3> rather than Matrix<3> for image_to_retina and retina_to_image

@@ -101,9 +101,13 @@ public:
 	DPGeometry();
 	// Initialize and configure
 	DPGeometry(const PosedCamera* camera, const Mat3& floorToCeil);
+	// Initialize and configure
+	DPGeometry(const PosedCamera* camera, double zfloor, double zceil);
 
 	// Compute the various homographies and useful vanishing point info
 	void Configure(const PosedCamera* camera, const Mat3& floorToCeil);
+	// Compute the various homographies and useful vanishing point info
+	void Configure(const PosedCamera* camera, double zfloor, double zceil);
 
 	// Convert between image and grid coordinates
 	Vec3 GridToImage(const Vec2& x) const;
@@ -283,8 +287,10 @@ public:
 
 	// Draw the original image
 	void OutputOrigViz(const string& path);
-	// Draw the solution
+	// DEPRECATED: just calls OutputSolution()
 	void OutputSolutionOrients(const string& path);
+	// Output the solution as an image blended with the solultion orientations
+	void OutputSolution(const string& path);
 	// Draw the solution in grid coordinates
 	void OutputGridViz(const string& path);
 	// Vizualize the opp_rows matrix

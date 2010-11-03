@@ -22,7 +22,7 @@
 #include "gl_utils.tpp"
 
 #include "image_utils.tpp"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "io_utils.tpp"
 
 using namespace indoor_context;

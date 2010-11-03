@@ -16,8 +16,6 @@ public:
 	// The const semantics of this class preserve the constness of the
 	// image itself. The following are thought of as alternate
 	// representations of the same image, hence they are marked mutable
-	mutable ImageHSV<byte> hsv;
-	mutable bool hsvdirty;  // RGB has been modified since HSV was built
 	mutable ImageF mono;
 	mutable bool monodirty;  // RGB has been modified since M was built
 	mutable unsigned gl_texture_id;  // texture name if this image has been loaded
@@ -42,12 +40,10 @@ public:
 	void Unload();
 	// Returns true iff image is loaded
 	bool loaded() const;
-	// Read an image file into this->rgb  -- commented for compile speed
-	//void Load(const fs::path& filename);
-	// Convert this->rgb to mono and store in this->m
+	// Convert this->rgb to mono and store in this->mono
 	void BuildMono() const;
-	// Convert this->rgb to HSV and store in this->hsv
-	void BuildHSV() const;
+	// Mark the current image in this->mono as up-to-date
+	void SaveMono();
 	// Load the texture into memory under the specified texture ID (or
 	// generate a new one if id=-1). For multi-window applications
 	// the texture can only be used in the window it was loaded

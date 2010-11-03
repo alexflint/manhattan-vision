@@ -50,4 +50,15 @@ namespace indoor_context {
 												 const PosedCamera& pc,
 												 int& num_walls,
 												 int& num_occlusions);
+
+	// Draw an array of dots to visualize the given payoffs
+	void DrawPayoffs(Canvas& canvas,
+									 const boost::array<MatF,2>& payoffs,
+									 const DPGeometry& geom);
+
+	// Output a visualization of the given payoffs to the file specified
+	void OutputPayoffsViz(const string& filename,
+												const ImageRGB<byte>& orig,
+												const boost::array<MatF,2>& payoffs,
+												const DPGeometry& geom);
 }

@@ -16,7 +16,7 @@
 #include "io_utils.tpp"
 
 #include "counted_foreach.tpp"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
@@ -225,6 +225,15 @@ const KeyFrame* Map::KeyFrameByIdOrDie(int id) const {
 	CHECK_NOT_NULL(kf) << "No keyframe with ID=" << id;
 	return kf;
 }
+
+PosedImage& Map::ImageByIdOrDie(int id) {
+	Frame* f = KeyFrameByIdOrDie(id);
+	f->LoadImage();
+	PosedImage& im = f->image;
+	im.BuildMono();
+	return im;
+}
+
 
 void Map::Transform(const SE3<>& M) {
 	// Transform the frames

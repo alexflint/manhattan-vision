@@ -13,7 +13,7 @@
 #include "widget3d.h"
 #include "viewer3d.h"
 
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "gl_utils.tpp"
 #include "image_utils.tpp"
 #include "io_utils.tpp"

@@ -576,7 +576,7 @@ void GuidedLineDetector::OutputThetaViz(const string& basename) {
 		}
 	}
 	for (int j = 0; j < 3; j++) {
-		WriteImage(basename+PaddedInt(j,1)+".png", canvases[j]);
+		WriteImage(basename+itoa(j)+".png", canvases[j]);
 	}
 }
 

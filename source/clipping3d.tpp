@@ -3,7 +3,6 @@
 #include "common_types.h"
 #include "camera.h"
 
-#include "io_utils.tpp"
 #include "vector_utils.tpp"
 #include "range_utils.tpp"
 

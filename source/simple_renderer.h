@@ -27,7 +27,6 @@ public:
 	const MatI& framebuffer() const { return framebuffer_; }
 	// Get the depth buffer
 	const MatD& depthbuffer() const { return depthbuffer_; }
-
 private:
 	Vec2I viewport_;
 	toon::Matrix<3,4> camera_;

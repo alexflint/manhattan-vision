@@ -11,7 +11,7 @@
 #include "common_types.h"
 #include "map.pb.h"
 
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "range_utils.tpp"
 
 namespace indoor_context {

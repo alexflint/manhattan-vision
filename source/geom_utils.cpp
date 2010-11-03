@@ -5,7 +5,7 @@
 #include "common_types.h"
 #include "camera.h"
 
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
@@ -131,9 +131,11 @@ Vec3 PlaneToDepthEqn(const Matrix<3,4>& camera, const Vec4& plane) {
 	return makeVector(du-dw, dv-dw, dw);
 }
 
+double EvaluateDepthEqn(const Vec3& depth_eqn, const Vec3& p) {
+	return 1.0 / (depth_eqn*p);
+}
 
 double CrossRatio(const Vec2& a, const Vec2& b, const Vec2& c, const Vec2& d) {
-	//return norm(a-c)*norm(b-d)/(norm(b-c)*norm(a-d));
 	return Det(a,b)*Det(c,d) / (Det(a,c)*Det(b,d));
 }
 
@@ -157,8 +159,10 @@ Mat3 GetHomographyVia(const PosedCamera& from,
 	return GetHomographyVia(from.Linearize(), to.Linearize(), plane);
 }
 
-Mat3 ConstructPlanarHomology(const Vec3& vertex, const Vec3& axis,
-                             const Vec3& p, const Vec3& q) {
+Mat3 ConstructPlanarHomology(const Vec3& vertex,
+														 const Vec3& axis,
+                             const Vec3& p,
+														 const Vec3& q) {
 	Mat3 I = Identity;
 	double cr = CrossRatio(vertex, p, q, p^q^axis);
 	return I + (cr-1)*(vertex.as_col()*axis.as_row())/(vertex*axis);

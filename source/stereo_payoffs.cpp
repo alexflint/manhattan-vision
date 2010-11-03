@@ -65,14 +65,16 @@ namespace indoor_context {
 		if (sum_wts == 0) {
 			return 0.0;
 		} else {
-			double denom_a = sum_asqr - sum_a*sum_a/sum_wts;
-			double denom_b = sum_bsqr - sum_b*sum_b/sum_wts;
-			CHECK_GE(denom_a, -1e-8) << format("{sum_a=%f, sum_asqr=%f, sum_wts=%f}") % sum_a, sum_asqr, sum_wts;
-			CHECK_GE(denom_b, -1e-8) << format("{sum_b=%f, sum_asqr=%f, sum_wts=%f}") % sum_b, sum_bsqr, sum_wts;
-			if (denom_a < 1e-6 || denom_b < 1e-8) {
+			double rhs_a = sum_a*sum_a/sum_wts;
+			double rhs_b = sum_b*sum_b/sum_wts;
+			CHECK_GE(sum_asqr, rhs_a*(1.0-1e-6)) << format("{sum_a=%f, sum_asqr=%f, sum_wts=%f}") % sum_a % sum_asqr % sum_wts;
+			CHECK_GE(sum_bsqr, rhs_b*(1.0-1e-6)) << format("{sum_b=%f, sum_asqr=%f, sum_wts=%f}") % sum_b % sum_bsqr % sum_wts;
+			if (sum_asqr <= rhs_a*(1.0+1e-6) || sum_bsqr <= rhs_b*(1.0+1e-6)) {
 				return 0.0;  // not sure if this is really justified...
 			} else {
-				return (sum_ab - sum_a*sum_b/sum_wts) / sqrt(denom_a*denom_b);
+				double denom = sum_asqr*sum_bsqr + rhs_a*rhs_b - sum_asqr*rhs_b - sum_bsqr*rhs_a;
+				CHECK_GE(denom, 1e-8);
+				return (sum_ab - sum_a*sum_b/sum_wts) / sqrt(denom);
 			}
 		}
 	}
@@ -378,23 +380,17 @@ namespace indoor_context {
 						int r_len = r_vrect_im_tr.Cols();
 
 						// Compute contributions from the vertical component
-						for (int yy = grid_y0; yy <= grid_y1; yy++) {  // '<=' justified because y1 always < geom.grid_size[1]
+						for (int yy = grid_y0; yy <= grid_y1; yy++) {  // use '<=' because grid_y1 always < geom.grid_size[1]
 							int ly = l_m*yy + l_c;
 							int ry = r_m*yy + r_c;
 
 							if (ly >= 0 && ly < l_len && l_row[ly] >= 0 &&
 									ry >= 0 && ry < r_len && r_row[ry] >= 0) {
-								// l_m measures the number of pixels in the vrect domain
-								// that each grid pixel corresponds to. Therefore we weight
-								// each grid measurement by l_m.
+								// l_m measures the number of pixels in the vrect
+								// domain that each grid pixel corresponds
+								// to. Therefore we weight each grid measurement by
+								// l_m.
 								stats.Add(l_row[ly], r_row[ry], l_m);  // accessing row from transposed image where y=column
-								//wall_stats.Add(l_row[ly], r_row[ry], l_m);
-
-								/*if (special) {
-									Vec3 p = makeVector(x, yy, 1.0);
-									l_samples.DrawDot(project(l_vrect_inv * makeVector(lx,ly,1.0)), 2.0, Colors::red());
-									r_samples.DrawDot(project(r_vrect_inv * makeVector(rx,ry,1.0)), 2.0, Colors::red());
-									}*/
 							}
 						}
 					}

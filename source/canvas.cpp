@@ -10,7 +10,7 @@
 
 #include "canvas.tpp"
 #include "polygon.tpp"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {

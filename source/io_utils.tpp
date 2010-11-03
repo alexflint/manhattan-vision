@@ -1,11 +1,23 @@
 #pragma once
 
+#include <sstream>
+#include <iomanip>
+
 #include "common_types.h"
 #include "safe_stream.h"
 
 #include "range_utils.tpp"
 
 namespace indoor_context {
+	// Convert an integer to a string of length W, padding on the left
+	// with '0' chars.
+	template <typename T>
+	string itoa(const T& x, int width=1) {
+		stringstream ss;
+		ss << setfill('0') << setw(width) << x;
+		return ss.str();
+	}
+
 	// Read an object from a file
 	template <typename T>
 	void ReadFile(const char* file, T& x) {
@@ -260,12 +272,12 @@ namespace indoor_context {
 	void ParseMultiRange(const string& s, vector<T>& v) {
 		int a = 0, pos;
 		do {
-			pos = s.find(' ', a);
+			pos = min(s.find(',', a), s.find(' ', a));
 			int b = (pos == string::npos) ? s.size() : pos;
 			string token = s.substr(a, b-a);
 			int dash = token.find('-');
 			int colon = token.find(':');
-			if (dash != string::npos) {
+			if (dash != string::npos && dash != 0) {  // if dash == 0 then we have a negative number
 				T first = lexical_cast<T>(token.substr(0, dash));
 				T last = lexical_cast<T>(token.substr(dash+1));
 				for (int j = first; j <= last; j++) {

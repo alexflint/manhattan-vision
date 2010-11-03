@@ -11,7 +11,7 @@
 #include <boost/foreach.hpp>
 
 #include "common_types.h"
-#include "math_utils.h"
+//#include "numeric_utils.h"
 
 namespace indoor_context {
 
@@ -46,12 +46,6 @@ VecD LogLikelihoodToDistr(const VecD& ys) {
 	VecD distr = ys;
 	NormalizeLogDistr(distr);
 	return distr.Apply(exp);
-}
-
-string PaddedInt(int x, int width) {
-	stringstream ss;
-	ss << setfill('0') << setw(width) << x;
-	return ss.str();
 }
 
 }

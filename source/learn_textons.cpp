@@ -4,7 +4,7 @@
 #include "vars.h"
 #include "progress_reporter.h"
 #include "kmeans.h"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 
 using namespace indoor_context;
 using namespace toon;

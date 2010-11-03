@@ -7,7 +7,7 @@
 //#include "vanishing_points.h"
 //#include "clipping.h"
 //#include "image_bundle.h"
-//#include "math_utils.h"
+////#include "numeric_utils.h"
 #include "guided_line_detector.h"
 
 //#include "range_utils.tpp"
@@ -150,7 +150,7 @@ void LineSweeper::OutputSupportViz(const string& basename) const {
 		ImageRGB<byte> canvas;
 		ImageCopy(input->rgb, canvas);
 		DrawStencil(support_maps[i], canvas, BrightColors::Get(i, 0.5));
-		WriteImage(basename+PaddedInt(i,1)+".png", canvas);
+		WriteImage(basename+itoa(i)+".png", canvas);
 	}
 }
 

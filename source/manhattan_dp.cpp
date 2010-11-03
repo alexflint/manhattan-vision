@@ -14,7 +14,7 @@
 
 #include "fill_polygon.tpp"
 #include "integral_col_image.tpp"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "io_utils.tpp"
 #include "image_utils.tpp"
 #include "range_utils.tpp"
@@ -127,9 +127,18 @@ DPGeometry::DPGeometry(const PosedCamera* camera, const Mat3& floorToCeil) {
 	Configure(camera, floorToCeil);
 }
 
-void DPGeometry::Configure(const PosedCamera* cam, const Mat3& fcmap) {
+DPGeometry::DPGeometry(const PosedCamera* camera, double zfloor, double zceil) {
+	grid_size = *gvGridSize;
+	Configure(camera, zfloor, zceil);
+}
+
+void DPGeometry::Configure(const PosedCamera* cam, double zfloor, double zceil) {
+	Configure(cam, GetManhattanHomology(*cam, zfloor, zceil));
+}
+
+void DPGeometry::Configure(const PosedCamera* cam, const Mat3& fToC) {
 	camera = cam;
-	floorToCeil = fcmap;
+	floorToCeil = fToC;
 
 	// Compute the rectification homography
 	imageToGrid = GetVerticalRectifier(*camera, Bounds2D<>::FromSize(grid_size));
@@ -585,6 +594,12 @@ void ManhattanDPReconstructor::OutputOrigViz(const string& path) {
 }
 
 void ManhattanDPReconstructor::OutputSolutionOrients(const string& path) {
+	// This version is now deprecated, use below
+	DLOG << "ManhattanDPReconstructor::OutputSolutionOrients deprecated: use OutputSolution";
+	OutputSolution(path);
+}
+
+void ManhattanDPReconstructor::OutputSolution(const string& path) {
 	ImageRGB<byte> soln_canvas;
 	ImageCopy(input_image->rgb, soln_canvas);
 	DrawOrientations(dp.soln_orients, soln_canvas, 0.35);

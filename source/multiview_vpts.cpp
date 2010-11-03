@@ -26,7 +26,7 @@
 #include "vars.h"
 
 #include "image_utils.tpp"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 
 using namespace indoor_context;
 using namespace VWEvents;

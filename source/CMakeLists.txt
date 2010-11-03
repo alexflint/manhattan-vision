@@ -243,7 +243,6 @@ SET( CORE_SOURCES
 	image_utils.cpp
 	math_utils.cpp
 	gl_utils.cpp
-	io_utils.cpp
 	vector_utils.cpp
 
 	viewer3d.cpp
@@ -325,7 +324,8 @@ SET( EXECUTABLES
 	multiview_dp
 	feature_dp
 	evaluate_mv
-	photoconsistency
+	stereo_dp
+	point_dp
 
 	inspect_geometry
 	test_gt_walls

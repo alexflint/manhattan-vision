@@ -15,7 +15,7 @@
 #include "geom_utils.h"
 
 #include "eigensystem2d.tpp"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "image_utils.tpp"
 
 namespace indoor_context {

@@ -29,8 +29,4 @@ void NormalizeLogDistr(VecD& ys);
 // avoid underflow.
 VecD LogLikelihoodToDistr(const VecD& ys);
 
-// Convert an integer to a string of length W, padding on the left
-// with '0' chars.
-string PaddedInt(int x, int width);
-
 }  // namespace indoor_context

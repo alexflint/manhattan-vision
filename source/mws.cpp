@@ -22,7 +22,7 @@
 #include "read_ply.h"
 
 #include "counted_foreach.tpp"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "io_utils.tpp"
 #include "gl_utils.tpp"
 #include "image_utils.tpp"

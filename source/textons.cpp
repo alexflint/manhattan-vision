@@ -12,7 +12,7 @@
 #include <boost/ref.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
 
-#include <VW/Image/imagecopy.tpp>
+#include <VW/Image/pixelconversions.h>
 
 #include "common_types.h"
 #include "textons.h"
@@ -20,8 +20,10 @@
 #include "kmeans.h"
 #include "progress_reporter.h"
 
+#include <VW/Image/imagecopy.tpp>
+
 #include "io_utils.tpp"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "image_utils.tpp"
 #include "vector_utils.tpp"
 
@@ -73,7 +75,7 @@ namespace indoor_context {
 	}
 
 	void TextonVocab::Compute(const vector<ImageBundle*>& images) {
-		last_input = &images;
+		input = &images;
 
 		TextonFeatures ftrgen;
 		ProgressReporter gen_prog(images.size(), "Generating features");
@@ -135,8 +137,7 @@ namespace indoor_context {
 	void TextonFeatures::Compute(const ImageBundle& image) {
 		// Build the mono and HSV images
 		image.BuildMono();
-		image.BuildHSV();
-		last_input = &image;
+		input = &image;
 
 		// Configure the filter bank
 		if (filters.filterbank.get() == NULL) {
@@ -190,22 +191,24 @@ namespace indoor_context {
 		case kMono: {
 			// TODO: what is ImageMono<float> normalized to, what should we
 			// divide by??
-			const PixelF& m = last_input->mono[y][x];
+			const PixelF& m = input->mono[y][x];
 			ftr[n] = mono_weight * m.y;
 			break;
 		}
 		case kRGB: {
-			const PixelRGB<byte>& p = last_input->rgb[y][x];
+			const PixelRGB<byte>& p = input->rgb[y][x];
 			ftr[n] = r_weight * p.r / 127.5;
 			ftr[n+1] = g_weight * p.g / 127.5;
 			ftr[n+2] = b_weight * p.b / 127.5;
 			break;
 		}
 		case kHSV: {
-			PixelHSV<byte>& q = last_input->hsv[y][x];
-			ftr[n] = h_weight * q.h / 127.5;
-			ftr[n+1] = s_weight * q.s / 127.5;
-			ftr[n+2] = v_weight * q.v / 127.5;
+			float h, s, v;
+			const PixelRGB<byte>& q = input->rgb[y][x];
+			VW::ImageConversions::RGB2HSV(q.r, q.g, q.b, h, s, v);
+			ftr[n] = h_weight * h / 127.5;
+			ftr[n+1] = s_weight * s / 127.5;
+			ftr[n+2] = v_weight * v / 127.5;
 			break;
 		}
 		case kNone:
@@ -239,7 +242,7 @@ namespace indoor_context {
 	}
 
 	void TextonMap::Reset(const ImageBundle& image) {
-		last_input = &image;
+		input = &image;
 
 		// Load vocabulary
 		if (vocab.words.empty()) {
@@ -295,7 +298,7 @@ namespace indoor_context {
 	void TextonMap::DrawTextonViz(ImageRGB<byte>& canvas,
 																const int texton) const {
 		ResizeImage(canvas, map.Cols(), map.Rows());
-		ImageCopy(last_input->rgb, canvas);
+		ImageCopy(input->rgb, canvas);
 		PixelRGB<byte> highlight(255, 0, 0);
 		for (int y = 0; y < canvas.GetHeight(); y++) {
 			const int* maprow = map[y];

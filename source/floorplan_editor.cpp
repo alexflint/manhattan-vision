@@ -10,7 +10,7 @@
 
 #include "counted_foreach.tpp"
 #include "gl_utils.tpp"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {

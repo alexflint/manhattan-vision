@@ -6,7 +6,7 @@
 #include "canvas.h"
 #include "colors.h"
 
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "io_utils.tpp"
 #include "quaternion.tpp"
 #include "counted_foreach.tpp"

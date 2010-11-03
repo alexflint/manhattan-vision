@@ -1,8 +1,7 @@
 #include "rotation_estimator.h"
 #include "common_types.h"
 
-#include "math_utils.tpp"
-#include "io_utils.tpp"
+//#include "numeric_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {

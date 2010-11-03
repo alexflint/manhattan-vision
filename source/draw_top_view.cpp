@@ -14,7 +14,7 @@
 #include "vars.h"
 #include "colors.h"
 #include "geom_utils.h"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 
 using namespace indoor_context;
 using namespace toon;

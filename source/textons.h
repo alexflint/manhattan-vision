@@ -14,7 +14,7 @@ namespace indoor_context {
 		// The features generated for the input images
 		vector<VecD> sampled_features;
 		// The images this vocab was generated from
-		const vector<ImageBundle*>* last_input;
+		const vector<ImageBundle*>* input;
 
 		// Initialize an empty vocabulary
 		TextonVocab();
@@ -34,7 +34,7 @@ namespace indoor_context {
 		// Filter bank
 		GaborFilterBank filters;
 		// Current image
-		const ImageBundle* last_input;
+		const ImageBundle* input;
 		// Length of features (pre-computed for efficiency)
 		int feature_size_;
 
@@ -72,7 +72,7 @@ namespace indoor_context {
 		// Number of pixels assigned to each texton
 		VecI texton_counts;
 		// Pointer to most recent input
-		const ImageBundle* last_input;
+		const ImageBundle* input;
 
 		// Initialize empty
 		TextonMap();

@@ -15,7 +15,7 @@
 #include "gl_utils.tpp"
 
 #include "image_utils.tpp"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 
 using namespace GVars3;
 using namespace indoor_context;

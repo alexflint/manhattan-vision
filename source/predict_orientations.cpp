@@ -13,7 +13,7 @@
 #include "vars.h"
 #include "bld_helpers.h"
 #include "image_utils.h"
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 
 using namespace indoor_context;
 using namespace toon;

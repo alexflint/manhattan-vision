@@ -9,7 +9,7 @@
 #include "map.h"
 #include "vars.h"
 
-#include "math_utils.tpp"
+//#include "numeric_utils.tpp"
 
 using namespace indoor_context;
 using namespace toon;

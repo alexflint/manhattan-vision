@@ -152,6 +152,9 @@ public:
 	KeyFrame* KeyFrameByIdOrDie(int id);
 	const KeyFrame* KeyFrameByIdOrDie(int id) const;
 
+	// Get a frame by ID, and load its image
+	PosedImage& ImageByIdOrDie(int id);
+
 	// Initialize the undistort map. If no image size is specified
 	// then the size of the first keyframe will be used. If no
 	// keyframes are loaded then an error will be raised.
