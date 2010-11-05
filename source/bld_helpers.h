@@ -1,10 +1,14 @@
 #pragma once
 
+#include <boost/array.hpp>
+
+#include "manhattan_dp.h"
 #include "common_types.h"
 
 namespace indoor_context {
 	class ManhattanReconstruction;
 	class PosedCamera;
+	class Canvas;
 
 	namespace proto {
 	class FloorPlan;
@@ -53,12 +57,12 @@ namespace indoor_context {
 
 	// Draw an array of dots to visualize the given payoffs
 	void DrawPayoffs(Canvas& canvas,
-									 const boost::array<MatF,2>& payoffs,
+									 const DPPayoffs& payoffs,
 									 const DPGeometry& geom);
 
 	// Output a visualization of the given payoffs to the file specified
 	void OutputPayoffsViz(const string& filename,
 												const ImageRGB<byte>& orig,
-												const boost::array<MatF,2>& payoffs,
+												const DPPayoffs& payoffs,
 												const DPGeometry& geom);
 }

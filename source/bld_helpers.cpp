@@ -15,6 +15,7 @@
 #include "camera.h"
 #include "floorplan_renderer.h"
 #include "geom_utils.h"
+#include "canvas.h"
 
 #include "vector_utils.tpp"
 
@@ -307,13 +308,13 @@ namespace indoor_context {
 
 
 	void DrawPayoffs(Canvas& canvas,
-									 const boost::array<MatF,2>& payoffs,
+									 const DPPayoffs& payoffs,
 									 const DPGeometry& geom) {
 		double max_payoff = 0;
 		for (int i = 0; i < 2; i++) {
-			for (int y = 0; y < payoffs[i].Rows(); y++) {
-				const float* row = payoffs[i][y];
-				for (int x = 0; x < payoffs[i].Cols(); x++) {
+			for (int y = 0; y < payoffs.wall_scores[i].Rows(); y++) {
+				const float* row = payoffs.wall_scores[i][y];
+				for (int x = 0; x < payoffs.wall_scores[i].Cols(); x++) {
 					if (row[x] > max_payoff) max_payoff = row[x];
 				}
 			}
@@ -322,9 +323,9 @@ namespace indoor_context {
 		static const double kDotSize = 1.0;
 		for (int i = 0; i < 2; i++) {
 			Vec2 tdot = makeVector(kDotSize*i*1.5, 0);
-			for (int y = 0; y < payoffs[i].Rows(); y++) {
-				const float* row = payoffs[i][y];
-				for (int x = 0; x < payoffs[i].Cols(); x++) {
+			for (int y = 0; y < payoffs.wall_scores[i].Rows(); y++) {
+				const float* row = payoffs.wall_scores[i][y];
+				for (int x = 0; x < payoffs.wall_scores[i].Cols(); x++) {
 					if (row[x] >= 0) {
 						double v = row[x] / max_payoff;
 						PixelRGB<byte> color( (i == 1 ? v*255 : 0),
@@ -340,7 +341,7 @@ namespace indoor_context {
 
 	void OutputPayoffsViz(const string& filename,
 												const ImageRGB<byte>& orig,
-												const boost::array<MatF,2>& payoffs,
+												const DPPayoffs& payoffs,
 												const DPGeometry& geom) {
 		FileCanvas canvas(filename, orig);
 		DrawPayoffs(canvas, payoffs, geom);

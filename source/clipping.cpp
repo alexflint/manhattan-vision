@@ -1,10 +1,11 @@
 #include "clipping.h"
 #include "common_types.h"
 
+#include "polygon.tpp"
+
 namespace indoor_context {
 using namespace toon;
 using VW::ROI;
-using VW::ImageRef;
 
 bool ClipAgainstLine(Vec3& start,
                      Vec3& end,

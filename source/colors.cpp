@@ -1,7 +1,7 @@
 #include "colors.h"
 #include "common_types.h"
 
-//#include "numeric_utils.tpp"
+#include "numeric_utils.tpp"
 
 namespace indoor_context {
 	PixelRGB<byte> BrightColors::Get(const byte i, const float alpha) {

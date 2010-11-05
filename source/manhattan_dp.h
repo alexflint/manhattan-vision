@@ -14,14 +14,7 @@
 
 namespace indoor_context {
 
-// Downsample an orientation map to a specified resolution, taking a
-// majority vote in each cell
-void DownsampleOrients(const MatI& in, MatI& out, ImageRef res);
-
-// Downsample an orientation by a scaling factor k, taking a majority
-// vote in each cell
-void DownsampleOrients(const MatI& in, MatI& out, int k);
-
+////////////////////////////////////////////////////////////////////////////////
 // Represents a wall segment in an image
 struct ManhattanWall {
 	Polygon<4> poly;
@@ -37,6 +30,7 @@ struct ManhattanWall {
 };
 
 
+////////////////////////////////////////////////////////////////////////////////
 // Represents a node in the DP graph.
 // Be very careful about adding things to this class since
 // DPStateHasher reads this as an array of bytes. Don't add virtual
@@ -57,6 +51,7 @@ struct DPStateHasher {
 	size_t operator()(const DPState & dpstate) const;
 };
 
+////////////////////////////////////////////////////////////////////////////////
 // Represents the solution at a node in the DP problem
 struct DPSolution {
 	double score;
@@ -73,6 +68,7 @@ struct DPSolution {
 ostream& operator<<(ostream& s, const DPState& x);
 ostream& operator<<(ostream& s, const DPSolution& x);
 
+////////////////////////////////////////////////////////////////////////////////
 // Represents a cache of DP states and their solutions
 class DPCache {
 public:
@@ -86,6 +82,7 @@ public:
 	DPSolution& operator[](const DPState& state);
 };
 
+////////////////////////////////////////////////////////////////////////////////
 // Represents a transformation from image coordinates to a rectified grid
 class DPGeometry {
 public:
@@ -104,9 +101,9 @@ public:
 	// Initialize and configure
 	DPGeometry(const PosedCamera* camera, double zfloor, double zceil);
 
-	// Compute the various homographies and useful vanishing point info
+	// Configure the various homographies and useful vanishing point info
 	void Configure(const PosedCamera* camera, const Mat3& floorToCeil);
-	// Compute the various homographies and useful vanishing point info
+	// Configurethe various homographies and useful vanishing point info
 	void Configure(const PosedCamera* camera, double zfloor, double zceil);
 
 	// Convert between image and grid coordinates
@@ -118,10 +115,18 @@ public:
 };
 
 
-// The score (negative cost) in per-pixel, per-label form.
-// TODO: make this more abstract so we can implement multiple views.
+
+////////////////////////////////////////////////////////////////////////////////
+// Represents a cost function that ManhattanDP optimizes, in terms of
+// the cost of assigning label A to pixel [Y,X] (stored in
+// pixel_scores[A][Y][X]). An object of this form is converted to the
+// more general representation of DPPayoffs
 class DPObjective {
 public:
+	double wall_penalty;  // the cost per wall segment (for regularisation)
+	double occl_penalty;  // the cost per occluding wall segment (_additional_ to wall_penalty)
+	MatF pixel_scores[3];  // score associated with assigning each label to each pixel (image coords)
+
 	DPObjective() : wall_penalty(-1), occl_penalty(-1) { }
 	DPObjective(int nx, int ny) {
 		Resize(nx, ny);
@@ -141,16 +146,40 @@ public:
 		rhs.wall_penalty = wall_penalty;
 		rhs.occl_penalty = occl_penalty;
 	}
-
-	MatF pixel_scores[3];  // score associated with assigning each label to each pixel (image coords)
-	double wall_penalty;  // the cost per wall segment (for regularisation)
-	double occl_penalty;  // the cost per occluding wall segment (_additional_ to wall_penalty)
 private:
-	// Disallow copy constructor, use CopyTo explicitly instead
+	// Disallow copy constructor (CopyTo explicitly)
 	DPObjective(const DPObjective& rhs);
 };
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+// The cost function the DP optimizes, specified in terms of the cost
+// of placing the top/bottom of a wall at each pixel.
+class DPPayoffs {
+public:
+	double wall_penalty;  // the cost per wall segment (for regularisation)
+	double occl_penalty;  // the cost per occluding wall segment (_additional_ to wall_penalty)
+	MatF wall_scores[2];  // cost of building the top/bottom of a wall at p (grid coords)
+
+	// Initialize empty
+	DPPayoffs();
+	// Initialize and allocate
+	DPPayoffs(Vec2I size);
+	// Resize the score matrix
+	void Resize(Vec2I size);
+	// Resize the score matrix and reset all elements to the specified value
+	void Resize(Vec2I size, float fill);
+	// Clone this object
+	void CopyTo(DPPayoffs& other);
+private:
+	// Disallow copy constructor (use CopyTo explicitly instead)
+	DPPayoffs(const DPPayoffs& rhs);
+};
+
+
+
+////////////////////////////////////////////////////////////////////////////////
 // Find optimal indoor Manhattan structures by dynamic programming
 class ManhattanDP {
 public:
@@ -161,23 +190,10 @@ public:
 	int vert_axis;
 	int max_corners;
 
-	// Copied from the DPObjective object passed to Compute for convenience
-	double wall_penalty;  // the cost per wall segment (for regularisation)
-	double occl_penalty;  // the cost per occluding wall segment (_additional_ to wall_penalty)
+	// The function to optimize
+	const DPPayoffs* payoffs;
 
-	// Per-pixel scores. To be factored out.
-	//const DPObjective* score_func;  // Pointer to input object passed to Compute()
-
-	// These are now only here so that ComputeScores() can re-use its large buffers
-	MatF grid_scores[3];  // the above, transformed into grid coordinates
-	IntegralColImage<float> integ_scores[3];  // integral-column image of scores
-
-	// The payoff matrix. Computed from the above.
-	// scores accumulated over entire columns
-	// has size 2 because there are only two possible wall orientations
-	boost::array<MatF,2> payoffs;
-
-	// Geometry
+	// Various pieces of geometry
 	const DPGeometry* geom; // an input parameter
 	MatI opp_rows;  // cache of floor<->ceil mapping as passed through floorToCeil
 
@@ -203,31 +219,22 @@ public:
 	// Initializes input parameters from GVar values.
 	ManhattanDP();
 
-	// Compute the optimal manhattan model from a DPObjective, which
-	// expresses the problem in terms of affinities between each
-	// pixel/label. This function transforms score_func into a matrix of
-	// "node scores" and then calls the implementation below.
-	void Compute(const DPObjective& objective,
-							 const DPGeometry& geometry);
-
 	// Compute the optimal manhattan model from the per-node score
 	// matrix, which expresses the problem in terms of marginal costs of
 	// building walls of each orientation at each pixel.
-	void Compute(const boost::array<MatF,2>& node_scores,
-							 const DPGeometry& geometry,
-							 double wall_penalty,
-							 double occl_penalty);
-
-	// The above two delegate here
-	void ComputeInternal();
-
-	// Populate integ_orients with rectified score data
-	void ComputePayoffs(const DPObjective& objective,
-											const DPGeometry& geometry);
+	void Compute(const DPPayoffs& payoffs,
+							 const DPGeometry& geometry);
 	// Populate opp_rows according to fcmap
 	void ComputeOppositeRows(const DPGeometry& geometry);
 	// Backtrack through the evaluation graph from the solution
 	void ComputeBacktrack();
+	// Get a mask representing the path taken through the payoff
+	// matrix. The matrix will be set to 0 or 1 to indicate the base of
+	// walls with orientation 0 or 1 respectively. The remaining
+	// elements will be set to -1. The result is such that
+	// this->solution.score equals the sum of all the elements in the
+	// payoff matrix for which m(p) is not zero.
+	void ComputeSolutionPath(MatI& m) const;
 
 	// The caching wrapper for the DP
 	const DPSolution& Solve(const DPState& state);
@@ -235,8 +242,7 @@ public:
 	DPSolution Solve_Impl(const DPState& state);
 
 	// Get the marginal cost of building a wall across an additional column
-	double MarginalWallScore(int row, int col, int axis);
-
+	//double MarginalWallScore(int row, int col, int axis);
 	// Determines whether an occlusion is physically realisable
 	// occl_side should be -1 for left or 1 for right
 	bool OcclusionValid(int col, int left_axis, int right_axis, int occl_side);
@@ -253,29 +259,63 @@ public:
 	void DrawGridSolution(ImageRGB<byte>& canvas) const;
 };
 
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+class MonocularPayoffGen {
+public:
+	bool empty;
+	DPGeometry geom;
+	IntegralColImage<float> integ_scores[3];
+	double wall_penalty, occl_penalty;
+	DPPayoffs payoffs;  // payoffs are stored here when Compute() is called
+
+	// Initialize empty
+	MonocularPayoffGen() : empty(true) { }
+	// Initialize and compute
+	MonocularPayoffGen(const DPObjective& obj, const DPGeometry& geom);
+	// Transform a DPObjective to a DPPayoff, storing the result in
+	// this->payoffs. Equivalent to calling Configure(obj, geom) then
+	// GetPayoffs(this->payoffs).
+	void Compute(const DPObjective& obj,
+							 const DPGeometry& geom);
+	// Compute the integral images in preparation for calls to GetPayoff
+	void Configure(const DPObjective& obj,
+								 const DPGeometry& geom);
+	// Get payoff for building a wall at a point in grid coordinates.
+	// grid_pt can be outside the grid bounds, clamping will be applied appropriately
+	double GetWallScore(const Vec2& grid_pt, int orient) const;
+	// Resize the matrix to the size of the grid and fill it with all payoffs
+	void GetPayoffs(DPPayoffs& payoffs) const;
+};
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
 // Wraps ManhattanDP, providing visualization routines that utilize a provided image
 class ManhattanDPReconstructor {
 public:
-	const PosedImage* input_image;
-	DPGeometry geometry;
+	const PosedImage* input;
 	ManhattanDP dp;
+	DPGeometry geometry;
+	MonocularPayoffGen payoff_gen;  // transforms DPObjective objects to DPPayoffs objects
 
-	// Compute the reconstruction for the given input and cost
+	// Compute the reconstruction for the given objective
+	// function. Internally the DPObjective is converted to a DPPayoffs
+	// using MonocularPayoffGen before passing it to ManhattanDP
 	void Compute(const PosedImage& image,
-	             const Mat3& floorToCeil,
-	             const DPObjective& scores);
-	// Compute the reconstruction for the given payoff matrix, using
-	// GVar values for the penalty terms.
+							 const Mat3& floorToCeil,
+							 const DPObjective& scores);
+	// As above but deprecated version (TODO: delete)
+	/*void ComputeOld(const PosedImage& image,
+									const Mat3& floorToCeil,
+									const DPObjective& scores);*/
+	// Compute the reconstruction for the given payoff function
 	void Compute(const PosedImage& image,
 							 const DPGeometry& geometry,
-	             const boost::array<MatF,2>& payoffs);
-	// Compute the reconstruction for the given payoff matrix and
-	// penalty terms.
-	void Compute(const PosedImage& image,
-							 const DPGeometry& geometry,
-	             const boost::array<MatF,2>& payoffs,
-							 double wall_penalty,
-							 double occl_penalty);
+	             const DPPayoffs& payoffs);
 
 	// Report the solution as a sequence of DP nodes
 	void ReportBacktrack();

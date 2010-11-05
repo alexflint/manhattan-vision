@@ -17,80 +17,6 @@
 namespace indoor_context {
 	using namespace toon;
 
-	void MonocularPayoffs::Configure(const DPObjective& obj,
-																	 const DPGeometry& geometry) {
-		empty = false;
-		geom = geometry;
-
-		// Compute per orientation, per pixel affinities
-		MatF grid_buffer;
-		for (int i = 0; i < 3; i++) {
-			// Allocate memory
-			grid_buffer.Resize(geom.grid_size[1], geom.grid_size[0], 0);
-			CHECK_EQ(obj.pixel_scores[i].Rows(), geom.camera->image_size().y);
-			CHECK_EQ(obj.pixel_scores[i].Cols(), geom.camera->image_size().x);
-
-			// Transform the scores according to ImageToGrid()
-			for (int y = 0; y < geom.camera->image_size().y; y++) {
-				const float* inrow = obj.pixel_scores[i][y];
-				for (int x = 0; x < geom.camera->image_size().x; x++) {
-					Vec2I grid_pt = RoundVector(geom.ImageToGrid(makeVector(x, y, 1.0)));
-					if (grid_pt[0] >= 0 && grid_pt[0] < geom.grid_size[0] &&
-							grid_pt[1] >= 0 && grid_pt[1] < geom.grid_size[1]) {
-						grid_buffer[ grid_pt[1] ][ grid_pt[0] ] += inrow[x];
-					}
-				}
-			}
-
-			// Compute the integral-col image
-			integ_scores[i].Compute(grid_buffer);
-		}
-	}
-
-	void MonocularPayoffs::GetAllPayoffs(boost::array<MatF,2>& payoffs) const {
-		for (int i = 0; i < 2; i++) {
-			payoffs[i].Resize(geom.grid_size[1], geom.grid_size[0]);
-			for (int y = 0; y < geom.grid_size[1]; y++) {
-				float* outrow = payoffs[i][y];
-				for (int x = 0; x < geom.grid_size[0]; x++) {
-					outrow[x] = GetPayoff(makeVector(x,y), i);
-				}
-			}
-		}
-	}
-
-	double MonocularPayoffs::GetPayoff(const Vec2& grid_pt, int axis) const {
-		CHECK_GT(integ_scores[0].m_int.Rows(), 0) << "Configure() must be called before GetPayoff()";
-		CHECK_INTERVAL(grid_pt[0], 0, geom.grid_size[0]-1);
-
-		// Compute the row of the opposite face (floor <-> ceiling)
-		// TODO: go back to using opp_rows here
-		Vec2 opp_pt = geom.Transfer(grid_pt);
-		int opp_y = Clamp<int>(opp_pt[1], 0, geom.grid_size[1]-1);
-
-		// Rounding and clamping must come after Transfer()
-		int x = roundi(grid_pt[0]);
-		int y = Clamp<int>(roundi(grid_pt[1]), 0, geom.grid_size[1]-1);
-
-		// Compute the score for this segment
-		int wall_orient = 1-axis;  // orients refer to normal direction rather than vpt index
-		int y0 = min(y, opp_y);
-		int y1 = max(y, opp_y);
-		return integ_scores[kVerticalAxis].Sum(x, 0, y0-1)
-			+ integ_scores[wall_orient].Sum(x, y0, y1-1)
-			+ integ_scores[kVerticalAxis].Sum(x, y1, geom.grid_size[1]-1);
-	}
-
-
-
-
-
-
-
-
-
-
-
 	void MultiViewPayoffs::Configure(const DPGeometry& geom,
 																	 const DPObjective& obj,
 																	 double zf,
@@ -99,7 +25,7 @@ namespace indoor_context {
 		zfloor = zf;
 		zceil = zc;
 		base_payoff_gen.Configure(obj, base_geom);
-		base_payoff_gen.GetAllPayoffs(base_payoffs);	// for visualization only
+		base_payoff_gen.GetPayoffs(base_payoffs); // for visualization only
 		aux_views.clear();
 	}
 
@@ -110,7 +36,7 @@ namespace indoor_context {
 		AuxiliaryView* view = new AuxiliaryView;
 		view->geom = aux_geom;
 		view->payoff_gen.Configure(obj, aux_geom);
-		view->payoff_gen.GetAllPayoffs(view->payoffs); 	// for visualization only
+		view->payoff_gen.GetPayoffs(view->payoffs); // for visualization only
 	
 		view->image_hfloor = GetHomographyVia(*base_geom.camera,
 																					*aux_geom.camera,
@@ -131,47 +57,40 @@ namespace indoor_context {
 	void MultiViewPayoffs::Compute() {
 		CHECK(!base_payoff_gen.empty) << "Configure() must be called before Compute()";
 
-		int nx = base_geom.grid_size[0];
-		int ny = base_geom.grid_size[1];
+		// Configure the payoff matrices
+		payoffs.Resize(base_geom.grid_size, 0);
+		BOOST_FOREACH(AuxiliaryView& aux, aux_views) {
+			aux.contrib_payoffs.Resize(base_geom.grid_size, -1);  // for visualization only
+		}
+
 		for (int orient = 0; orient < 2; orient++) {
-			payoffs[orient].Resize(ny, nx, 0);
-			BOOST_FOREACH(AuxiliaryView& aux, aux_views) {
-				// we only keep contrib_payoffs around for visualization
-				aux.contrib_payoffs[orient].Resize(ny, nx, -1);
-			}
-			for (int y = 0; y < ny; y++) {
-				bool on_ceil = (y < base_geom.horizon_row);
-				for (int x = 0; x < nx; x++) {
+			for (int y = 0; y < base_geom.grid_size[1]; y++) {
+				for (int x = 0; x < base_geom.grid_size[0]; x++) {
 					// initialize to payoffs in base view
 					Vec2I p = makeVector(x,y);
-					double sum_payoffs = base_payoff_gen.GetPayoff(p, orient);
-					double norm = 1.0;  // the base view gets weighted by 1.0
-
-					//double sum_payoffs = base_payoff_gen[orient][y][x];  // initialize to payoffs in base view
+					double sum_payoffs = base_payoff_gen.GetWallScore(p, orient);
+					double sum_weights = 1.0;  // the base view gets weighted by 1.0
 
 					BOOST_FOREACH(AuxiliaryView& aux, aux_views) {
 						// Construct the weighted sum over the base view and all auxiliary views
-						const Mat3& transfer = on_ceil ? aux.grid_hceil : aux.grid_hfloor;
+						const Mat3& transfer = y<base_geom.horizon_row ? aux.grid_hceil : aux.grid_hfloor;
 						Vec2I p_aux = RoundVector(project(transfer * unproject(p)));
 
 						// No need to check the y-coordinate (in fact we _must_ not)
 						// as this will be dealt with by GetPayoff()
 						if (p_aux[0] >= 0 && p_aux[0] < aux.geom.grid_size[0]) {
-							// For now,  the aux view contribute half weight w.r.t to base view
-							double contrib = 0.5;
+							// For now, the aux view contribute half weight w.r.t to base view
+							double weight = 0.5;
+							double payoff = aux.payoff_gen.GetWallScore(p_aux, orient);
+							sum_payoffs += weight * payoff;
+							sum_weights += weight;
 
-							//double payoff = (*aux.payoffs)[orient][ p_aux[1] ][ p_aux[0] ];
-							double payoff = aux.payoff_gen.GetPayoff(p_aux, orient);
-							sum_payoffs += contrib * payoff;
-							norm += contrib;
-
-							// we only keep this data for visualization later
-							aux.contrib_payoffs[orient][y][x] = payoff;
+							aux.contrib_payoffs.wall_scores[orient][y][x] = payoff;  // for visualization only
 						}
 					}
 
 					// Record the final payoffs
-					payoffs[orient][y][x] = sum_payoffs / norm;
+					payoffs.wall_scores[orient][y][x] = sum_payoffs / sum_weights;
 				}
 			}
 		}
@@ -188,14 +107,12 @@ namespace indoor_context {
 		canvas.DrawImage(aux_im, 1.0, t);
 		canvas.DrawImage(base_im, 1.0, Zeros);
 
-		int nx = base_geom.grid_size[0];
-		int ny = base_geom.grid_size[1];
 		BrightColors bc;
 		const AuxiliaryView& aux = aux_views[index];
-		for (int y = 0; y < ny; y += 15) {
+		for (int y = 0; y < base_geom.grid_size[1]; y += 15) {
 			if (abs(y-base_geom.horizon_row) < 25) continue; // skip the section near the horion
 			bool on_ceil = (y < base_geom.horizon_row);
-			for (int x = 0; x < nx; x += 15) {
+			for (int x = 0; x < base_geom.grid_size[0]; x += 15) {
 				Vec2I p = makeVector(x, y);
 				const Mat3& transfer = on_ceil ? aux.grid_hceil : aux.grid_hfloor;
 				Vec2I p_aux = RoundVector(project(transfer * unproject(p)));
@@ -240,7 +157,7 @@ namespace indoor_context {
 
 		Mat3 fToC = GetManhattanHomology(frame.pc(), zfloor, zceil);
 		DPGeometry base_geom(&frame.pc(), fToC);
-		joint_payoffs.Configure(base_geom, obj, zfloor, zceil);
+		joint_payoff_gen.Configure(base_geom, obj, zfloor, zceil);
 		aux_frames.clear();
 		aux_objectives.clear();
 		aux_gen.clear();
@@ -260,7 +177,7 @@ namespace indoor_context {
 		aux_objectives.push_back(&obj);
 		Mat3 fToC = GetManhattanHomology(frame.pc(), zfloor, zceil);
 		DPGeometry geom(&frame.pc(), fToC);
-		joint_payoffs.AddView(geom, obj);
+		joint_payoff_gen.AddView(geom, obj);
 	}
 
 	void MultiViewReconstructor::AddFrame(const PosedImage& frame) {
@@ -274,12 +191,10 @@ namespace indoor_context {
 
 		DLOG << "Reconstructing with " << aux_frames.size() << " aux views";
 
-		joint_payoffs.Compute();
+		joint_payoff_gen.Compute();
 		recon.Compute(*base_frame,
-									joint_payoffs.base_geom,
-									joint_payoffs.payoffs,
-									base_objective->wall_penalty,
-									base_objective->occl_penalty);
+									joint_payoff_gen.base_geom,
+									joint_payoff_gen.payoffs);
 	}
 
 
@@ -290,8 +205,8 @@ namespace indoor_context {
 	void MultiViewReconstructor::OutputBasePayoffs(const string& filename) {
 		OutputPayoffsViz(filename,
 										 base_frame->rgb,
-										 joint_payoffs.base_payoffs,
-										 joint_payoffs.base_geom);
+										 joint_payoff_gen.base_payoffs,
+										 joint_payoff_gen.base_geom);
 	}
 
 	void MultiViewReconstructor::OutputAuxPayoffs(const string& basename) {
@@ -304,12 +219,12 @@ namespace indoor_context {
 			DLOG << "Visualizing auxiliary frame " << i;
 			OutputPayoffsViz(str(format("%saux%02d_payoffs.png") % basename % i),
 											 aux_frames[i]->rgb,
-											 joint_payoffs.aux_views[i].payoffs,
-											 joint_payoffs.aux_views[i].geom);
+											 joint_payoff_gen.aux_views[i].payoffs,
+											 joint_payoff_gen.aux_views[i].geom);
 			OutputPayoffsViz(str(format("%saux%02d_contrib.png") % basename % i),
 											 base_frame->rgb,
-											 joint_payoffs.aux_views[i].contrib_payoffs,
-											 joint_payoffs.aux_views[i].geom);
+											 joint_payoff_gen.aux_views[i].contrib_payoffs,
+											 joint_payoff_gen.aux_views[i].geom);
 			if (!aux_objectives.empty()) {
 				aux_gen[i].line_sweeper.OutputOrientViz
 					(str(format("%saux%02d_sweeps.png") % basename % i));
@@ -320,8 +235,7 @@ namespace indoor_context {
 	void MultiViewReconstructor::OutputJointPayoffs(const string& filename) {
 		OutputPayoffsViz(filename,
 										 base_frame->rgb,
-										 joint_payoffs.payoffs,
-										 joint_payoffs.base_geom);
+										 joint_payoff_gen.payoffs,
+										 joint_payoff_gen.base_geom);
 	}
-
 }  // namespace indoor_context

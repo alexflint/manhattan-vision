@@ -2,10 +2,8 @@
 
 #include <cmath>
 
-//#include "numeric_utils.h"
+#include "numeric_utils.h"
 #include "common_types.h"
-
-// Simple math utilities
 
 namespace indoor_context {
 // This template provides a compile-time mapping from two input type to

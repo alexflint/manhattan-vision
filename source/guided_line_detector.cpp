@@ -1,9 +1,13 @@
 #include "guided_line_detector.h"
 
+#include <VW/Image/imagecopy.h>
+
 #include "common_types.h"
-//#include "geom_utils.h"
+#include "image_utils.h"
 #include "clipping.h"
 
+#include "io_utils.tpp"
+#include "numeric_utils.tpp"
 #include "counted_foreach.tpp"
 #include "vector_utils.tpp"
 

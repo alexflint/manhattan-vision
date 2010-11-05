@@ -11,7 +11,7 @@
 #include "fast_sobel.h"
 #include "canny.h"
 #include "filters.h"
-//#include "numeric_utils.tpp"
+#include "numeric_utils.tpp"
 #include "image_utils.tpp"
 
 namespace indoor_context {

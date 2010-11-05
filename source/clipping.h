@@ -3,11 +3,12 @@
 #include <limits>
 
 #include "common_types.h"
-//#include "numeric_utils.tpp"
-#include "image_utils.tpp"
-#include "polygon.tpp"
+#include "polygon-fwd.h"
+
+#include "numeric_utils.tpp"
 
 namespace indoor_context {
+
 // Return the sign of the dot product between two vectors
 inline int SignDP(const toon::Vector<>& a, const toon::Vector<>& b) {
 	return Sign(a*b);
@@ -64,9 +65,9 @@ void ClipToPositive(const Vec3& line,
                     Vec3& start,
                     Vec3& end);
 
-void GetImageBounds(const VW::ImageRef& size, vector<Vec3 >& bounds);
+void GetImageBounds(const VW::ImageRef& size, vector<Vec3>& bounds);
 
-void GetROIBounds(const VW::ROI& roi, vector<Vec3 >& bounds);
+void GetROIBounds(const VW::ROI& roi, vector<Vec3>& bounds);
 
 // Take care here, poly must be a vector of line equations
 // representing the sides of the poly, NOT the coordinates of the

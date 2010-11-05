@@ -82,9 +82,9 @@ public:
 	GuidedLineDetector guided_line_detector;
 
 	// Vanishing points in the retina plane
-	toon::Vector<3> retina_vpts[3];
+	Vec3 retina_vpts[3];
 	// Vanishing points in the image plane
-	toon::Vector<3> image_vpts[3];
+	Vec3 image_vpts[3];
 
 	// Load a keyframe from a file
 	//void Load(const string& image_file, const string& pose_file);
@@ -109,7 +109,7 @@ public:
 	// Id-to-keyframe map
 	map<int, KeyFrame*> kfs_by_id;
 	// The points
-	vector<toon::Vector<3> > pts;
+	vector<Vec3> pts;
 
 	// The camera model for frames in this map
 	shared_ptr<Camera> orig_camera;

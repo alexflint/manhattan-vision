@@ -157,7 +157,12 @@ SET( CORE_HEADERS
 	line_segment.h
 	
 	image_utils.h
-	math_utils.h
+	image_utils.tpp
+	io_utils.tpp
+	range_utils.tpp
+	numeric_utils.tpp
+	numeric_utils.h
+	vector_utils.tpp
 
 	viewer3d.h
 	widget3d.h
@@ -177,12 +182,6 @@ SET( CORE_HEADERS
 	manhattan_bnb.h
 	manhattan_dp.h
 	bld_helpers.h
-
-	image_utils.tpp
-	io_utils.tpp
-	range_utils.tpp
-	math_utils.tpp
-	vector_utils.tpp
 	
 	table.tpp
 	integral_col_image.tpp
@@ -199,7 +198,6 @@ SET( CORE_HEADERS
 
 	manhattan_bnb.h
 	manhattan_dp.h
-	manhattan_inference.h
 	multiview_reconstructor.h
 	stereo_payoffs.h
 	line_sweep_features.h
@@ -241,7 +239,7 @@ SET( CORE_SOURCES
 	
 	geom_utils.cpp
 	image_utils.cpp
-	math_utils.cpp
+	numeric_utils.cpp
 	gl_utils.cpp
 	vector_utils.cpp
 
@@ -258,7 +256,6 @@ SET( CORE_SOURCES
 	
 	manhattan_bnb.cpp
 	manhattan_dp.cpp
-	manhattan_inference.cpp
 	multiview_reconstructor.cpp
 	stereo_payoffs.cpp
 	line_sweep_features.cpp
@@ -419,7 +416,7 @@ IF ( MATLAB_FOUND )
         #discriminative_dp
 				mex_output_test
         dp_load_cases
-        dp_compatibility
+        #dp_compatibility
         dp_solve
     )
     

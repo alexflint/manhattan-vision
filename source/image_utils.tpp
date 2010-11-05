@@ -81,7 +81,7 @@ void Recentre(VW::ImageMono<T>& image, const S& max) {
 template<typename T, typename S>
 void Rescale(VW::ImageMono<T>& image, const S& max) {
 	T scale = max / GetMaxAbsPixel(image);
-	ImApply(image, bind(multiplies<T> (), scale, _1));
+	ImApply(image, bind(multiplies<T>(), scale, _1));
 }
 
 // Transform pixels so that 0 remains at 0 and the brighest pixel is
@@ -94,7 +94,6 @@ void RescaleAbs(VW::ImageMono<T>& image, const S& max) {
 			row[x].y = abs(row[x].y);
 		}
 	}
-	//ImApply(image, abs<T>);
 	Rescale(image, max);
 }
 
@@ -173,8 +172,8 @@ void MatrixToImage(const VNL::Matrix<T>& mat, ImageMono<S>& image) {
 
 
 template<typename T, typename S>
-void MatrixToImageRescaled(const VNL::Matrix<T>& mat, ImageRGB<S>& image) {
-	T scale = 255.0 / mat.MaxValue();
+void DrawMatrixRescaled(const VNL::Matrix<T>& mat, ImageRGB<S>& image) {
+	T scale = 255.0 / mat.MaxValue();DREPORT(scale);
 	if (image.IsAlloced()) {
 		CHECK_EQ(image.GetWidth(), mat.Cols());
 		CHECK_EQ(image.GetHeight(), mat.Rows());
@@ -219,7 +218,7 @@ void WriteImageRescaledInPlace(String filename, ImageMono<T>& image) {
 
 template<typename T, typename String>
 void WriteImageRescaled(String filename, const ImageMono<T>& image) {
-	ImageMono < T > clone;
+	ImageMono<T> clone;
 	ImageCopy(image, clone);
 	WriteImageRescaledInPlace(filename, clone);
 }
@@ -232,7 +231,7 @@ void WriteImageRecentredInPlace(String filename, ImageMono<T>& image) {
 
 template<typename T, typename String>
 void WriteImageRecentred(String filename, const ImageMono<T>& image) {
-	ImageMono < T > clone;
+	ImageMono<T> clone;
 	ImageCopy(image, clone);
 	WriteImageRecentredInPlace(filename, clone);
 }

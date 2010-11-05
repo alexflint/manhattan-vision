@@ -11,52 +11,30 @@
 
 namespace indoor_context {
 	////////////////////////////////////////////////////////////////////////////////
-	class MonocularPayoffs {
-	public:
-		bool empty;
-		DPGeometry geom;
-		IntegralColImage<float> integ_scores[3];
-
-		MonocularPayoffs() : empty(true) { }
-
-		// Compute the integral images in preparation for calls to GetPayoff
-		void Configure(const DPObjective& obj,
-									 const DPGeometry& geom);
-
-		// Get payoff for building a wall at a point in grid coordinates.
-		// grid_pt can be outside the grid bounds, clamping will be applied appropriately
-		double GetPayoff(const Vec2& grid_pt, int orient) const;
-
-		// Resize the matrix to the size of the grid and fill it with all payoffs
-		void GetAllPayoffs(boost::array<MatF,2>& payoffs) const;
-	};
-
-
-	////////////////////////////////////////////////////////////////////////////////
 	class MultiViewPayoffs {
 	public:
 		struct AuxiliaryView {
 			DPGeometry geom;  // DP geometry for base view
 			Mat3 grid_hfloor;  // homography from base view to this one, via floor plan, in grid coords
 			Mat3 grid_hceil;  // homography from base view to this one, via ceiling plan, in grid coords
-			MonocularPayoffs payoff_gen;
+			MonocularPayoffGen payoff_gen;
 
 			// These are only kept for analysis/visualization:
-			boost::array<MatF,2> payoffs;  // Payoffs for this view
-			boost::array<MatF,2> contrib_payoffs;  // Payoffs transferred into base view
-			Mat3 image_hfloor;  // only for debugging...
-			Mat3 image_hceil;
+			  DPPayoffs payoffs;  // Monocular payoffs for this view
+			  DPPayoffs contrib_payoffs;  // Payoffs transferred into base view
+			  Mat3 image_hfloor;  // only for debugging...
+			  Mat3 image_hceil;
 		};
 
 		double zfloor, zceil;
 
 		DPGeometry base_geom;  // DP geometry for base view
-		MonocularPayoffs base_payoff_gen;  // The payoff generator
-		boost::array<MatF,2> base_payoffs;  // Monocular payoffs for base view (only kept for visualization)
+		MonocularPayoffGen base_payoff_gen;  // The payoff generator
+		DPPayoffs base_payoffs;  // Monocular payoffs for base view (only kept for visualization)
 
 		boost::ptr_vector<AuxiliaryView> aux_views; // DP geometries for auxiliary views
 	
-		boost::array<MatF,2> payoffs;  // Node payoffs computed for all views jointly
+		DPPayoffs payoffs;  // Node payoffs computed for all views jointly
 	
 		// Set up the base view
 		void Configure(const DPGeometry& base_geom,
@@ -97,7 +75,7 @@ namespace indoor_context {
 		boost::ptr_vector<LineSweepDPScore> aux_gen;  // only kept for visualisation
 
 		// The reconstructor
-		MultiViewPayoffs joint_payoffs;
+		MultiViewPayoffs joint_payoff_gen;
 		ManhattanDPReconstructor recon;
 
 		// Constructor

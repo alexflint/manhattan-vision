@@ -4,15 +4,11 @@
 
 #include "line_sweeper.h"
 #include "common_types.h"
-//#include "vanishing_points.h"
-//#include "clipping.h"
-//#include "image_bundle.h"
-////#include "numeric_utils.h"
 #include "guided_line_detector.h"
+#include "image_utils.h"
 
-//#include "range_utils.tpp"
+#include "io_utils.tpp"
 #include "fill_polygon.tpp"
-//#include "image_utils.tpp"
 
 namespace indoor_context {
 using namespace toon;

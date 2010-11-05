@@ -10,6 +10,7 @@
 #include "common_types.h"
 #include "clipping.h"
 
+#include "image_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {

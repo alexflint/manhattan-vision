@@ -19,7 +19,7 @@
 
 #include "common_types.h"
 #include "kmeans.h"
-//#include "numeric_utils.h"
+#include "numeric_utils.h"
 
 namespace indoor_context {
 

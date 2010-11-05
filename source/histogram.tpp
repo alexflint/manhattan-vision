@@ -6,7 +6,7 @@
 
 #include "common_types.h"
 #include "range_utils.tpp"
-//#include "numeric_utils.tpp"
+#include "numeric_utils.tpp"
 #include "image_utils.tpp"
 #include "lazyvar.h"
 

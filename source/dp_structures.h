@@ -26,6 +26,8 @@ namespace indoor_context {
 	// Represents a solution to a reconstruction problem
 	MatlabProto SolutionProto("orients",
 														"num_walls",  // _total_ number of wall intersections
-														"num_occlusions"  // number of the intersections above that are occluding
+														"num_occlusions",  // number of the intersections above that are occluding
+														"payoffs",  // payoff matrix computed during reconstruction
+														"path" // solution represented as a path through the payoff matrix
 														);
 }

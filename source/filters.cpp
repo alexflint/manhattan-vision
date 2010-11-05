@@ -3,7 +3,7 @@
 
 #include "filters.h"
 #include "common_types.h"
-//#include "numeric_utils.tpp"
+#include "numeric_utils.tpp"
 #include "image_utils.tpp"
 
 #include "functional_types.tpp"

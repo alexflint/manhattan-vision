@@ -37,7 +37,7 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 	TIMED("Complete MEX execution (inner)") {
 		//ProfilerStart("/tmp/dp_solve.prof");
 		InitMex();
-		if (nlhs > 1 || nrhs != 2) {
+		if (nrhs != 2) {
 			mexErrMsgTxt("Usage: orients=dp_solve(case, objective)\n");
 		}
 
@@ -56,7 +56,9 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 
 		// Construct the objective function
 		VecI obj_dims = GetMatlabArrayDims(objective(0, "scores"));
-		CHECK_EQ(obj_dims, concat(3, dims));  // check that the scores are compatible with the image size
+		CHECK_EQ(obj_dims[0], dims[0]);  // check that the scores are compatible with the image size
+		CHECK_EQ(obj_dims[1], dims[1]);
+		CHECK_EQ(obj_dims[2], 3);
 		DPObjective obj(dims[1], dims[0]);
 		double* scoredata = mxGetPr(objective(0, "scores"));
 		for (int i = 0; i < 3; i++) {
@@ -74,15 +76,23 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 		DREPORT(obj.wall_penalty, obj.occl_penalty);
 
 		// Do the reconstruction
+		DPGeometry geom(&pc, fToC);
+		MonocularPayoffGen gen(obj, geom);
 		ManhattanDP dp;
-		DPGeometry(pc, fToC);
-		dp.Compute(obj, geom);
+		dp.Compute(gen.payoffs, geom);
+
+		// Compute the path through the payoff matrix
+		MatI soln_path;
+		dp.ComputeSolutionPath(soln_path);
 
 		// Create the solution
 		MatlabStructure soln = SolutionProto.New(1);
 		soln.put(0, "orients", NewMatlabArrayFromMatrix(dp.soln_orients));
 		soln.put(0, "num_walls", NewMatlabArrayFromScalar(dp.soln_num_walls));
 		soln.put(0, "num_occlusions", NewMatlabArrayFromScalar(dp.soln_num_occlusions));
+		soln.put(0, "payoffs0", NewMatlabArrayFromMatrix(gen.payoffs.wall_scores[0]));
+		soln.put(0, "payoffs1", NewMatlabArrayFromMatrix(gen.payoffs.wall_scores[1]));
+		soln.put(0, "path", NewMatlabArrayFromMatrix(soln_path));
 
 		// Copy the results back
 		if (nlhs > 0) {

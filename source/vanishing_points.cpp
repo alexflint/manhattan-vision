@@ -18,11 +18,10 @@
 #include "vanishing_points.h"
 #include "rotation_estimator.h"
 #include "camera.h"
-//#include "numeric_utils.h"
 
 #include "eigensystem2d.tpp"
 #include "range_utils.tpp"
-//#include "numeric_utils.tpp"
+#include "numeric_utils.tpp"
 #include "image_utils.tpp"
 #include "vector_utils.tpp"
 #include "counted_foreach.tpp"
