@@ -42,10 +42,10 @@ int main(int argc, char **argv) {
 	// Get the floor and ceiling positions
 	double zfloor = gt_map.floorplan().zfloor();
 	double zceil = gt_map.floorplan().zceil();
-	Vec3 vup = map.kfs[0].pc->pose_inverse() * makeVector(0,1,0);
+	/*Vec3 vup = map.kfs[0].pc->pose_inverse() * makeVector(0,1,0);
 	if (Sign(zceil-zfloor) == Sign(vup[2])) {
 		swap(zfloor, zceil);
-	}
+		}*/
 
 	// Calculate all the frames we need to compute line sweeps for
 	set<int> include_ids;

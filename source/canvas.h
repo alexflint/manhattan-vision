@@ -33,6 +33,7 @@ public:
 	void MoveTo(const Vec3& p);  // homogeneous
 	void LineTo(const Vec2& p);
 	void LineTo(const Vec3& p);  // homogeneous
+	void Stroke();  // stroke the current path (i.e. preceeding calls to LineTo)
 
 	// Modify the transformation matrix
 	void Translate(const Vec2& t);

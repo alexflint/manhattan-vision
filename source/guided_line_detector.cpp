@@ -585,7 +585,10 @@ void GuidedLineDetector::OutputThetaViz(const string& basename) {
 }
 
 void GuidedLineDetector::DrawRays(ImageRGB<byte>& canvas, int axis) {
-	Vec2 retina_tl = input->pc().ImToRet(makeVector(0.0, 0.0));
+	// TODO: implement this using Canvas instead
+	CHECK(false);
+
+	/*	Vec2 retina_tl = input->pc().ImToRet(makeVector(0.0, 0.0));
 	Vec2 retina_br = input->pc().ImToRet(makeVector(canvas.GetWidth()-1.0,
 			canvas.GetHeight()-1.0));
 	Vec3 left = makeVector(1, 0, -retina_tl[0]);
@@ -633,6 +636,7 @@ void GuidedLineDetector::DrawRays(ImageRGB<byte>& canvas, int axis) {
 			}
 		}
 	}
+	*/
 }
 
 void GuidedLineDetector::OutputRayViz(const string& filename, int axis) {
@@ -643,12 +647,16 @@ void GuidedLineDetector::OutputRayViz(const string& filename, int axis) {
 }
 
 void GuidedLineDetector::DrawSegments(ImageRGB<byte>& canvas, int axis) {
+	CHECK(false);
+	// TODO: implement this using canvas
+
+	/*
 	for (int i = 0; i < 3; i++) {
 		if (i != axis && axis != -1) continue;
 		BOOST_FOREACH(const LineDetection& det, detections[i]) {
 			det.DrawLine(canvas, Colors::primary(i), Zeros, draw_thick_lines?2:1);
 		}
-	}
+		}*/
 }
 
 void GuidedLineDetector::OutputSegmentsViz(const string& filename, int axis) {

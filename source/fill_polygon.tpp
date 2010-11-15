@@ -10,7 +10,7 @@
 #include "common_types.h"
 #include "clipping.h"
 
-#include "image_utils.tpp"
+#include "matrix_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
@@ -50,12 +50,12 @@ int ComputeFillScanlines(const Range& poly,
 				cs[i] = -line[2]/line[0];
 			}
 
-			if (ceili(ys[i]) < ymin) {
-				ymin = ceili(ys[i]);
+			if (floori(ys[i]) < ymin) {
+				ymin = floori(ys[i]);
 				imin = i;
 			}
-			if (floori(ys[i]) > ymax) {
-				ymax = floori(ys[i]);
+			if (ceili(ys[i]) > ymax) {
+				ymax = ceili(ys[i]);
 				imax = i;
 			}
 		}
@@ -96,11 +96,11 @@ template <typename Range, typename Canvas, typename T>
 int FillPolygon(const Range& poly, Canvas& canvas, const T& v) {
 	int y0;
 	vector<pair<int, int> > scanlines;
-	Vec2I sz = toon::makeVector(Width(canvas), Height(canvas));
+	Vec2I sz = matrix_size(canvas);
 	int count = ComputeFillScanlines(poly, sz, y0, scanlines);
 
 	for (int i = 0; i < scanlines.size(); i++) {
-		fill(canvas[y0+i]+scanlines[i].first, canvas[y0+i]+scanlines[i].second, v);
+		fill(canvas[y0+i]+scanlines[i].first, canvas[y0+i]+scanlines[i].second+1, v);
 	}
 	return count;
 }
@@ -113,8 +113,8 @@ int FillPolygon(const Range& poly, Canvas& canvas, const T& v) {
 // Fill a convex polygon with a specified value
 template <typename Canvas, typename T>
 void FillPolygonSlow(const vector<Vec3>& poly, Canvas& image, const T& v) {
-	const int nx = Width(image);
-	const int ny = Height(image);
+	const int nx = matrix_width(image);
+	const int ny = matrix_height(image);
 	const int n = poly.size();
 
 	int ymin = ny-1, ymax = 0;

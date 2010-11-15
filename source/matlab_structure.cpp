@@ -27,7 +27,7 @@ namespace indoor_context {
 
 	const mxArray* ConstMatlabStructure::operator()(int index, const string& field) const {
 		map<string,int>::const_iterator it = fields.find(field);
-		CHECK(it != fields.end()) << "Field not found: '" << field << "'";
+		CHECK(it != fields.end()) << "Unknown field: '" << field << "'";
 		return GetFieldOrDie(m, index, it->second);
 	}
 
@@ -59,7 +59,7 @@ namespace indoor_context {
 
 	void MatlabStructure::put(int index, const string& field, mxArray* p) {
 		map<string,int>::const_iterator it = fields.find(field);
-		CHECK(it != fields.end()) << "Field not found: '" << field << "'";
+		CHECK(it != fields.end()) << "Unknown field: '" << field << "'";
 		CHECK_GE(it->second, 0);
 		mxSetFieldByNumber(m, index, fields[field], p);
 	}

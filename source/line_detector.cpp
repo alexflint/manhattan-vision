@@ -43,6 +43,7 @@ namespace indoor_context {
 		DrawSpot(canvas, project(seg.end)+offs, color, thickness+1);
 	}
 
+	/*
 	void LineDetection::DrawLine(ImageRGB<byte>& canvas,
 															 const PixelRGB<byte>& color,
 															 const toon::Vector<2> offs,
@@ -59,7 +60,7 @@ namespace indoor_context {
 													 color,
 													 thickness);
 		}
-	}
+		}*/
 
 
 

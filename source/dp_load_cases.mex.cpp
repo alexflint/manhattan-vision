@@ -7,9 +7,6 @@
 #include <boost/foreach.hpp>
 #include <boost/filesystem.hpp>
 
-#include <google/heap-profiler.h>
-#include <google/profiler.h>
-
 #include <mex.h>
 
 #include <VW/Image/imagecopy.h>
@@ -22,17 +19,34 @@
 #include "bld_helpers.h"
 #include "dp_structures.h"
 #include "line_sweep_features.h"
+#include "landmark_payoffs.h"
 
+#include "matrix_utils.tpp"
 #include "counted_foreach.tpp"
 
 using namespace std;
 using namespace indoor_context;
 using boost::format;
 
+mxArray* MatrixVecToMatlabArray(const vector<const MatF*> matrices) {
+	CHECK(!matrices.empty());
+	mxArray* arr = NewMatlabArray(matrices[0]->Rows(), matrices[0]->Cols(), matrices.size());
+	double* p = mxGetPr(arr);
+	for (int i = 0; i < matrices.size(); i++) {
+		CHECK_SAME_SIZE(*matrices[i], *matrices[0]);
+		for (int y = 0; y < matrices[i]->Rows(); y++) {
+			const float* row = (*matrices[i])[y];
+			for (int x = 0; x < matrices[i]->Cols(); x++) {
+				*p++ = *row++;
+			}
+		}
+	}
+	return arr;
+}
+
+
 void _mexFunction(int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[]) {
-	//ProfilerStart("/tmp/dp_load_cases.prof");
-
 	InitMex();
 	if (nlhs != 1 || nrhs < 2 || nrhs > 3) {
 		mexErrMsgTxt("Usage: cases=dp_load_cases(sequence_name, ids_to_load, [feature_set])"); 
@@ -54,6 +68,8 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 	Map map;
 	proto::TruthedMap gt_map;
 	map.LoadWithGroundTruth(map_file.string(), gt_map);
+	double zceil = gt_map.floorplan().zceil();
+	double zfloor = gt_map.floorplan().zfloor();
 
 	// Create the struct array
 	MatlabStructure cases = CaseProto.New(ids.size());
@@ -76,6 +92,7 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 
 		// Compute manhattan homology
 		Mat3 fToC = GetFloorCeilHomology(kf.image.pc(), gt_map.floorplan());
+		DPGeometry geom(kf.image.pc(), fToC);
 
 		// Compute ground truth
 		MatI gt_orients;
@@ -83,13 +100,15 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 		GetGroundTruth(gt_map.floorplan(), kf.image.pc(),
 									 gt_orients, gt_num_walls, gt_num_occlusions);
 
-		// Generate features
-		mxArray* ftrs = NULL;
+		//
+		// Generate pixel features
+		//
+		mxArray* pixel_ftrs = NULL;
 		if (feature_set == "default" || feature_set == "line_sweep") {
 			gen.Compute(kf.image);
 			int ftr_size = LineSweepFeatureGenerator::kFeatureLength;
-			ftrs = NewMatlabArray(kf.image.ny(), kf.image.nx(), ftr_size);
-			double* ftr_data = mxGetPr(ftrs);
+			pixel_ftrs = NewMatlabArray(kf.image.ny(), kf.image.nx(), ftr_size);
+			double* ftr_data = mxGetPr(pixel_ftrs);
 			for (int j = 0; j < ftr_size; j++) {
 				for (int x = 0; x < kf.image.nx(); x++) {
 					for (int y = 0; y < kf.image.ny(); y++) {
@@ -101,8 +120,8 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 
 		} else if (feature_set == "gt") {
 			int ftr_size = 3;
-			ftrs = NewMatlabArray(kf.image.ny(), kf.image.nx(), ftr_size);
-			double* ftr_data = mxGetPr(ftrs);
+			pixel_ftrs = NewMatlabArray(kf.image.ny(), kf.image.nx(), ftr_size);
+			double* ftr_data = mxGetPr(pixel_ftrs);
 			for (int j = 0; j < 3; j++) {
 				for (int x = 0; x < kf.image.nx(); x++) {
 					for (int y = 0; y < kf.image.ny(); y++) {
@@ -113,9 +132,9 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 
 		} else if (feature_set == "sweeps_only") {
 			int ftr_size = 3;
-			ftrs = NewMatlabArray(kf.image.ny(), kf.image.nx(), ftr_size);
+			pixel_ftrs = NewMatlabArray(kf.image.ny(), kf.image.nx(), ftr_size);
 			IsctGeomLabeller line_sweeper(kf.image);
-			double* ftr_data = mxGetPr(ftrs);
+			double* ftr_data = mxGetPr(pixel_ftrs);
 			for (int j = 0; j < 3; j++) {
 				for (int x = 0; x < kf.image.nx(); x++) {
 					for (int y = 0; y < kf.image.ny(); y++) {
@@ -125,7 +144,17 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 			}
 		}
 
-		CHECK_NOT_NULL(ftrs) << "Unrecognised feature set: '" << feature_set << "'";
+		CHECK_NOT_NULL(pixel_ftrs) << "Unrecognised feature set: '" << feature_set << "'";
+
+		//
+		// Generate wall features
+		//
+		MatF agree, occl;
+		ComputeLandmarkPayoffs(kf, geom, zfloor, zceil, agree, occl);
+		vector<const MatF*> ms;
+		ms.push_back(&agree);
+		ms.push_back(&occl);
+		mxArray* wall_ftrs = MatrixVecToMatlabArray(ms);
 
 		// Create geometry object
 		const PosedCamera& pc = kf.image.pc();
@@ -147,8 +176,7 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 		cases.put(i, "image_file", NewMatlabArrayFromString(kf.image_file));
 		cases.put(i, "ground_truth", gt.get());
 		cases.put(i, "frame", frame.get());
-		cases.put(i, "features", ftrs);
+		cases.put(i, "pixel_features", pixel_ftrs);
+		cases.put(i, "wall_features", wall_ftrs);
 	}
-
-	//ProfilerStop();
 }

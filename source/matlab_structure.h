@@ -1,3 +1,5 @@
+#pragma once
+
 #include <mex.h>
 #include "common_types.h"
 

@@ -36,10 +36,10 @@ public:
 	                const PixelRGB<byte>& color,
 	                Vec2 offset=toon::Zeros,
 	                int thickness=1) const;
-	void DrawLine(ImageRGB<byte>& canvas,
+	/*void DrawLine(ImageRGB<byte>& canvas,
 	              const PixelRGB<byte>& color,
 	              Vec2 offset=toon::Zeros,
-	              int thickness=1) const;
+	              int thickness=1) const;*/
 };
 
 // Finds line segments using the algorithm of (Kosecka and Zhang, 2002)
@@ -47,13 +47,11 @@ class CannyLineDetector {
 public:
 	// Last image passed to Compute()
 	const ImageBundle* input;
-
 	// Line segments found in the image
 	vector<LineDetection> detections;
 	// Map of pixel to the line segment that contains them. Pixels not
 	// part of any line segment are set to -1
 	MatI segment_map;
-
 	// The canny edge detector. Included here to allow it to re-use its
 	// buffers across several invokations.
 	Canny canny;

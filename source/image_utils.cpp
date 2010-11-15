@@ -125,10 +125,10 @@ void DrawLine(ImageRGB<byte>& canvas,
 void DrawStencil(const MatI& stencil,
                  ImageRGB<byte>& canvas,
                  const PixelRGB<byte>& color) {
-	for (int y = 0; y < Height(stencil); y++) {
+	for (int y = 0; y < stencil.Rows(); y++) {
 		const int* strow = stencil[y];
 		PixelRGB<byte>* crow = canvas[y];
-		for (int x = 0; x < Width(stencil); x++) {
+		for (int x = 0; x < stencil.Cols(); x++) {
 			if (strow[x]) {
 				BlendWith(crow[x], color, 1.0*color.alpha/255.0);
 			}

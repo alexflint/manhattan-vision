@@ -11,6 +11,12 @@
 
 namespace indoor_context {
 
+// Evaluate a 1D gaussion centred at m with variance s
+double Gauss1D(double x, double m, double s);
+
+// Evaluate a 2D gaussion centred at m with variance s
+double Gauss2D(const Vec2& x, const Vec2& m, double s);
+
 // Compute log( exp(y1)+exp(y2)+...+exp(yn) )
 double LogSumExp(const VecD& ys);
 

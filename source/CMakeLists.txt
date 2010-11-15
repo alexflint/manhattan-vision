@@ -201,6 +201,7 @@ SET( CORE_HEADERS
 	multiview_reconstructor.h
 	stereo_payoffs.h
 	line_sweep_features.h
+	landmark_payoffs.h
 )
 
 SET( CORE_SOURCES 
@@ -259,6 +260,7 @@ SET( CORE_SOURCES
 	multiview_reconstructor.cpp
 	stereo_payoffs.cpp
 	line_sweep_features.cpp
+	landmark_payoffs.cpp
 	
 	camera.cpp
 	glut_window.cpp
@@ -400,9 +402,9 @@ IF ( MATLAB_FOUND )
     
     # This library contains common matlab utilities
     SET( MATUTILS_SOURCES
-			matlab_utils.h matlab_utils.cpp
-			matlab_structure.h matlab_structure.cpp
-			dp_structures.h
+			matlab_utils.h        matlab_utils.cpp
+			matlab_structure.h    matlab_structure.cpp
+			dp_structures.h       dp_structures.cpp
 			)
     ADD_LIBRARY( matutils ${MATUTILS_SOURCES} )
     
@@ -413,10 +415,8 @@ IF ( MATLAB_FOUND )
 
     # The list of matlab targets    
     SET( MEX_OUTPUTS
-        #discriminative_dp
 				mex_output_test
         dp_load_cases
-        #dp_compatibility
         dp_solve
     )
     
@@ -456,7 +456,7 @@ IF ( MATLAB_FOUND )
     	    )
 
         # Always build the MEX target when building the binary target
-    	ADD_DEPENDENCIES( ${EXECUTABLE_NAME} ${MEX_NAME} )
+    		ADD_DEPENDENCIES( ${EXECUTABLE_NAME} ${MEX_NAME} )
     	
     ENDFOREACH( MEX_OUTPUT )
 ENDIF ( MATLAB_FOUND )

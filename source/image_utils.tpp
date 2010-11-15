@@ -15,28 +15,6 @@
 #include "polygon.tpp"
 
 namespace indoor_context {
-// Get the width of a matrix or image
-template<typename Array>
-int Width(const Array& x) {
-	return x.GetWidth();
-}
-
-template<typename T>
-int Width(const VNL::Matrix<T>& x) {
-	return x.Cols();
-}
-
-// Get the height of a matrix or image
-template<typename Array>
-int Height(const Array& x) {
-	return x.GetHeight();
-}
-
-template<typename T>
-int Height(const VNL::Matrix<T>& x) {
-	return x.Rows();
-}
-
 // Get the maximum absolute value of a pixel in an image
 template<typename T>
 T GetMaxAbsPixel(const VW::ImageMono<T>& image) {
@@ -88,9 +66,9 @@ void Rescale(VW::ImageMono<T>& image, const S& max) {
 // white.
 template<typename T, typename S>
 void RescaleAbs(VW::ImageMono<T>& image, const S& max) {
-	for (int y = 0; y < Width(image); y++) {
+	for (int y = 0; y < image.GetWidth(); y++) {
 		VW::PixelMono<T>* row = image[y];
-		for (int x = 0; x < Height(image); x++) {
+		for (int x = 0; x < image.GetHeight(); x++) {
 			row[x].y = abs(row[x].y);
 		}
 	}
@@ -170,10 +148,9 @@ void MatrixToImage(const VNL::Matrix<T>& mat, ImageMono<S>& image) {
 	}
 }
 
-
 template<typename T, typename S>
 void DrawMatrixRescaled(const VNL::Matrix<T>& mat, ImageRGB<S>& image) {
-	T scale = 255.0 / mat.MaxValue();DREPORT(scale);
+	T scale = 255.0 / mat.MaxValue();
 	if (image.IsAlloced()) {
 		CHECK_EQ(image.GetWidth(), mat.Cols());
 		CHECK_EQ(image.GetHeight(), mat.Rows());
@@ -185,6 +162,7 @@ void DrawMatrixRescaled(const VNL::Matrix<T>& mat, ImageRGB<S>& image) {
 		PixelRGB<S>* imrow = image[r]; 
 		for (int c = 0; c < image.GetWidth(); c++) {
 			imrow[c].r = imrow[c].g = imrow[c].b = matrow[c]*scale;
+			imrow[c].alpha = 0;
 		}
 	}
 }

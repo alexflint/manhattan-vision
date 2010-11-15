@@ -5,15 +5,19 @@
  *      Author: alexf
  */
 
-#include <sstream>
-#include <iomanip>
-
+#include "numeric_utils.h"
 #include <boost/foreach.hpp>
-
 #include "common_types.h"
-//#include "numeric_utils.h"
 
 namespace indoor_context {
+
+double Gauss1D(double x, double m, double s) {
+	return exp(-(x-m)*(x-m)/(2*s*s)) / (s*sqrt(2*M_PI));
+}
+
+double Gauss2D(const Vec2& x, const Vec2& m, double s) {
+	return exp(-0.5 * norm_sq(m-x) / s) / (2*M_PI*sqrt(s));
+}
 
 double LogSumExp(const VecD& ys) {
 	// Here we scale and then unscale by a factor k to avoid machine

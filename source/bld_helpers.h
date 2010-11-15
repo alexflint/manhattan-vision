@@ -25,6 +25,13 @@ namespace indoor_context {
 	                    MatI& out_orients);
 
 	// Get the ground truth orientation map for a frame by rendering the floorplan.
+	// Also provide a depthmap for the rendered floorplan
+	void GetTrueOrients(const proto::FloorPlan& floorplan,
+	                    const PosedCamera& pc,
+	                    MatI& out_orients,
+											MatD& out_depthmap);
+
+	// Get the ground truth orientation map for a frame by rendering the floorplan.
 	void GetGroundTruth(const proto::FloorPlan& floorplan,
 	                    const PosedCamera& pc,
 	                    MatI& out_orients,

@@ -33,13 +33,19 @@ namespace indoor_context {
 
 	void GetTrueOrients(const proto::FloorPlan& floorplan,
 	                    const PosedCamera& pc,
-	                    MatI& gt_orients) {
+	                    MatI& out_orients) {
 		FloorPlanRenderer re;
-		re.RenderOrients(floorplan, pc, gt_orients);
+		re.RenderOrients(floorplan, pc, out_orients);
 	}
 
+	void GetTrueOrients(const proto::FloorPlan& floorplan,
+	                    const PosedCamera& pc,
+	                    MatI& out_orients,
+											MatD& out_depthmap) {
+		FloorPlanRenderer re;
+		re.RenderOrients(floorplan, pc, out_orients, out_depthmap);
+	}
 
-	// Get the ground truth orientation map for a frame by rendering the floorplan.
 	void GetGroundTruth(const proto::FloorPlan& fp,
 	                    const PosedCamera& pc,
 	                    MatI& orients,

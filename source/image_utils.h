@@ -15,14 +15,14 @@ void DrawSegmentation(const MatI& mat,
 
 // Draw a spot with specified side length and color at X in IMAGE.
 void DrawSpot(ImageRGB<byte>& image,
-              const toon::Vector<2>& x,
+              const Vec2& x,
               const PixelRGB<byte>& color,
               const int size);
 
 // Draw an alpha-blended line
 void DrawLine(ImageRGB<byte>& canvas,
-              const toon::Vector<2>& start,
-              const toon::Vector<2>& end,
+              const Vec2& start,
+              const Vec2& end,
               const PixelRGB<byte>& color,
               const float alpha=1.0);
 
@@ -33,8 +33,8 @@ void DrawLine(ImageRGB<byte>& canvas,
 
 // Draw a line, clipped to the image boundary
 void DrawLineClipped(ImageRGB<byte>& canvas,
-                     const toon::Vector<2>& start,
-                     const toon::Vector<2>& end,
+                     const Vec2& start,
+                     const Vec2& end,
                      const PixelRGB<byte>& color,
                      double alpha=1.0);
 
@@ -43,13 +43,6 @@ void DrawLineClipped(ImageRGB<byte>& canvas,
                      const LineSeg& seg,
                      const PixelRGB<byte>& color,
                      double alpha=1.0);
-
-// Draw a thick line by drawing multiple lines
-void DrawThickLineClipped(ImageRGB<byte>& canvas,
-                          const toon::Vector<2>& start,
-                          const toon::Vector<2>& end,
-                          const PixelRGB<byte>& color,
-                          const int thickness);
 
 // For each pixel>0 in stencil, set the corresponding pixel in canvas
 // to the specified color.

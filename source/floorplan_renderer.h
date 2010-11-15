@@ -20,6 +20,10 @@ public:
 	// Configure the renderer
 	void Configure(const proto::FloorPlan& floorplan);
 
+	// Get the internal renderer
+	SimpleRenderer& renderer() { return renderer_; }
+	const SimpleRenderer& renderer() const { return renderer_; }
+
 	// Render from a particular view
 	void Render(const proto::FloorPlan& floorplan,
 	            const toon::Matrix<3,4>& cam,
@@ -37,6 +41,10 @@ public:
 	void RenderOrients(const proto::FloorPlan& floorplan,
 	                   const PosedCamera& cam,
 										 MatI& orients);
+	void RenderOrients(const proto::FloorPlan& floorplan,
+	                   const PosedCamera& cam,
+										 MatI& orients,
+										 MatD& depthmap);
 private:
 	SimpleRenderer renderer_;
 

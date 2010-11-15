@@ -130,8 +130,8 @@ public:
 	Map();
 	// Load a map, detecting its format automatically from GVars
 	void Load(const string& path);
-	// Load a map with ground truth. Store the ground truth in tru_map.
-	void LoadWithGroundTruth(const string& path, proto::TruthedMap& tru_map);
+	// Load a map with ground truth. Store the ground truth in gt_map.
+	void LoadWithGroundTruth(const string& path, proto::TruthedMap& gt_map);
 	// Deprecated: use Load(xml_file) instead
 	void LoadXml(const string& path);
 

@@ -24,9 +24,16 @@ FloorPlanRenderer::FloorPlanRenderer() {
 void FloorPlanRenderer::RenderInternal(const proto::FloorPlan& fp,
                                        const Matrix<3,4>& cam,
                                        const Vec2I& viewport) {
-	int nv = fp.vertices_size();
+	// Configure the renderer
 	renderer_.Configure(cam, viewport);
-	renderer_.Clear(2);  // initialize with the vertical label
+	renderer_.Clear(-1);  // no pixels should still be at -1 after rendering
+
+	// Render the floor and ceiling planes. Do _not_ do this by using
+	// Clear() because then the depth map will be incomplete.
+	renderer_.RenderInfinitePlane(fp.zfloor(), kVerticalAxis);
+	renderer_.RenderInfinitePlane(fp.zceil(), kVerticalAxis);
+
+	int nv = fp.vertices_size();
 	for (int i = 0; i < nv; i++) {
 		Vec2 u = asToon(fp.vertices(i));
 		Vec2 v = asToon(fp.vertices((i+1)%nv));
@@ -44,7 +51,6 @@ void FloorPlanRenderer::RenderInternal(const proto::FloorPlan& fp,
 	}
 }
 
-// Render from a particular view
 void FloorPlanRenderer::Render(const proto::FloorPlan& floorplan,
                                const Matrix<3,4>& cam,
                                const Vec2I& viewport,
@@ -62,15 +68,14 @@ void FloorPlanRenderer::Render(const proto::FloorPlan& floorplan,
 				 canvas);
 }
 
-// Render orientations
 void FloorPlanRenderer::RenderOrients(const proto::FloorPlan& floorplan,
                                       const Matrix<3,4>& cam,
                                       const Vec2I& viewport,
                                       MatI& orients) {
 	RenderInternal(floorplan, cam, viewport);
-	orients = renderer_.framebuffer();
+	orients = renderer_.framebuffer();  // copying large matrix -- ouch
 }
-
+	
 void FloorPlanRenderer::RenderOrients(const proto::FloorPlan& floorplan,
                                       const PosedCamera& cam,
                                       MatI& orients) {
@@ -78,6 +83,14 @@ void FloorPlanRenderer::RenderOrients(const proto::FloorPlan& floorplan,
 								cam.Linearize(),
 								asToon(cam.image_size()),
 								orients);
+}
+
+void FloorPlanRenderer::RenderOrients(const proto::FloorPlan& floorplan,
+                                      const PosedCamera& cam,
+                                      MatI& orients,
+																			MatD& depthmap) {
+	RenderOrients(floorplan, cam, orients);
+	depthmap = renderer_.depthbuffer();  // copying large matrix -- ouch
 }
 
 }

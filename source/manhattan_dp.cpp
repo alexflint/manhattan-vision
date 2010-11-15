@@ -11,6 +11,7 @@
 #include "canvas.h"
 #include "bld_helpers.h"
 #include "geom_utils.h"
+#include "line_segment.h"
 
 #include "fill_polygon.tpp"
 #include "integral_col_image.tpp"
@@ -24,7 +25,6 @@
 namespace indoor_context {
 using namespace toon;
 
-lazyvar<int> gvMaxComplexity("ManhattanDP.MaxCorners");
 lazyvar<Vec2> gvGridSize("ManhattanDP.GridSize");
 lazyvar<float> gvLineJumpThreshold("ManhattanDP.LineJumpThreshold");
 
@@ -90,7 +90,7 @@ ostream& operator<<(ostream& s, const DPSolution& x) {
 
 
 ////////////////////////////////////////////////////////////////////////////////
-void DPCache::reset(const Vector<2,int>& grid_size, int max_corners) {
+void DPCache::reset(const Vector<2,int>& grid_size) {
 	// This ordering helps the OS to do locality-based caching
 	table.Resize(grid_size[0], grid_size[1], 2, 4);
 	// Resize is a no-op if the size is the same as last time, so do a clear()
@@ -126,22 +126,22 @@ DPGeometry::DPGeometry() : camera(NULL) {
 	grid_size = *gvGridSize;
 }
 
-DPGeometry::DPGeometry(const PosedCamera* camera, const Mat3& floorToCeil) {
-	grid_size = *gvGridSize;
-	Configure(camera, floorToCeil);
-}
-
-DPGeometry::DPGeometry(const PosedCamera* camera, double zfloor, double zceil) {
+DPGeometry::DPGeometry(const PosedCamera& camera, double zfloor, double zceil) {
 	grid_size = *gvGridSize;
 	Configure(camera, zfloor, zceil);
 }
 
-void DPGeometry::Configure(const PosedCamera* cam, double zfloor, double zceil) {
-	Configure(cam, GetManhattanHomology(*cam, zfloor, zceil));
+DPGeometry::DPGeometry(const PosedCamera& camera, const Mat3& floorToCeil) {
+	grid_size = *gvGridSize;
+	Configure(camera, floorToCeil);
 }
 
-void DPGeometry::Configure(const PosedCamera* cam, const Mat3& fToC) {
-	camera = cam;
+void DPGeometry::Configure(const PosedCamera& cam, double zfloor, double zceil) {
+	Configure(cam, GetManhattanHomology(cam, zfloor, zceil));
+}
+
+void DPGeometry::Configure(const PosedCamera& cam, const Mat3& fToC) {
+	camera = &cam;
 	floorToCeil = fToC;
 
 	// Compute the rectification homography
@@ -154,7 +154,7 @@ void DPGeometry::Configure(const PosedCamera* cam, const Mat3& fToC) {
 
 	// Locate the vanishing points in grid coordinates
 	for (int i = 0; i < 3; i++) {
-		vpt_cols[i] = ImageToGrid(cam->GetImageVpt(i))[0];
+		vpt_cols[i] = ImageToGrid(cam.GetImageVpt(i))[0];
 	}
 
 	// Calculate the horizon row
@@ -163,15 +163,15 @@ void DPGeometry::Configure(const PosedCamera* cam, const Mat3& fToC) {
 	// the image even though the vertical vanishing point is
 	// guaranteed to be at infinity. The horizon is, however,
 	// guaranteed to be horizontal in the image.
-	double y0 = ImageToGrid(cam->GetImageVpt(0))[1];
-	double y1 = ImageToGrid(cam->GetImageVpt(1))[1];
+	double y0 = ImageToGrid(cam.GetImageVpt(0))[1];
+	double y1 = ImageToGrid(cam.GetImageVpt(1))[1];
 	CHECK_EQ_TOL(y0, y1, 1e-6) << "The horizon is not horizontal in the image.";
 	horizon_row = roundi((y0 + y1)/2.0);
 
 	// Check that image is not flipped. This should be guaranteed by GetVerticalRectifier
 	Vec2 floor_pt = makeVector(0, horizon_row+1);
 	// Note that PosedCamera::GetImageHorizon always returns a line with positive half on the floor...
-	CHECK_GT(GridToImage(floor_pt) * cam->GetImageHorizon(), 0)
+	CHECK_GT(GridToImage(floor_pt) * cam.GetImageHorizon(), 0)
 		<< "The matrix returned by GetVerticalRectifier flips the image upside down!";
 }
 
@@ -185,9 +185,13 @@ Vec2 DPGeometry::ImageToGrid(const Vec3& x) const {
 
 Vec2 DPGeometry::Transfer(const Vec2& grid_pt) const {
 	const Mat3& m = grid_pt[1] < horizon_row ? grid_ceilToFloor : grid_floorToCeil;
-	return project(m * unproject(grid_pt));
+	return project(Transfer(unproject(grid_pt)));
 }
 
+Vec3 DPGeometry::Transfer(const Vec3& grid_pt) const {
+	const Mat3& m = grid_pt[1] < horizon_row ? grid_ceilToFloor : grid_floorToCeil;
+	return m * grid_pt;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 DPPayoffs::DPPayoffs()
@@ -216,11 +220,22 @@ void DPPayoffs::CopyTo(DPPayoffs& other) {
 	other.occl_penalty = occl_penalty;
 }
 
+void DPPayoffs::Add(double weight, const MatF& delta) {
+	CHECK_SAME_SIZE(delta, wall_scores[0]);
+	for (int i = 0; i < 2; i++) {
+		for (int y = 0; y < delta.Rows(); y++) {
+			const float* in = delta[y];
+			float* out = wall_scores[i][y];
+			for (int x = 0; x < delta.Cols(); x++) {
+				out[x] += weight*in[x];
+			}
+		}
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ManhattanDP::ManhattanDP() : geom(NULL) {
 	jump_thresh = *gvLineJumpThreshold;
-	max_corners = *gvMaxComplexity;
 }
 
 // This is mostly a copy of Compute() above. TODO: Factor out common elements of both.
@@ -240,7 +255,7 @@ void ManhattanDP::Compute(const DPPayoffs& the_payoffs,
 	// Reset the cache
 	cache_lookups = 0;
 	cache_hits = 0;
-	cache.reset(geom->grid_size, max_corners);
+	cache.reset(geom->grid_size);
 
 	// Begin the search
 	DPSolution best(-INFINITY);
@@ -259,43 +274,6 @@ void ManhattanDP::Compute(const DPPayoffs& the_payoffs,
 	solution = best;
 	ComputeBacktrack();	
 }
-
-	/*void ManhattanDP::ComputePayoffsOld(const DPObjective& objective,
-																		const DPGeometry& geometry) {
-	// Compute per orientation, per pixel affinities
-	for (int i = 0; i < 3; i++) {
-		// Allocate memory
-		grid_scores[i].Resize(geometry.grid_size[1], geometry.grid_size[0], 0);
-		CHECK_EQ(objective.pixel_scores[i].Rows(), geometry.camera->image_size().y);
-		CHECK_EQ(objective.pixel_scores[i].Cols(), geometry.camera->image_size().x);
-
-		// Transform the scores according to ImageToGrid(.)
-		for (int y = 0; y < geometry.camera->image_size().y; y++) {
-			const float* inrow = objective.pixel_scores[i][y];
-			for (int x = 0; x < geometry.camera->image_size().x; x++) {
-				Vec2I grid_pt = RoundVector(geometry.ImageToGrid(makeVector(x, y, 1.0)));
-				if (grid_pt[0] >= 0 && grid_pt[0] < geometry.grid_size[0] &&
-					grid_pt[1] >= 0 && grid_pt[1] < geometry.grid_size[1]) {
-					grid_scores[i][ grid_pt[1] ][ grid_pt[0] ] += inrow[x];
-				}
-			}
-		}
-
-		// Compute the integral-col image
-		integ_scores[i].Compute(grid_scores[i]);
-	}
-
-	// Compute the whole-column costs for each node
-	for (int i = 0; i < 2; i++) {
-		payoffs[i].Resize(geometry.grid_size[1], geometry.grid_size[0]);
-		for (int y = 0; y < geometry.grid_size[1]; y++) {
-			float* row = payoffs[i][y];
-			for (int x = 0; x < geometry.grid_size[0]; x++) {
-				row[x] = MarginalWallScore(y, x, i);
-			}
-		}
-	}
-	}*/
 
 void ManhattanDP::ComputeOppositeRows(const DPGeometry& geometry) {
 	opp_rows.Resize(geometry.grid_size[1], geometry.grid_size[0]);
@@ -442,8 +420,8 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 void ManhattanDP::ComputeBacktrack() {
 	full_backtrack.clear();
 	abbrev_backtrack.clear();
-	soln_walls.clear();
-	soln_grid_walls.clear();
+	soln_segments.clear();
+	soln_seg_orients.clear();
 	soln_orients.Resize(geom->camera->image_size().y,
 											geom->camera->image_size().x,
 											kVerticalAxis);
@@ -465,26 +443,17 @@ void ManhattanDP::ComputeBacktrack() {
 				soln_num_occlusions++;
 			}
 
-			Vec2 tl = makeVector(cur->col, cur->row);
-			Vec2 tr = makeVector(out->col, out->row);
-			Vec2 bl = makeVector(tl[0], opp_rows[ cur->row ][ cur->col ]);
-			Vec2 br = makeVector(tr[0], opp_rows[ out->row ][ out->col ]);
+			int orient = 1-cur->axis;
+			LineSeg seg(makeVector(cur->col, cur->row, 1.0),
+									makeVector(out->col, out->row, 1.0));
+			soln_segments.push_back(seg);
+			soln_seg_orients.push_back(orient);
 
-			soln_grid_walls.push_back(ManhattanWall(unproject(tl),
-																							unproject(tr),
-																							unproject(br),
-																							unproject(bl),
-																							out->axis));
-			soln_walls.push_back(ManhattanWall(geom->GridToImage(tl),
-																				 geom->GridToImage(tr),
-																				 geom->GridToImage(br),
-																				 geom->GridToImage(bl),
-																				 out->axis));
-
-			vector<Vec3> poly;
-			copy_all_into(soln_walls.back().poly.verts, poly);
-			int wall_orient = 1-out->axis;  // labels refer to normal direction rather than vpt index
-			FillPolygon(poly, soln_orients, wall_orient);
+			Vec3 verts[] = { geom->GridToImage(project(seg.start)),
+											 geom->GridToImage(project(seg.end)),
+											 geom->GridToImage(geom->Transfer(project(seg.end))),
+											 geom->GridToImage(geom->Transfer(project(seg.start))) };
+			FillPolygon(array_range(verts, 4), soln_orients, orient);
 
 			out = NULL;
 		} else if (cur->dir == DPState::DIR_OUT && out == NULL) {
@@ -513,6 +482,34 @@ void ManhattanDP::ComputeSolutionPath(MatI& grid) const {
 	}
 }
 
+const MatD& ManhattanDP::ComputeDepthMap(double zfloor, double zceil) {
+	CHECK(!soln_segments.empty()) << "ComputeDepthMap() was called before Compute()";
+
+	// Setup some geometry
+	Matrix<3,4> cam = geom->camera->Linearize();
+	Matrix<3,4> grid_cam = geom->imageToGrid * cam;
+
+	// The entire solution should be on one side of the horizon
+	double y0 = project(soln_segments[0].start)[1];
+	double plane_z = y0 < geom->horizon_row ? zceil : zfloor;
+	double opp_z =   y0 < geom->horizon_row ? zfloor : zceil;
+	Vec4 plane = makeVector(0, 0, 1, -plane_z);
+
+	// Push each polygon through the renderer
+	renderer.Configure(cam, asToon(geom->camera->image_size()));
+	renderer.RenderInfinitePlane(zfloor, kVerticalAxis);
+	renderer.RenderInfinitePlane(zceil, kVerticalAxis);
+	BOOST_FOREACH(const LineSeg& seg, soln_segments) {
+		Vec3 tl = IntersectRay(seg.start, grid_cam, plane);
+		Vec3 tr = IntersectRay(seg.end, grid_cam, plane);
+		Vec3 bl = makeVector(tl[0], tl[1], opp_z);
+		Vec3 br = makeVector(tr[0], tr[1], opp_z);
+		renderer.Render(tl, br, tr, 0);  // we're only going to use the depth buffer
+		renderer.Render(tl, br, bl, 0);
+	}
+	return renderer.depthbuffer();
+}
+
 bool ManhattanDP::OcclusionValid(int col, int left_axis, int right_axis, int occl_side) {
 	int occl_axis = occl_side < 0 ? left_axis : right_axis;
 	int occl_vpt_col = geom->vpt_cols[occl_axis];
@@ -532,8 +529,6 @@ bool ManhattanDP::OcclusionValid(int col, int left_axis, int right_axis, int occ
 	return occl_vpt_behind == opp_vpt_between;
 }
 
-// Determine whether occlusion constrains prevent us from moving
-// between two states in the DP
 bool ManhattanDP::CanMoveVert(const DPState& cur, const DPState& next) {
 	// is the occluding stripe to the left or right?
 	bool on_ceil = cur.row < geom->horizon_row;
@@ -544,23 +539,28 @@ bool ManhattanDP::CanMoveVert(const DPState& cur, const DPState& next) {
 	return OcclusionValid(cur.col, next.axis, cur.axis, occl_side);
 }
 
-
-void ManhattanDP::DrawWalls(ImageRGB<byte>& canvas,
-                            const vector<ManhattanWall>& walls) const {
-	BOOST_FOREACH(const ManhattanWall& wall, walls) {
-		for (int i = 0; i < 4; i++) {
-			DrawLineClipped(canvas, wall.poly.edge(i), Colors::red());
-		}
+void ManhattanDP::DrawWireframeGridSolution(ImageRGB<byte>& canvas) const {
+	CHECK(!soln_segments.empty());
+	BOOST_FOREACH(const LineSeg& seg, soln_segments) {
+		LineSeg opp(geom->Transfer(seg.start), geom->Transfer(seg.end));
+		DrawLineClipped(canvas, seg, Colors::red());
+		DrawLineClipped(canvas, opp, Colors::red());
+		DrawLineClipped(canvas, project(seg.start), project(opp.start), Colors::red());
+		DrawLineClipped(canvas, project(seg.end), project(opp.end), Colors::red());
 	}
 }
 
-
-void ManhattanDP::DrawSolution(ImageRGB<byte>& canvas) const {
-	DrawWalls(canvas, soln_walls);
-}
-
-void ManhattanDP::DrawGridSolution(ImageRGB<byte>& canvas) const {
-	DrawWalls(canvas, soln_grid_walls);
+void ManhattanDP::DrawWireframeSolution(ImageRGB<byte>& canvas) const {
+	CHECK(!soln_segments.empty());
+	BOOST_FOREACH(const LineSeg& grid_seg, soln_segments) {
+		LineSeg seg(geom->GridToImage(project(grid_seg.start)),
+								geom->GridToImage(project(grid_seg.end)));
+		LineSeg opp(geom->Transfer(seg.start), geom->Transfer(seg.end));
+		DrawLineClipped(canvas, seg, Colors::red());
+		DrawLineClipped(canvas, opp, Colors::red());
+		DrawLineClipped(canvas, project(seg.start), project(opp.start), Colors::red());
+		DrawLineClipped(canvas, project(seg.end), project(opp.end), Colors::red());
+	}
 }
 
 
@@ -656,18 +656,10 @@ void ManhattanDPReconstructor::Compute(const PosedImage& image,
 																			 const Mat3& floorToCeil,
 																			 const DPObjective& objective) {
 	input = &image;
-	geometry.Configure(&image.pc(), floorToCeil);
+	geometry.Configure(image.pc(), floorToCeil);
 	payoff_gen.Compute(objective, geometry);
 	Compute(image, geometry, payoff_gen.payoffs);
 }
-
-	/*void ManhattanDPReconstructor::ComputeOld(const PosedImage& image,
-																					const Mat3& floorToCeil,
-																					const DPObjective& objective) {
-	input = &image;
-	geometry.Configure(&image.pc(), floorToCeil);
-	TIMED("Complete DP") dp.ComputeOld(objective, geometry);
-	}*/
 
 void ManhattanDPReconstructor::Compute(const PosedImage& image,
 																			 const DPGeometry& geom,
@@ -699,14 +691,40 @@ double ManhattanDPReconstructor::GetAccuracy(const proto::FloorPlan& gt_floorpla
 	return GetAccuracy(gt_orients);
 }
 
-void ManhattanDPReconstructor::OutputOrigViz(const string& path) {
-	WriteImage(path, input->rgb);
+double ManhattanDPReconstructor::ReportAccuracy(const proto::FloorPlan& gt_floorplan) {
+	double acc = GetAccuracy(gt_floorplan);
+	DLOG << format("Accuracy: %25.0f%%") % (acc*100);
+	return acc;
 }
 
-void ManhattanDPReconstructor::OutputSolutionOrients(const string& path) {
-	// This version is now deprecated, use below
-	DLOG << "ManhattanDPReconstructor::OutputSolutionOrients deprecated: use OutputSolution";
-	OutputSolution(path);
+double ManhattanDPReconstructor::GetDepthError(const proto::FloorPlan& gt_floorplan) {
+	const MatD& soln_depth = dp.ComputeDepthMap(gt_floorplan.zfloor(), gt_floorplan.zceil());
+	MatI gt_orients;
+	MatD gt_depth;
+	GetTrueOrients(gt_floorplan, input->pc(), gt_orients, gt_depth);
+	CHECK_EQ(gt_depth.Rows(), soln_depth.Rows());
+	CHECK_EQ(gt_depth.Cols(), soln_depth.Cols());
+	double sum_err = 0;
+	for (int y = 0; y < gt_depth.Rows(); y++) {
+		const double* soln_row = soln_depth[y];
+		const double* gt_row = gt_depth[y];
+		for (int x = 0; x < gt_depth.Cols(); x++) {
+			double rel_err = abs(soln_row[x]-gt_row[x]) / gt_row[x];
+			CHECK_PRED1(isfinite, rel_err) << "true=" << gt_row[x] << ", est=" << soln_row[x];
+			sum_err += rel_err;
+		}
+	}
+	return sum_err / (gt_depth.Rows() * gt_depth.Cols());
+}
+
+double ManhattanDPReconstructor::ReportDepthError(const proto::FloorPlan& gt_floorplan) {
+	double acc = GetDepthError(gt_floorplan);
+	DLOG << format("Mean depth error: %25.3f%%") % (acc*100);
+	return acc;
+}
+
+void ManhattanDPReconstructor::OutputOrigViz(const string& path) {
+	WriteImage(path, input->rgb);
 }
 
 void ManhattanDPReconstructor::OutputSolution(const string& path) {
@@ -719,7 +737,7 @@ void ManhattanDPReconstructor::OutputSolution(const string& path) {
 void ManhattanDPReconstructor::OutputGridViz(const string& path) {
 	ImageRGB<byte> grid_canvas(geometry.grid_size[0], geometry.grid_size[1]);
 	grid_canvas.Clear(Colors::white());
-	dp.DrawGridSolution(grid_canvas);
+	dp.DrawWireframeGridSolution(grid_canvas);
 	WriteImage(path, grid_canvas);
 }
 

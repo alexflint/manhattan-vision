@@ -156,7 +156,7 @@ namespace indoor_context {
 		zceil = zc;
 
 		Mat3 fToC = GetManhattanHomology(frame.pc(), zfloor, zceil);
-		DPGeometry base_geom(&frame.pc(), fToC);
+		DPGeometry base_geom(frame.pc(), fToC);
 		joint_payoff_gen.Configure(base_geom, obj, zfloor, zceil);
 		aux_frames.clear();
 		aux_objectives.clear();
@@ -176,7 +176,7 @@ namespace indoor_context {
 		aux_frames.push_back(&frame);
 		aux_objectives.push_back(&obj);
 		Mat3 fToC = GetManhattanHomology(frame.pc(), zfloor, zceil);
-		DPGeometry geom(&frame.pc(), fToC);
+		DPGeometry geom(frame.pc(), fToC);
 		joint_payoff_gen.AddView(geom, obj);
 	}
 

@@ -177,10 +177,19 @@ void Map::Load(const string& path) {
 	DLOG << "Loaded " << pts.size() << " points and " << kfs.size() << " frames";
 }
 
-void Map::LoadWithGroundTruth(const string& path, proto::TruthedMap& tru_map) {
-	ReadProto(path, tru_map);
-	Load(tru_map.spec_file());
-	RotateToSceneFrame(SO3<>::exp(asToon(tru_map.ln_scene_from_slam())));
+void Map::LoadWithGroundTruth(const string& path, proto::TruthedMap& gt_map) {
+	ReadProto(path, gt_map);
+	Load(gt_map.spec_file());
+	RotateToSceneFrame(SO3<>::exp(asToon(gt_map.ln_scene_from_slam())));
+
+	double zfloor = gt_map.floorplan().zfloor();
+	double zceil = gt_map.floorplan().zceil();
+	Vec3 vup = kfs[0].pc->pose_inverse() * makeVector(0,1,0);
+	if (Sign(zceil-zfloor) == Sign(vup[2])) {
+		swap(zfloor, zceil);
+		gt_map.mutable_floorplan()->set_zfloor(zfloor);
+		gt_map.mutable_floorplan()->set_zceil(zceil);
+	}
 }
 
 void Map::LoadXml(const string& xml_file) {

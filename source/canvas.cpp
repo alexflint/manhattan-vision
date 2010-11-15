@@ -7,10 +7,10 @@
 #include <cairomm/surface.h>
 
 #include "common_types.h"
+#include "image_utils.h"
 
 #include "canvas.tpp"
 #include "polygon.tpp"
-//#include "numeric_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
@@ -41,6 +41,10 @@ void Canvas::LineTo(const Vec2& p) {
 
 void Canvas::LineTo(const Vec3& p) {
 	LineTo(project(p));
+}
+
+void Canvas::Stroke() {
+	c_->stroke();
 }
 
 void Canvas::Scale(const Vec2& s) {
@@ -144,16 +148,17 @@ void Canvas::StrokeLine(const LineSeg& seg, const PixelRGB<byte>& color) {
 }
 
 void Canvas::DrawImageRescaled(const MatF& image, double alpha) {
-	float scale = 255 / image.MaxValue();
-	ImageRGB<byte> canvas(image.Cols(), image.Rows());
+	float scale = 255.0 / image.MaxValue();
+	ImageRGB<byte> buffer(image.Cols(), image.Rows());
 	for (int y = 0; y < image.Rows(); y++) {
 		const float* in = image[y];
-		PixelRGB<byte>* out = canvas[y];
+		PixelRGB<byte>* out = buffer[y];
 		for (int x = 0; x < image.Cols(); x++) {
-			out->r = out->g = out->b = scale * in[x];
+			out[x].r = out[x].g = out[x].b = 255*pow(scale*in[x]/255.0, 2.0);
 		}
 	}
-	DrawImage(canvas);
+	ResetAlpha(buffer);
+	DrawImage(buffer);
 }	
 
 void Canvas::DrawImage(const ImageRGB<byte>& image, double alpha) {

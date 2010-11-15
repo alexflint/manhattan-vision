@@ -7,28 +7,13 @@
 #include "guided_line_detector.h"
 #include "line_sweeper.h"
 #include "map.pb.h"
+#include "simple_renderer.h"
 
 #include "table.tpp"
 #include "integral_col_image.tpp"
 #include "histogram.tpp"
 
 namespace indoor_context {
-
-////////////////////////////////////////////////////////////////////////////////
-// Represents a wall segment in an image
-struct ManhattanWall {
-	Polygon<4> poly;
-	int axis;
-	inline ManhattanWall() { }
-	inline ManhattanWall(const Vec3& tl,
-	                     const Vec3& tr,
-	                     const Vec3& br,
-	                     const Vec3& bl,
-	                     int a)
-	: poly(tl, tr, br, bl), axis(a) {
-	}
-};
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Represents a node in the DP graph.
@@ -74,7 +59,7 @@ class DPCache {
 public:
 	typedef DPSolution* iterator;
 	Table<4, DPSolution> table;
-	void reset(const Vec2I& grid_size, int max_corners);
+	void reset(const Vec2I& grid_size);
 	void clear();
 	iterator begin();
 	iterator end();
@@ -97,14 +82,18 @@ public:
 	// Initializes grid_size to the gvar value. Can be modified before Configure()
 	DPGeometry();
 	// Initialize and configure
-	DPGeometry(const PosedCamera* camera, const Mat3& floorToCeil);
+	DPGeometry(const PosedCamera& camera, const Mat3& floorToCeil);
 	// Initialize and configure
-	DPGeometry(const PosedCamera* camera, double zfloor, double zceil);
+	DPGeometry(const PosedCamera& camera, double zfloor, double zceil);
+
+	// Accessors
+	int nx() const { return grid_size[0]; }
+	int ny() const { return grid_size[1]; }
 
 	// Configure the various homographies and useful vanishing point info
-	void Configure(const PosedCamera* camera, const Mat3& floorToCeil);
+	void Configure(const PosedCamera& camera, const Mat3& floorToCeil);
 	// Configurethe various homographies and useful vanishing point info
-	void Configure(const PosedCamera* camera, double zfloor, double zceil);
+	void Configure(const PosedCamera& camera, double zfloor, double zceil);
 
 	// Convert between image and grid coordinates
 	Vec3 GridToImage(const Vec2& x) const;
@@ -112,6 +101,7 @@ public:
 
 	// Transfer a point between the floor and ceiling (is always self-inverting)
 	Vec2 Transfer(const Vec2& grid_pt) const;
+	Vec3 Transfer(const Vec3& grid_pt) const;
 };
 
 
@@ -128,6 +118,9 @@ public:
 	MatF pixel_scores[3];  // score associated with assigning each label to each pixel (image coords)
 
 	DPObjective() : wall_penalty(-1), occl_penalty(-1) { }
+	DPObjective(Vec2I size) {
+		Resize(size[0], size[1]);
+	}
 	DPObjective(int nx, int ny) {
 		Resize(nx, ny);
 	}
@@ -172,6 +165,8 @@ public:
 	void Resize(Vec2I size, float fill);
 	// Clone this object
 	void CopyTo(DPPayoffs& other);
+	// Add a payoff matrix to wall_scores[0] and wall_scores[1], multiplied by a constant.
+	void Add(double weight, const MatF& delta);
 private:
 	// Disallow copy constructor (use CopyTo explicitly instead)
 	DPPayoffs(const DPPayoffs& rhs);
@@ -188,7 +183,6 @@ public:
 	// modified programatically before Compute()
 	double jump_thresh;
 	int vert_axis;
-	int max_corners;
 
 	// The function to optimize
 	const DPPayoffs* payoffs;
@@ -204,11 +198,15 @@ public:
 	DPSolution solution;  // the solution node
 	vector<const DPState*> full_backtrack;  // series of nodes to the solution
 	vector<const DPState*> abbrev_backtrack;  // as above but omitting UP, DOWN, and some OUT nodes
-	vector<ManhattanWall> soln_walls; // series of quads representing the solution in image coords
-	vector<ManhattanWall> soln_grid_walls; // series of quads representing the solution in grid coords
+	vector<LineSeg> soln_segments;  // line segments represent either the top or the bottom of walls
+	vector<int> soln_seg_orients;  // orientations of the above line segments
+	//vector<ManhattanWall> soln_walls; // series of quads representing the solution in image coords
+	//vector<ManhattanWall> soln_grid_walls; // series of quads representing the solution in grid coords
+	//vector<pair<Polygon<4>, int> soln_walls;  // (Quad,Orientation) pairs comprising the solution in image coords
 	MatI soln_orients;  // orientation map as predicted by the optimal model
 	int soln_num_walls;  // number of walls in the solution (both normal and occluding)
 	int soln_num_occlusions;  // number of occlusions in the solution
+	SimpleRenderer renderer;  // used in ComputeSolutionDepth
 
 	// Performance statistics
 	double solve_time;
@@ -228,13 +226,13 @@ public:
 	void ComputeOppositeRows(const DPGeometry& geometry);
 	// Backtrack through the evaluation graph from the solution
 	void ComputeBacktrack();
-	// Get a mask representing the path taken through the payoff
-	// matrix. The matrix will be set to 0 or 1 to indicate the base of
-	// walls with orientation 0 or 1 respectively. The remaining
-	// elements will be set to -1. The result is such that
-	// this->solution.score equals the sum of all the elements in the
-	// payoff matrix for which m(p) is not zero.
+	// Get a mask representing the path taken through the payoff matrix,
+	// with values of 0 or 1 indicating the base of walls, and all other
+	// cells set to -1.
 	void ComputeSolutionPath(MatI& m) const;
+	// Compute depth map for the solution given floor and ceiling heights
+	// This returns a reference to an internal buffer.
+	const MatD& ComputeDepthMap(double zfloor, double zceil);
 
 	// The caching wrapper for the DP
 	const DPSolution& Solve(const DPState& state);
@@ -250,13 +248,10 @@ public:
 	// between two DP nodes.
 	bool CanMoveVert(const DPState& cur, const DPState& next);
 
-	// Draw a series of walls as a wireframe model
-	void DrawWalls(ImageRGB<byte>& canvas,
-	               const vector<ManhattanWall>& walls) const;
-	// Draw the best solution as a wireframe model
-	void DrawSolution(ImageRGB<byte>& canvas) const;
-	// Draw the best solution in grid coordinates as a wireframe model
-	void DrawGridSolution(ImageRGB<byte>& canvas) const;
+	// Draw wireframe walls in image coordinates
+	void DrawWireframeSolution(ImageRGB<byte>& canvas) const;
+	// Draw wireframe walls in grid coordinates
+	void DrawWireframeGridSolution(ImageRGB<byte>& canvas) const;
 };
 
 
@@ -308,10 +303,6 @@ public:
 	void Compute(const PosedImage& image,
 							 const Mat3& floorToCeil,
 							 const DPObjective& scores);
-	// As above but deprecated version (TODO: delete)
-	/*void ComputeOld(const PosedImage& image,
-									const Mat3& floorToCeil,
-									const DPObjective& scores);*/
 	// Compute the reconstruction for the given payoff function
 	void Compute(const PosedImage& image,
 							 const DPGeometry& geometry,
@@ -320,15 +311,21 @@ public:
 	// Report the solution as a sequence of DP nodes
 	void ReportBacktrack();
 
-	// Compute accuracy w.r.t. ground truth
+	// Compute classification accuracy w.r.t. ground truth
 	double GetAccuracy(const MatI& gt_orients);
-	// Compute accuracy w.r.t. the ground truth floorplan
+	// Compute classification accuracy w.r.t. the ground truth floorplan
 	double GetAccuracy(const proto::FloorPlan& gt_floorplan);
+	// Report and return classification accuracy.
+	double ReportAccuracy(const proto::FloorPlan& gt_floorplan);
+
+	// Compute mean relative-depth-error
+	double GetDepthError(const proto::FloorPlan& gt_floorplan);
+	// Report and return mean relative-depth-error
+	double ReportDepthError(const proto::FloorPlan& gt_floorplan);
+
 
 	// Draw the original image
 	void OutputOrigViz(const string& path);
-	// DEPRECATED: just calls OutputSolution()
-	void OutputSolutionOrients(const string& path);
 	// Output the solution as an image blended with the solultion orientations
 	void OutputSolution(const string& path);
 	// Draw the solution in grid coordinates

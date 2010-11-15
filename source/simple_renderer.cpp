@@ -14,11 +14,21 @@
 
 namespace indoor_context {
 
+static const double kExtent = 1e+3;  // extent of horizontal surfaces for RenderHorizSurface
+
 SimpleRenderer::SimpleRenderer() {
+}
+
+SimpleRenderer::SimpleRenderer(const PosedCamera& camera) {
+	Configure(camera);
 }
 
 SimpleRenderer::SimpleRenderer(const toon::Matrix<3,4>& camera, Vec2I viewport) {
 	Configure(camera, viewport);
+}
+
+void SimpleRenderer::Configure(const PosedCamera& camera) {
+	Configure(camera.Linearize(), asToon(camera.image_size()));
 }
 
 void SimpleRenderer::Configure(const toon::Matrix<3,4>& camera, Vec2I viewport) {
@@ -29,7 +39,11 @@ void SimpleRenderer::Configure(const toon::Matrix<3,4>& camera, Vec2I viewport) 
 	Clear(0);
 }
 
-bool SimpleRenderer::Render(Vec3 p, Vec3 q, Vec3 r, int label) {
+bool SimpleRenderer::Render(const Vec2& p, const Vec2& q, const Vec2& r, int label) {
+	return Render(unproject(p), unproject(q), unproject(r), label);
+}
+
+bool SimpleRenderer::Render(const Vec3& p, const Vec3& q, const Vec3& r, int label) {
 	// Do 3D clipping
 	Vec3 vs[] = {p,q,r};
 	vector<Vec3> clipped;
@@ -61,9 +75,8 @@ bool SimpleRenderer::Render(Vec3 p, Vec3 q, Vec3 r, int label) {
 		// Fill the row
 		double* depth_row = depthbuffer_[y0+i];
 		int* label_row = framebuffer_[y0+i];
-		//DREPORT(i, y0+i, scanlines[i].first, scanlines[i].second);
-		for (int x = scanlines[i].first; x < scanlines[i].second; x++) {
-			double depth = 1.0 / (depth_base + depth_coef*x);  // reciprocal is due to PlaneToDepthEqn
+		for (int x = scanlines[i].first; x <= scanlines[i].second; x++) {
+			double depth = 1.0 / (depth_base + depth_coef*x);  // see PlaneToDepthEqn in geom_utils.h
 			if (depth < depth_row[x]) {
 				depth_row[x] = depth;
 				label_row[x] = label;
@@ -73,6 +86,15 @@ bool SimpleRenderer::Render(Vec3 p, Vec3 q, Vec3 r, int label) {
 	}
 
 	return affected;
+}
+
+bool SimpleRenderer::RenderInfinitePlane(double z0, int label) {
+	Vec3 nw = makeVector(-kExtent, -kExtent, z0);
+	Vec3 ne = makeVector(kExtent, -kExtent, z0);
+	Vec3 se = makeVector(kExtent, kExtent, z0);
+	Vec3 sw = makeVector(-kExtent, kExtent, z0);
+	Render(nw, ne, se, label);
+	Render(nw, sw, se, label);
 }
 
 void SimpleRenderer::Clear(int bg) {

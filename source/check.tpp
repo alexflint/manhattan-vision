@@ -62,6 +62,10 @@
 // Any container compatible with Boost.Range can be used.
 #define CHECK_INDEX(i,range) CHECK_INTERVAL(i, 0, size(range));
 
+// Check that two objects are the same size. Uses matrix_size() from matrix_utils.tpp
+#define CHECK_SAME_SIZE(a,b)																									\
+	CHECK_EQ(matrix_size(a), matrix_size(b))
+
 
 namespace indoor_context {
 

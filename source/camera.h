@@ -132,6 +132,10 @@ public:
 	const CameraBase& camera() const { return *camera_; }
 	void SetCamera(const CameraBase* camera) { camera_ = camera; }
 
+	// Helpers to get size
+	int nx() const { return camera_->image_size().x; }
+	int ny() const { return camera_->image_size().y; }
+
 	// Get the image size
 	const ImageRef& image_size() const { return camera_->image_size(); }
 	// Get the image bounds (same info as image_size() but different format)
@@ -185,8 +189,6 @@ public:
 	Vec3 GetImageHorizon() const;
 
 private:
-	// disable copying
-	PosedCamera(const PosedCamera&);
 	// camera pose: (world->retina transformation, i.e. extrinsic camera parameters)
 	toon::SE3<> pose_;
 	// Inverse of above

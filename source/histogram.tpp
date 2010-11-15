@@ -5,10 +5,10 @@
 #include <boost/format.hpp>
 
 #include "common_types.h"
+
 #include "range_utils.tpp"
 #include "numeric_utils.tpp"
 #include "image_utils.tpp"
-#include "lazyvar.h"
 
 namespace indoor_context {
 
