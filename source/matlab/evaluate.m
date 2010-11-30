@@ -8,7 +8,6 @@ for i = 1:length(cases)
   acc(i) = get_accuracy(soln, cases(i).ground_truth);
 end
 
-disp('\n\n');
 for i = 1:length(cases)
   disp([ 'Frame ' num2str(cases(i).frame_id) ':      Accuracy=' num2str(acc(i)) '%' ]);
 end

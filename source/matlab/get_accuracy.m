@@ -26,6 +26,6 @@ a = [ 1 2 3 ; 4 5 6 ];
 b = [ 0 0 0 ; -1 -1 -1 ];
 c = [ 1 2 13 ; 14 15 6 ];
 
-assert(get_accuracy(a, a) == 100);
-assert(get_accuracy(a, b) == 0);
-assert(get_accuracy(a, c) == 50);
+check get_accuracy(a, a) == 100;
+check get_accuracy(a, b) == 0;
+check get_accuracy(a, c) == 50;

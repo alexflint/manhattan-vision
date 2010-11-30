@@ -1,17 +1,15 @@
 % load some real test data
-cases = dp_load_cases('lab_kitchen1', 56, 'gt');
+cases = dp_load_cases('lab_kitchen1', 56);
 c = cases(1);
 [ny nx nf] = size(c.pixel_features);
+[gny gnx ns] = size(c.wall_features);
+
+wvec = zeros(1, nf*3 + ns*2 + 2);
 
 % setup some mock weights
-weights = reshape(eye(3), 9, 1);
+%weights = make_weights(zeros(nf, 3), zeros(ns, 2), 0, -1);
+weights = unpack_weights(wvec, nf, ns);
 
 % create objective functions
-[orients, obj] = reconstruct(c, weights);
-
-write_orients(orients, 'out/mat_soln.png');
-imwrite(obj.scores(:,:,1), 'out/mat_scores0.png');
-imwrite(obj.scores(:,:,2), 'out/mat_scores1.png');
-imwrite(obj.scores(:,:,3), 'out/mat_scores2.png');
-
-acc = sum(sum(orients == c.ground_truth))
+[soln, obj] = reconstruct(c, weights);
+imshow(orientim(soln.orients));
