@@ -1,4 +1,3 @@
-
 #include "gaussian.h"
 
 #include <ext/algorithm>
@@ -7,8 +6,7 @@
 #include <functional>
 #include <iterator>
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/scoped_array.hpp>
+#include <boost/shared_array.hpp>
 
 #include <VNL/matrix.h>
 #include <VNL/vector.h>
@@ -22,6 +20,7 @@
 #include "numeric_utils.h"
 
 namespace indoor_context {
+using boost::shared_array;
 
 double Gaussian::Evaluate(const VecD& x) const {
 	return GaussianEvaluator(*this).Evaluate(x);

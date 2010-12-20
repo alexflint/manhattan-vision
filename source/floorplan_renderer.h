@@ -24,34 +24,22 @@ public:
 	SimpleRenderer& renderer() { return renderer_; }
 	const SimpleRenderer& renderer() const { return renderer_; }
 
-	// Render from a particular view
-	void Render(const proto::FloorPlan& floorplan,
-	            const toon::Matrix<3,4>& cam,
-	            const Vec2I& viewport,
-	            ImageRGB<byte>& canvas);
-	void Render(const proto::FloorPlan& floorplan,
-	            const PosedCamera& cam,
-	            ImageRGB<byte>& canvas);
-
 	// Render orientations
-	void RenderOrients(const proto::FloorPlan& floorplan,
-	                   const toon::Matrix<3,4>& cam,
-	                   const Vec2I& viewport,
-	                   MatI& orients);
-	void RenderOrients(const proto::FloorPlan& floorplan,
-	                   const PosedCamera& cam,
-										 MatI& orients);
-	void RenderOrients(const proto::FloorPlan& floorplan,
-	                   const PosedCamera& cam,
-										 MatI& orients,
-										 MatD& depthmap);
+	void Render(const proto::FloorPlan& floorplan,
+							const toon::Matrix<3,4>& cam,
+							const Vec2I& viewport);
+	void Render(const proto::FloorPlan& floorplan,
+							const PosedCamera& cam);
+
+	// Retrieve the results
+	const MatI& GetOrientations() { return renderer_.framebuffer(); }
+	const MatD& GetDepthMap() const { return renderer_.depthbuffer(); }
+
+	// Visualizations
+	void DrawOrientations(ImageRGB<byte>& canvas);
+
 private:
 	SimpleRenderer renderer_;
-
-	// Send the floorplan to the renderer
-	void RenderInternal(const proto::FloorPlan& floorplan,
-	                    const toon::Matrix<3,4>& cam,
-	                    const Vec2I& viewport);
 };
 
 }  // namespace indoor_context

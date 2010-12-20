@@ -31,7 +31,7 @@ namespace indoor_context {
 
 	void MultiViewPayoffs::AddView(const DPGeometry& aux_geom,
 																 const DPObjective& obj) {
-		CHECK(!base_payoff_gen.empty) << "Configure() must be called before AddView()";
+		CHECK(!base_payoff_gen.Empty()) << "Configure() must be called before AddView()";
 
 		AuxiliaryView* view = new AuxiliaryView;
 		view->geom = aux_geom;
@@ -55,7 +55,7 @@ namespace indoor_context {
 	}
 
 	void MultiViewPayoffs::Compute() {
-		CHECK(!base_payoff_gen.empty) << "Configure() must be called before Compute()";
+		CHECK(!base_payoff_gen.Empty()) << "Configure() must be called before Compute()";
 
 		// Configure the payoff matrices
 		payoffs.Resize(base_geom.grid_size, 0);

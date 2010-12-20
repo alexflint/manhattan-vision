@@ -1,8 +1,11 @@
 #pragma once
 
 #include <GL/gl.h>
+
 #include <boost/function.hpp>
 #include <boost/static_assert.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/shared_array.hpp>
 
 #include <TooN/TooN.h>
 
@@ -26,6 +29,8 @@
 #define glError() indoor_context::glErrorInternal(__FILE__, __LINE__);
 
 namespace indoor_context {
+	using boost::shared_ptr;
+	using boost::shared_array;
 
 	// Report GL errors
 	void glErrorInternal(const char* file, int line);

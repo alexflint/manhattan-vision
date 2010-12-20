@@ -62,33 +62,33 @@ Mat3 CameraBase::Linearize() const {
 
 ///// Camera
 
-Camera::Camera() : atan_(new PTAMM::ATANCamera(*gvDefaultCamera)) {
+ATANCamera::ATANCamera() : atan_(new PTAMM::ATANCamera(*gvDefaultCamera)) {
 	SetImageSize(asIR(*gvImageSize));
 }
 
-Camera::Camera(const ImageRef& image_size)
+ATANCamera::ATANCamera(const ImageRef& image_size)
 : atan_(new PTAMM::ATANCamera(*gvDefaultCamera)) {
 	SetImageSize(image_size);
 }
 
-Camera::Camera(const ImageRef& image_size, const string& cam_name)
+ATANCamera::ATANCamera(const ImageRef& image_size, const string& cam_name)
 : atan_(new PTAMM::ATANCamera(cam_name)) {
 	SetImageSize(image_size);
 }
 
-Vec2 Camera::RetToIm(const Vec2& v) const {
+Vec2 ATANCamera::RetToIm(const Vec2& v) const {
 	return atan_->Project(v);
 }
 
-Vec3 Camera::RetToIm(const Vec3& v) const {
+Vec3 ATANCamera::RetToIm(const Vec3& v) const {
 	return unproject(RetToIm(project(v)));
 }
 
-Vec2 Camera::ImToRet(const Vec2& v) const {
+Vec2 ATANCamera::ImToRet(const Vec2& v) const {
 	return atan_->UnProject(v);
 }
 
-Vec3 Camera::ImToRet(const Vec3& v) const {
+Vec3 ATANCamera::ImToRet(const Vec3& v) const {
 	return unproject(ImToRet(project(v)));
 }
 

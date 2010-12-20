@@ -1,18 +1,21 @@
 #include <unistd.h>
 #include <algorithm>
 
+#include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/scoped_array.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/device/file.hpp>
 #include <boost/iostreams/concepts.hpp>
 #include <boost/iostreams/operations.hpp>
+#include <boost/iostreams/categories.hpp>
 
-#include "log.tpp"
 #include "common_types.h"
 
+#include "log.tpp"
+
 namespace indoor_context {
+using namespace boost;
 namespace ios=boost::iostreams;
 
 // Constants
@@ -24,6 +27,21 @@ struct SpecialLogTokens {
 	static const int kEndToken = -2;
 	static const int kNewline = '\n';
 };
+
+
+// Wrapper for sinks
+class SinkWrapper {
+public:
+	typedef char char_type;
+	typedef boost::iostreams::sink_tag category;
+	GenericCharSink* inner;
+	SinkWrapper(GenericCharSink* sink) : inner(sink) {
+	}
+	streamsize write(const char* s, streamsize n) {
+		return inner->write(s,n);
+	}
+};
+
 
 // Ends the current line whenever kNewline is
 // recieved, unless the line has already be ended.
@@ -117,23 +135,39 @@ LogManager::ScopedEnabler::~ScopedEnabler() {
 	LogManager::enabled = oldstate;
 }
 
-// This function is not a member of LogManager because we do not want to expose
-// boost::isotreams in log.tpp, since that would slow down compile time considerably.
+// The singleton log stream -- TODO: should this really be a global variable?
+scoped_ptr<ios::filtering_ostream> log_stream;
+
+// Set the sink for the log stream
+template <typename Sink>
+void SetLogSinkImpl(const Sink& sink) {
+	//static AutoNewlineFilter newline_filter;
+	//static IndentFilter indent_filter;
+	// TODO: only reset the stream on first creation, use filtering_ostream::pop() thereafter
+	log_stream.reset(new ios::filtering_ostream);
+	log_stream->push(AutoNewlineFilter()); // filtering_stream copies its argument so temp objs are fine
+	log_stream->push(IndentFilter()); // filtering_stream copies its argument so temp objs are fine
+	log_stream->push(sink); // filtering_stream copies its argument so it's fine to pass a reference
+}
+
+// This function is not exposed in log.tpp for efficient compilation
 ios::filtering_ostream& GetLogStreamImpl() {
-	static scoped_ptr<ios::filtering_ostream> stream;
-	static AutoNewlineFilter newline_filter;
-	static IndentFilter indent_filter;
-	if (stream.get() == NULL) {
-		stream.reset(new ios::filtering_ostream);
-		stream->push(newline_filter);
-		stream->push(indent_filter);
-		stream->push(ios::file_descriptor_sink(kLogFileNo, ios::never_close_handle));
+	//static AutoNewlineFilter newline_filter;
+	//static IndentFilter indent_filter;
+	if (log_stream.get() == NULL) {
+		SetLogSinkImpl(ios::file_descriptor_sink(kLogFileNo, ios::never_close_handle));
 	}
-	return *stream;
+	return *log_stream;
 }
 
 ostream& LogManager::GetLogStream() {
 	return GetLogStreamImpl();
+}
+
+void LogManager::SetLogSink(GenericCharSink* sink) {
+	static scoped_ptr<GenericCharSink> p;
+	p.reset(sink);
+	SetLogSinkImpl(SinkWrapper(sink));
 }
 
 bool LogManager::Flush() {

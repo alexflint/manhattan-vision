@@ -7,7 +7,7 @@ struct device_image {
 	int width;
 	int height;
 	int size; // = sizeof(float) * width * height
-	float *data;  // location in device memory!
+	float *data;  // *in device memory*
 };
 
 // Initialize the device

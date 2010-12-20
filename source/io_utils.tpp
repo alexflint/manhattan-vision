@@ -3,12 +3,16 @@
 #include <sstream>
 #include <iomanip>
 
+#include <boost/lexical_cast.hpp>
+
 #include "common_types.h"
 #include "safe_stream.h"
 
 #include "range_utils.tpp"
 
 namespace indoor_context {
+	using boost::lexical_cast;
+
 	// Convert an integer to a string of length W, padding on the left
 	// with '0' chars.
 	template <typename T>

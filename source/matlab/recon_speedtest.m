@@ -13,7 +13,9 @@ obj = make_objective(c.pixel_features, c.wall_features, weights);
 profile on
 tic;
 for i=1:20
+  if i==1, setenv('MEXCPUPROFILE', '/tmp/foo.prof'); end
   soln = dp_solve(c.frame, obj);
+  if i==1, setenv('MEXCPUPROFILE', ''); end
 end
 t=toc;
 disp(['Average dp_solve execution time: ' num2str(t/20)]);

@@ -7,12 +7,37 @@
 
 #include "image_utils.tpp"
 #include "range_utils.tpp"
-//#include "numeric_utils.tpp"
 #include "vector_utils.tpp"
 #include "polygon.tpp"
 
 namespace indoor_context {
 using namespace toon;
+
+void Upsample(const MatF& input, MatF& output, int k) {
+	CHECK_EQ(matrix_size(input)*k, matrix_size(output));
+	for (int r = 0; r < output.Rows(); r++) {
+		const float* inrow1 = input[r/k];
+		const float* inrow2 = (r >= output.Rows()-k) ? inrow1 : input[r/k+1];
+		float* outrow = output[r];
+		for (int c = 0; c < output.Cols()-k; c++) {
+			const int t = c%k;
+			const int u = r%k;
+			const float A = (k-t) * (k-u) * inrow1[c/k];
+			const float B = t * (k-u) * inrow1[c/k+1];
+			const float C = (k-t) * u * inrow2[c/k];
+			const float D = t * u * inrow2[c/k+1];
+			outrow[c] = (A+B+C+D) / (k*k);
+		}
+		// Deal with the last K columns seperately to avoid reading past
+		// the end of rows
+		for (int c = output.Cols()-k; c < output.Cols(); c++) {
+			const int u = r%k;
+			const float A = (k-u) * inrow1[c/k];
+			const float C = u * inrow2[c/k];
+			outrow[c] = (A+C) / k;
+		}
+	}
+}
 
 void DrawSegmentation(const MatI& seg, ImageRGB<byte>& output) {
 	BrightColors gen;

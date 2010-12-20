@@ -1,9 +1,12 @@
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include "common_types.h"
 #include "image_bundle.h"
 
 namespace indoor_context {
+using boost::shared_ptr;
 
 // Compute pixelwise gradient magnitude and orientation
 class Gradients {

@@ -9,11 +9,13 @@
 
 #include <string>
 #include <mex.h>
+
 #include "common_types.h"
 #include "matrix_traits.tpp"
 
 namespace indoor_context {
-	// Helper to initialize vars etc for MEX files
+	// Helper to initialize logging, exceptions, and gvars for MEX files
+	// This is called automatically from mex_stub.cpp
 	void InitMex();
 
 	// Get a field number by name, or exit if it doesn't exist.
@@ -57,57 +59,33 @@ namespace indoor_context {
 	// Copy a toon matrix to a matlab array
 	template <typename Matrix>
 	void MatrixToMatlabArray(const Matrix& m, mxArray* p) {
-		if (mxGetM(p) != m.num_rows()) {
-			mxSetM(p, m.num_rows());
+		int ny = matrix_height(m);
+		int nx = matrix_width(m);
+		if (mxGetM(p) != ny) {
+			mxSetM(p, ny);
 		}
-		if (mxGetN(p) != m.num_cols()) {
-			mxSetN(p, m.num_cols());
+		if (mxGetN(p) != nx) {
+			mxSetN(p, nx);
 		}
 		double* pd = mxGetPr(p);
 		CHECK(pd);
 		// matlab arrays are stored column-major
-		for (int x = 0; x < m.num_cols(); x++) {
-			for (int y = 0; y < m.num_rows(); y++) {
+		for (int x = 0; x < nx; x++) {
+			for (int y = 0; y < ny; y++) {
 				*pd++ = static_cast<double>(m[y][x]);
 			}
 		}
 	}
 
-	// Copy a VNL matrix to a matlab array
-	template <typename T>
-	void MatrixToMatlabArray(const VNL::Matrix<T>& m, mxArray* p) {
-		if (mxGetM(p) != m.Rows()) {
-			mxSetM(p, m.Rows());
-		}
-		if (mxGetN(p) != m.Cols()) {
-			mxSetN(p, m.Cols());
-		}
-		double* pd = mxGetPr(p);
-		CHECK(pd);
-		// matlab arrays are stored column-major
-		for (int x = 0; x < m.Cols(); x++) {
-			for (int y = 0; y < m.Rows(); y++) {
-				*pd++ = static_cast<double>(m[y][x]);
-			}
-		}
-	}
-
-	// Copy a toon matrix to a matlab array
+	// Copy a generic matrix to a matlab array
 	template <typename Matrix>
 	mxArray* NewMatlabArrayFromMatrix(const Matrix& m) {
-		mxArray* p = NewMatlabArray(m.num_rows(), m.num_cols());
+		mxArray* p = NewMatlabArray(matrix_height(m), matrix_width(m));
 		MatrixToMatlabArray(m, p);
 		return p;
 	}
 
-	// Copy a VNL matrix to a matlab array
-	template <typename T>
-	mxArray* NewMatlabArrayFromMatrix(const VNL::Matrix<T>& m) {
-		mxArray* p = NewMatlabArray(m.Rows(), m.Cols());
-		MatrixToMatlabArray(m, p);
-		return p;
-	}
-
+	// Copy a matlab array to a VNL matrix
 	template <typename T>
 	void MatlabArrayToMatrix(const mxArray* p, VNL::Matrix<T>& m) {
 		CHECK(mxIsNumeric(p));

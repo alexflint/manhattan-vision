@@ -44,7 +44,7 @@ struct DPSolution {
 	DPSolution();
 	DPSolution(double s);
 	DPSolution(double s, const DPState& state);
-	void ReplaceIfSuperior(const DPSolution& other,
+	bool ReplaceIfSuperior(const DPSolution& other,
 	                       const DPState& state,
 	                       double delta=0);
 };
@@ -61,8 +61,8 @@ public:
 	Table<4, DPSolution> table;
 	void reset(const Vec2I& grid_size);
 	void clear();
-	iterator begin();
-	iterator end();
+	inline iterator begin() { return table.begin(); }
+	inline iterator end() { return table.end(); }
 	iterator find(const DPState& state);
 	DPSolution& operator[](const DPState& state);
 };
@@ -99,9 +99,19 @@ public:
 	Vec3 GridToImage(const Vec2& x) const;
 	Vec2 ImageToGrid(const Vec3& x) const;
 
+	// Transform data from image to grid coordinates. Each element of
+	// OUT is a sum over pixels from IN that project there according to
+	// ImageToGrid(). No normalization is applied.
+	void TransformDataToGrid(const MatF& in, MatF& out) const;
+
 	// Transfer a point between the floor and ceiling (is always self-inverting)
 	Vec2 Transfer(const Vec2& grid_pt) const;
 	Vec3 Transfer(const Vec3& grid_pt) const;
+
+	// Get the top and bottom of the wall corresponding to a given grid point
+	void GetWallExtent(const Vec2& grid_pt, int axis, int& y0, int& y1) const;
+	// Transform a path to an orientation map in the grid domain
+	void PathToOrients(const VecI& path, const VecI& path_axes, MatI& grid_orients) const;
 };
 
 
@@ -125,6 +135,11 @@ public:
 		Resize(nx, ny);
 	}
 
+	// Get size
+	int nx() const { return pixel_scores[0].Cols(); }
+	int ny() const { return pixel_scores[0].Rows(); }
+
+	// Change size
 	void Resize(int nx, int ny) {
 		for (int i = 0; i < 3; i++) {
 			pixel_scores[i].Resize(ny, nx);
@@ -189,7 +204,7 @@ public:
 
 	// Various pieces of geometry
 	const DPGeometry* geom; // an input parameter
-	MatI opp_rows;  // cache of floor<->ceil mapping as passed through floorToCeil
+	//MatI opp_rows;  // cache of floor<->ceil mapping as passed through floorToCeil
 
 	// The cache of DP evaluations
 	DPCache cache;
@@ -222,17 +237,29 @@ public:
 	// building walls of each orientation at each pixel.
 	void Compute(const DPPayoffs& payoffs,
 							 const DPGeometry& geometry);
-	// Populate opp_rows according to fcmap
-	void ComputeOppositeRows(const DPGeometry& geometry);
 	// Backtrack through the evaluation graph from the solution
 	void ComputeBacktrack();
-	// Get a mask representing the path taken through the payoff matrix,
-	// with values of 0 or 1 indicating the base of walls, and all other
-	// cells set to -1.
+	// Get a mask in the grid domain representing the path taken through
+	// the payoff matrix, with values of 0 or 1 indicating the base of
+	// walls, and all other cells set to -1.
 	void ComputeSolutionPath(MatI& m) const;
+	void ComputeSolutionPathOld(MatI& grid) const;
+	// Get a mask as above, but represented a mapping from columns to
+	// the (unique) row at which the path crosses that colum, together
+	// with the orientation for each image column.
+	void ComputeSolutionPath(VecI& path_rows, VecI& path_orients) const;
 	// Compute depth map for the solution given floor and ceiling heights
 	// This returns a reference to an internal buffer.
 	const MatD& ComputeDepthMap(double zfloor, double zceil);
+
+	// Get the exact pixel-wise orientations for the current solution,
+	// in grid coordinates. Uses GetSolutionPath etc.
+	void ComputeGridOrients(MatI& grid_orients);
+	// Get the exact pixel-wise orientations, in image coordinates, for
+	// the current solution. This approach is slow because we project
+	// each pixel individually into grid coordates to determine its
+	// orientation.
+	void ComputeExactOrients(MatI& orients);
 
 	// The caching wrapper for the DP
 	const DPSolution& Solve(const DPState& state);
@@ -260,14 +287,13 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 class MonocularPayoffGen {
 public:
-	bool empty;
 	DPGeometry geom;
 	IntegralColImage<float> integ_scores[3];
 	double wall_penalty, occl_penalty;
 	DPPayoffs payoffs;  // payoffs are stored here when Compute() is called
 
 	// Initialize empty
-	MonocularPayoffGen() : empty(true) { }
+	MonocularPayoffGen() { }
 	// Initialize and compute
 	MonocularPayoffGen(const DPObjective& obj, const DPGeometry& geom);
 	// Transform a DPObjective to a DPPayoff, storing the result in
@@ -278,6 +304,8 @@ public:
 	// Compute the integral images in preparation for calls to GetPayoff
 	void Configure(const DPObjective& obj,
 								 const DPGeometry& geom);
+	// Return true iff not yet configured
+	bool Empty() const;
 	// Get payoff for building a wall at a point in grid coordinates.
 	// grid_pt can be outside the grid bounds, clamping will be applied appropriately
 	double GetWallScore(const Vec2& grid_pt, int orient) const;
@@ -323,15 +351,12 @@ public:
 	// Report and return mean relative-depth-error
 	double ReportDepthError(const proto::FloorPlan& gt_floorplan);
 
-
 	// Draw the original image
 	void OutputOrigViz(const string& path);
 	// Output the solution as an image blended with the solultion orientations
 	void OutputSolution(const string& path);
 	// Draw the solution in grid coordinates
 	void OutputGridViz(const string& path);
-	// Vizualize the opp_rows matrix
-	void OutputOppRowViz(const string& path);
 };
 
 }

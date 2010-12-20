@@ -6,6 +6,10 @@
 #include "line_segment.h"
 
 namespace indoor_context {
+
+// Upsample an image by a factor of k
+void Upsample(const MatF& input, MatF& output, int k);
+
 // Vizualize a segmentation by assigning a colour to each region
 void DrawSegmentation(const MatI& mat,
                       ImageRGB<byte>& output);

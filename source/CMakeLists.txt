@@ -113,6 +113,10 @@ SET( EXTERNAL_LIBRARIES
 	${TCMALLOC_LIBRARY}
 )
 
+IF(CMAKE_COMPILER_IS_GNUCC)
+  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -include ${CMAKE_SOURCE_DIR}/prefix.h")
+ENDIF(CMAKE_COMPILER_IS_GNUCC)
+
 # Generate protos
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS map.proto)
 
@@ -125,6 +129,9 @@ SET( CORE_HEADERS
 
 	${PROTO_HDRS}
 
+	log.tpp
+	check.tpp
+
 	canny.h
 	common_types.h
 	concurrent_queue.h
@@ -136,7 +143,6 @@ SET( CORE_HEADERS
 	hw_convolver.h
 	kmeans.h
 	lazyvar.h
-	log.h
 	counted_foreach.h 
 	progress_reporter.h 
 	timer.h 
@@ -157,12 +163,16 @@ SET( CORE_HEADERS
 	line_segment.h
 	
 	image_utils.h
+	numeric_utils.h
+	generic_char_sink.h
+
 	image_utils.tpp
 	io_utils.tpp
 	range_utils.tpp
 	numeric_utils.tpp
-	numeric_utils.h
 	vector_utils.tpp
+
+	matrix_traits.tpp
 
 	viewer3d.h
 	widget3d.h
@@ -202,6 +212,7 @@ SET( CORE_HEADERS
 	stereo_payoffs.h
 	line_sweep_features.h
 	landmark_payoffs.h
+	building_features.h
 )
 
 SET( CORE_SOURCES 
@@ -214,6 +225,9 @@ SET( CORE_SOURCES
 
 	netlib_sanity_test.cpp
 
+	log.cpp
+	check.cpp
+
 	canny.cpp
 	fast_sobel.cpp
 	fhsegmenter.cpp
@@ -221,7 +235,6 @@ SET( CORE_SOURCES
 	gaussian.cpp
 	hw_convolver.cpp
 	kmeans.cpp 
-	log.cpp
 	progress_reporter.cpp
 	union_find.cpp
 	vanishing_points.cpp
@@ -261,6 +274,7 @@ SET( CORE_SOURCES
 	stereo_payoffs.cpp
 	line_sweep_features.cpp
 	landmark_payoffs.cpp
+	building_features.cpp
 	
 	camera.cpp
 	glut_window.cpp
@@ -284,7 +298,10 @@ ADD_LIBRARY( core SHARED ${CORE_SOURCES} )
 # BUILD EXECUTABLES
 ###############################################################################
 SET( EXECUTABLES
+	test
 	map_viewer
+
+	table_speedtest
 
 	edit_floorplan
 	edit_map
@@ -328,6 +345,11 @@ SET( EXECUTABLES
 
 	inspect_geometry
 	test_gt_walls
+	tata_video
+
+	test_solution_path
+
+	joint_vpt_calib
 )
 
 FOREACH( EXECUTABLE ${EXECUTABLES} )
@@ -403,6 +425,7 @@ IF ( MATLAB_FOUND )
     # This library contains common matlab utilities
     SET( MATUTILS_SOURCES
 			matlab_utils.h        matlab_utils.cpp
+			matlab_sink.h         matlab_sink.cpp
 			matlab_structure.h    matlab_structure.cpp
 			dp_structures.h       dp_structures.cpp
 			)
@@ -418,6 +441,8 @@ IF ( MATLAB_FOUND )
 				mex_output_test
         dp_load_cases
         dp_solve
+				logtest
+				dp_check_features
     )
     
     # The list of common libraries that they get linked to

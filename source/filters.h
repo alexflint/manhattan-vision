@@ -3,22 +3,25 @@
 #include <cmath>
 #include <iostream>
 
+#include <boost/shared_ptr.hpp>
+
 #include "worker.h"
 #include "common_types.h"
 #include "hw_convolver.h"
 
 namespace indoor_context {
+using boost::shared_ptr;
 
 // Represents a filter that takes an input image and produces an
 // output image of the same size
 class Filter2D {
 public:
 	// Run the filter
-	virtual void Run(const ImageF& input, ImageF& output) = 0;
+	virtual void RunSequential(const MatF& input, MatF& output) = 0;
 
 	// Run on dedicated hardware
 	virtual void RunOnHardware(HwConvolver& convolver,
-	                           ImageF& output) {
+	                           MatF& output) {
 		cerr << "Error: RunOnHardware not implemented for this filter type\n";
 	}
 };
@@ -32,8 +35,8 @@ private:
 public:
 	LinearFilter(int xrad, int yrad) : mask(xrad*2+1, yrad*2+1) { }
 	LinearFilter(const MatD& mat) : mask(mat) { }
-	virtual void Run(const ImageF& input, ImageF& output);
-	int RunAt(const ImageF& input, int r, int c) const;
+	virtual void RunSequential(const MatF& input, MatF& output);
+	int RunAt(const MatF& input, int r, int c) const;
 
 	template<typename Func>
 	static LinearFilter* MakeFromFunc(int xrad, int yrad, Func f) {
@@ -53,7 +56,7 @@ public:
 class SeperatedFilter;
 class SeperatedFilter : public Filter2D {
 private:
-	scoped_ptr<ImageF> temp;  // used for storing intermediate results
+	scoped_ptr<MatF> temp;  // used for storing intermediate results
 public:
 	VecD xmask;
 	VecD ymask;
@@ -66,8 +69,8 @@ public:
 	SeperatedFilter(const VecD& xs, const VecD& ys)
 	: xmask(xs),
 	  ymask(ys) { }
-	virtual void Run(const ImageF& input, ImageF& output);
-	virtual void RunOnHardware(HwConvolver& convolver, ImageF& output);
+	virtual void RunSequential(const MatF& input, MatF& output);
+	virtual void RunOnHardware(HwConvolver& convolver, MatF& output);
 
 	template<typename XFunc, typename YFunc>
 	static SeperatedFilter* MakeFromFuncs(int xrad, int yrad, XFunc xf, YFunc yf) {
@@ -88,16 +91,16 @@ class DiffFilter : public Filter2D {
 private:
 public:
 	scoped_ptr<SeperatedFilter> filter1, filter2;
-	scoped_ptr<ImageF> temp;
+	scoped_ptr<MatF> temp;
 
 	// Note that this constructor takes ownership of the two filters
 	DiffFilter(SeperatedFilter* a, SeperatedFilter* b) :
 		filter1(a),
 		filter2(b) { }
-	virtual void Run(const ImageF& input, ImageF& output);
+	virtual void RunSequential(const MatF& input, MatF& output);
 
-	virtual void RunOnHardware(HwConvolver& convolver, ImageF& output);
-	static void Subtract(ImageF& x, const ImageF& y);
+	virtual void RunOnHardware(HwConvolver& convolver, MatF& output);
+	static void Subtract(MatF& x, const MatF& y);
 	void ExpandBuffer(int min_width, int min_height);
 };
 
@@ -155,52 +158,55 @@ public:
 	// Get the number of output images to be produced
 	inline int size() const { return nscales * filters.size(); }
 	// Run the filter bank, storing output images in the supplied vector
-	void Run(const ImageF& input, vector<shared_ptr<ImageF> >* output) const;
+	void RunSequential(const MatF& input, vector<shared_ptr<MatF> >* output) const;
 	// Run the filter bank using multiple threads. Exactly the same
 	// result as above, but faster.
-	void RunParallel(const ImageF& input,
-	                 vector<shared_ptr<ImageF> >* output) const;
+	void RunParallel(const MatF& input,
+	                 vector<shared_ptr<MatF> >* output) const;
 
 	// Run the filter bank using multiple threads. Same result as above
 	// (except for perhaps some small differences due to different
 	// hardware).
-	void RunOnHardware(const ImageF& input,
-	                   vector<shared_ptr<ImageF> >* output) const;
+	void RunOnHardware(const MatF& input,
+	                   vector<shared_ptr<MatF> >* output) const;
 private:
 	void RunOneFilter(int filter,
-	                  const ImageF& input,
-	                  ImageF& output) const;
+	                  const MatF& input,
+	                  MatF& output) const;
 };
 
-class GaborFilterBank {
+class GaborFilters {
 public:
 	int num_scales;
 	int num_orients;
 	scoped_ptr<FilterBank> filterbank;
-	vector<shared_ptr<ImageF> > responses;
+	vector<shared_ptr<MatF> > responses;
 
 	// Initialize empty
-	GaborFilterBank();
+	GaborFilters();
 	// Initialize and configure the filter bank
-	GaborFilterBank(int scales, int orientations);
+	GaborFilters(int nscales, int norientations);
 	// Configure the filter bank to have the specified number of scales
 	// and orientations
-	void Configure(int scales, int orientations);
+	void Configure(int nscales, int norientations);
+	// Run the filter bank using the strategy specified in the
+	// "FilterStrategy" gvar.
+	void Run(const MatF& input);
 	// Run the filter bank, storing output images in the supplied vector
-	void Run(const ImageF& input);
+	void RunSequential(const MatF& input);
 	// Run the filter bank using multiple threads. Exactly the same
 	// result as above, but faster.
-	void RunParallel(const ImageF& input);
+	void RunParallel(const MatF& input);
 	// Run the filter bank using multiple threads. Same result as above
 	// (except for perhaps small differences arising from hardware
 	// differences)
-	void RunOnHardware(const ImageF& input);
+	void RunOnHardware(const MatF& input);
 };
 
 // Smooth an image with a gaussian kernel of radius sigma
 void SmoothGaussian(const float sigma,
-                    const ImageF& input,
-                    ImageF& output);
+                    const MatF& input,
+                    MatF& output);
 
 // Make a bank of gabor filters
 void MakeGaborFilters(int norients,

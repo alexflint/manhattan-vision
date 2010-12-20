@@ -25,7 +25,7 @@ HwConvolver::~HwConvolver() {
 void HwConvolver::Warmup() {
 #ifdef HAVE_CUDA
 	HwConvolver conv(100, 100);
-	ImageF image(100, 100);
+	MatF image(100, 100);
 	VecF kx(5), ky(5);
 	conv.LoadImage(image);
 	conv.Convolve(kx, ky, image);
@@ -42,9 +42,9 @@ void HwConvolver::EnsureInitialized() {
 #endif
 }
 
-void HwConvolver::LoadImage(const ImageF& image) {
+void HwConvolver::LoadImage(const MatF& image) {
 #ifdef HAVE_CUDA
-	cudaconv_LoadImage(reinterpret_cast<float*>(&image[0][0]), &input);
+	cudaconv_LoadImage(image[0], &input);
 #else
 	DLOG << "HwConvolver::LoadImage: CUDA support was not compiled" << endl;
 	exit(-1);
@@ -53,13 +53,13 @@ void HwConvolver::LoadImage(const ImageF& image) {
 
 void HwConvolver::Convolve(const VecF& kernelx,
 													 const VecF& kernely,
-													 ImageMono<float>& out_image) {
+													 MatF& out_image) {
 #ifdef HAVE_CUDA
 	float *kx, *ky;
 	int radius;
 	CheckKernels(kernelx, kernely, &kx, &ky, &radius);
 	cudaconv_Convolve(&input, radius, kx, ky, &temp, &output, false);
-	cudaconv_RetrieveImage(&output, reinterpret_cast<float*>(out_image[0]));
+	cudaconv_RetrieveImage(&output, out_image[0]);
 #else
 	DLOG << "HwConvolver::Convolve: CUDA support was not compiled" << endl;
 	exit(-1);
@@ -71,7 +71,7 @@ void HwConvolver::ConvolveDiff(const VecF& kernelx1,
 															 const VecF& kernely1,
 															 const VecF& kernelx2,
 															 const VecF& kernely2,
-															 ImageMono<float>& out_image) {
+															 MatF& out_image) {
 #ifdef HAVE_CUDA
 	float *kx1, *ky1, *kx2, *ky2;
 	int r1, r2;
@@ -80,7 +80,7 @@ void HwConvolver::ConvolveDiff(const VecF& kernelx1,
 
 	cudaconv_Convolve(&input, r1, kx1, ky1, &temp, &output, false);
 	cudaconv_Convolve(&input, r2, kx2, ky2, &temp, &output, true);
-	cudaconv_RetrieveImage(&output, reinterpret_cast<float*>(out_image[0]));
+	cudaconv_RetrieveImage(&output, out_image[0]);
 #else
 	DLOG << "HwConvolver::ConvolveDif: CUDA support was not compiled" << endl;
 	exit(-1);

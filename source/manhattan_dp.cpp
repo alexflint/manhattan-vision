@@ -21,6 +21,7 @@
 #include "range_utils.tpp"
 #include "vector_utils.tpp"
 #include "histogram.tpp"
+#include "matrix_traits.tpp"
 
 namespace indoor_context {
 using namespace toon;
@@ -58,6 +59,18 @@ size_t DPStateHasher::operator()(const DPState& dpstate) const {
 			sizeof(dpstate));
 }
 
+ostream& operator<<(ostream& s, const DPState& x) {
+	s << "{r=" << x.row << ",c=" << x.col<< ",axis=" << x.axis << ",dir=";
+	switch (x.dir) {
+	case DPState::DIR_IN: s << "DIR_IN"; break;
+	case DPState::DIR_OUT: s << "DIR_OUT"; break;
+	case DPState::DIR_UP: s << "DIR_UP"; break;
+	case DPState::DIR_DOWN: s << "DIR_DOWN"; break;
+	}
+	s << "}";
+	return s;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 DPSolution::DPSolution()
 : score(numeric_limits<double>::quiet_NaN()), src(DPState::none) { }
@@ -66,25 +79,19 @@ DPSolution::DPSolution(double s)
 DPSolution::DPSolution(double s, const DPState& state)
 : score(s), src(state) { }
 
-void DPSolution::ReplaceIfSuperior(const DPSolution& other,
+bool DPSolution::ReplaceIfSuperior(const DPSolution& other,
                                    const DPState& state,
                                    double delta) {
 	if (other.score+delta > score) {
 		score = other.score+delta;
 		src = state;
+		return true;
 	}
-}
-
-ostream& operator<<(ostream& s, const DPState& x) {
-	s << "{r=" << x.row
-		<< ",c=" << x.col
-		<< ",axis=" << x.axis
-		<< ",dir=" << (x.dir==DPState::DIR_IN?"DIR_IN":"DIR_OUT") << "}";
-	return s;
+	return false;
 }
 
 ostream& operator<<(ostream& s, const DPSolution& x) {
-	s << "<score=" << x.score << ",src=" << x.src << ">";
+	s << "<score=" << x.score << ", src=" << x.src << ">";
 	return s;
 }
 
@@ -92,7 +99,8 @@ ostream& operator<<(ostream& s, const DPSolution& x) {
 ////////////////////////////////////////////////////////////////////////////////
 void DPCache::reset(const Vector<2,int>& grid_size) {
 	// This ordering helps the OS to do locality-based caching
-	table.Resize(grid_size[0], grid_size[1], 2, 4);
+	// We have one more column in the table than in the grid
+	table.Resize(grid_size[0]+1, grid_size[1], 2, 4);
 	// Resize is a no-op if the size is the same as last time, so do a clear()
 	clear();
 }
@@ -101,21 +109,15 @@ void DPCache::clear() {
 	table.Fill(DPSolution());
 }
 
-DPCache::iterator DPCache::begin() {
-	return table.begin();
+DPCache::iterator DPCache::find(const DPState& x) {
+	// don't be tempted to cache the value of end() here as it will
+	// change from one iteration to the next.
+	iterator y = &(*this)[x];
+	return isnan(y->score) ? end() : y;
 }
 
-DPCache::iterator DPCache::end() {
-	return table.end();
-}
-
-inline DPCache::iterator DPCache::find(const DPState& x) {
-	DPSolution& y = (*this)[x];
-	return isnan(y.score) ? end() : &y;
-}
-
-inline DPSolution& DPCache::operator[](const DPState& x) {
-	// This ordering helps the OS to do locality-based caching
+DPSolution& DPCache::operator[](const DPState& x) {
+	// This particular ordering helps the OS to do locality-based caching
 	return table(x.col, x.row, x.axis, x.dir);
 }
 
@@ -145,7 +147,7 @@ void DPGeometry::Configure(const PosedCamera& cam, const Mat3& fToC) {
 	floorToCeil = fToC;
 
 	// Compute the rectification homography
-	imageToGrid = GetVerticalRectifier(*camera, Bounds2D<>::FromSize(grid_size));
+	imageToGrid = GetVerticalRectifier(*camera, Bounds2D<>::FromTightSize(grid_size));
 	gridToImage = LU<>(imageToGrid).get_inverse();
 
 	// Compute floor to ceiling mapping in grid coordinates
@@ -193,6 +195,58 @@ Vec3 DPGeometry::Transfer(const Vec3& grid_pt) const {
 	return m * grid_pt;
 }
 
+void DPGeometry::TransformDataToGrid(const MatF& in, MatF& out) const {
+	CHECK_EQ(matrix_size(in), asToon(camera->image_size()));
+	out.Resize(grid_size[1], grid_size[0], 0.0);
+
+	// Check that the four corners project within the grid bounds
+	CHECK_POS(ImageToGrid(makeVector(0, 0, 1)), out);
+	CHECK_POS(ImageToGrid(makeVector(0, in.Rows()-1, 1)), out);
+	CHECK_POS(ImageToGrid(makeVector(in.Cols()-1, 0, 1)), out);
+	CHECK_POS(ImageToGrid(makeVector(in.Cols()-1, in.Rows()-1, 1)), out);
+
+	// Do the transform
+	for (int y = 0; y < in.Rows(); y++) {
+		const float* inrow = in[y];
+		for (int x = 0; x < in.Cols(); x++) {
+			Vec2I grid_pt = RoundVector(ImageToGrid(makeVector(x, y, 1.0)));
+			out[ grid_pt[1] ][ grid_pt[0] ] += inrow[x];
+		}
+	}
+}
+
+void DPGeometry::GetWallExtent(const Vec2& grid_pt, int axis, int& y0, int& y1) const {
+	Vec2 opp_pt = Transfer(grid_pt);
+	int opp_y = Clamp<int>(opp_pt[1], 0, grid_size[1]-1);
+
+	// Rounding and clamping must come after Transfer()
+	int y = Clamp<int>(roundi(grid_pt[1]), 0, grid_size[1]-1);
+
+	// Swap if necessary
+	y0 = min(y, opp_y);
+	y1 = max(y, opp_y);
+}
+
+void DPGeometry::PathToOrients(const VecI& path_ys, const VecI& path_axes, MatI& grid_orients) const {
+	CHECK_EQ(path_ys.Size(), grid_size[0]);
+	CHECK_EQ(path_axes.Size(), grid_size[0]);
+	grid_orients.Resize(grid_size[1], grid_size[0]);
+	VecI y0s(grid_size[0]);
+	VecI y1s(grid_size[0]);
+	for (int x = 0; x < grid_size[0]; x++) {
+		CHECK_NE(path_ys[x], -1) << "This should have been caught in ComputeSolutionPath";
+		CHECK_NE(path_axes[x], -1) << "This should have been caught in ComputeSolutionPath";
+		GetWallExtent(makeVector(x, path_ys[x]), path_axes[x], y0s[x], y1s[x]);
+	}
+	for (int y = 0; y < grid_size[1]; y++) {
+		int* row = grid_orients[y];
+		for (int x = 0; x < grid_size[0]; x++) {
+			int orient = 1-path_axes[x];  // axes and orients are inverses of one another
+			row[x] = (y >= y0s[x] && y <= y1s[x]) ? orient : kVerticalAxis;
+		}
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 DPPayoffs::DPPayoffs()
 	: wall_penalty(*gvWallPenalty), occl_penalty(*gvOcclusionPenalty) {
@@ -238,19 +292,12 @@ ManhattanDP::ManhattanDP() : geom(NULL) {
 	jump_thresh = *gvLineJumpThreshold;
 }
 
-// This is mostly a copy of Compute() above. TODO: Factor out common elements of both.
-void ManhattanDP::Compute(const DPPayoffs& the_payoffs,
+void ManhattanDP::Compute(const DPPayoffs& po,
 													const DPGeometry& geometry) {
-	// TODO: store a reference to the_payoffs instead
-	payoffs = &the_payoffs;
+	geom = &geometry;
+	payoffs = &po;
 	CHECK_GE(payoffs->wall_penalty, 0);
 	CHECK_GE(payoffs->occl_penalty, 0);
-
-	geom = &geometry;
-
-	// Pre-cache the opposite rows
-	// TODO: compute instead using m*y+c in grid coordinates, see stereo_payoffs.cpp
-	ComputeOppositeRows(geometry);
 
 	// Reset the cache
 	cache_lookups = 0;
@@ -259,38 +306,31 @@ void ManhattanDP::Compute(const DPPayoffs& the_payoffs,
 
 	// Begin the search
 	DPSolution best(-INFINITY);
-	DPState init(-1, geom->grid_size[0]-1, -1, -1, DPState::DIR_OUT);
+	DPState init(-1, geom->grid_size[0]/*yes x-coord is _past_ the image bounds*/, -1, -1, DPState::DIR_OUT);
 	max_depth = cur_depth = 0;
+	bool feasible = false;
 	TIMED("Core DP")
 	for (init.axis = 0; init.axis <= 1; init.axis++) {
 		for (init.row = geom->horizon_row; init.row < geom->grid_size[1]; init.row++) {
 			// Need to account for the penalty for the first wall here since
 			// Solve_Impl() adds penalties on DIR_IN nodes.
-			best.ReplaceIfSuperior(Solve(init), init, -payoffs->wall_penalty);
+			if (best.ReplaceIfSuperior(Solve(init), init, -payoffs->wall_penalty)) {
+				feasible = true;
+			}
 		}
 	}
+
+	CHECK(feasible) << "No feasible solution found";
 
 	// Backtrack from the solution
 	solution = best;
 	ComputeBacktrack();	
 }
 
-void ManhattanDP::ComputeOppositeRows(const DPGeometry& geometry) {
-	opp_rows.Resize(geometry.grid_size[1], geometry.grid_size[0]);
-	for (int y = 0; y < geometry.grid_size[1]; y++) {
-		const Mat3& m = y < geometry.horizon_row ?
-			geometry.grid_ceilToFloor : geometry.grid_floorToCeil;
-		for (int x = 0; x < geometry.grid_size[0]; x++) {
-			Vec2 opp_grid_pos = project(m * makeVector(x,y,1.0));
-			opp_rows[y][x] = opp_grid_pos[1];
-		}
-	}
-}
-
 const DPSolution& ManhattanDP::Solve(const DPState& state) {
 	cache_lookups++;
-	max_depth = max(max_depth, cur_depth);
 	//CHECK_GE(state.row, geom->horizon_row);
+	//	DREPORT(state);
 
 	// unordered_map::insert actually does a lookup first and returns
 	// an existing element if there is one, or returns an iterator
@@ -298,6 +338,7 @@ const DPSolution& ManhattanDP::Solve(const DPState& state) {
 	DPCache::iterator it = cache.find(state);
 	if (it == cache.end()) {
 		cur_depth++;
+		max_depth = max(max_depth, cur_depth);
 		const DPSolution& soln = (cache[state] = Solve_Impl(state));  // single equals sign intended!
 		cur_depth--;
 		return soln;
@@ -309,11 +350,12 @@ const DPSolution& ManhattanDP::Solve(const DPState& state) {
 }
 
 DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
-	// This function is one of the few places where
-	// micro-optimizations make a real difference!
+	// This function is one of the few places where micro-optimizations
+	// make a real difference.
+
 	DPSolution best(-INFINITY);
 	if (state.col == 0) {
-		// base case 1
+		// base case
 		best.score = 0;
 
 	} else if (state.dir == DPState::DIR_IN) {
@@ -347,7 +389,7 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 		next_out.dir = DPState::DIR_OUT;
 		best.ReplaceIfSuperior(Solve(next_out), next_out);
 
-		// Try going up/down. Never cross the horizon
+		// Try going up/down. Never cross the horizon or the image bounds.
 		int next_row = state.row + (state.dir == DPState::DIR_UP ? -1 : 1);
 		if (next_row != geom->horizon_row && next_row >= 0 && next_row < geom->grid_size[1]) {
 			DPState next = state;
@@ -358,6 +400,10 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 	} else if (state.dir == DPState::DIR_OUT) {
 		DPState next = state;
 		next.dir = DPState::DIR_IN;
+
+		// TODO: we could just restrict the minimum length of a wall to N
+		// pixels. If the line-jump threshold is satisfied for N then we
+		// avoid a loop altogether.
 
 		double delta_score = 0.0;
 		int vpt_col = geom->vpt_cols[state.axis];
@@ -433,6 +479,7 @@ void ManhattanDP::ComputeBacktrack() {
 	const DPState* out = NULL;
 	do {
 		const DPState& next = cache[*cur].src;
+		CHECK(cache.find(*cur) != cache.end()) << "a state in the backtrack has no cached solution";
 
 		full_backtrack.push_back(cur);
 		if (cur->dir == DPState::DIR_IN && out != NULL) {
@@ -465,11 +512,12 @@ void ManhattanDP::ComputeBacktrack() {
 	} while (*cur != DPState::none);
 }
 
-void ManhattanDP::ComputeSolutionPath(MatI& grid) const {
+void ManhattanDP::ComputeSolutionPathOld(MatI& grid) const {
 	grid.Resize(geom->grid_size[1], geom->grid_size[0], -1);
 	for (int i = 0; i < full_backtrack.size()-1; i++) {
 		const DPState& state = *full_backtrack[i];
 		const DPState& next = *full_backtrack[i+1];
+		CHECK(state.col <= geom->grid_size[0]);  // state.col==geom->grid_size[0] is permitted
 		if (state.dir == DPState::DIR_OUT) {
 			int vpt_col = geom->vpt_cols[state.axis];
 			double m = (state.row-geom->horizon_row)/static_cast<double>(state.col-vpt_col);
@@ -478,6 +526,65 @@ void ManhattanDP::ComputeSolutionPath(MatI& grid) const {
 				int y = roundi(m*x + c);
 				grid[y][x] = state.axis;
 			}
+		}
+	}
+}
+
+void ManhattanDP::ComputeSolutionPath(MatI& grid) const {
+	VecI path_ys, path_axes;
+	ComputeSolutionPath(path_ys, path_axes);
+	grid.Resize(geom->grid_size[1], geom->grid_size[0], -1);
+	for (int x = 0; x < grid.Cols(); x++) {
+		CHECK_NE(path_ys[x], -1);
+		CHECK_NE(path_axes[x], -1);
+		grid[ path_ys[x] ][x] = path_axes[x];
+	}
+}
+
+void ManhattanDP::ComputeSolutionPath(VecI& path_ys, VecI& path_axes) const {
+	path_ys.Resize(geom->grid_size[0], -1);
+	path_axes.Resize(geom->grid_size[0], -1);
+	for (int i = 0; i < full_backtrack.size()-1; i++) {
+		const DPState& state = *full_backtrack[i];
+		const DPState& next = *full_backtrack[i+1];
+		CHECK(state.col <= geom->grid_size[0]);  // state.col==geom->grid_size[0] is permitted
+		if (state.dir == DPState::DIR_OUT) {
+			int vpt_col = geom->vpt_cols[state.axis];
+			double m = (state.row-geom->horizon_row)/static_cast<double>(state.col-vpt_col);
+			double c = geom->horizon_row - m*vpt_col;
+			for (int x = state.col-1; x >= next.col; x--) {
+				path_ys[x] = roundi(m*x + c);
+				path_axes[x] = state.axis;
+			}
+		}
+	}
+
+	for (int x = 0; x < geom->grid_size[0]; x++) {
+		CHECK_NE(path_ys[x], -1) << "Solution misses column " << x;
+		CHECK_NE(path_axes[x], -1) << "Invalid orientation at column " << x;
+	}
+}
+
+void ManhattanDP::ComputeGridOrients(MatI& grid_orients) {
+	VecI path_ys, path_axes;
+	ComputeSolutionPath(path_ys, path_axes);
+	geom->PathToOrients(path_ys, path_axes, grid_orients);
+}
+
+void ManhattanDP::ComputeExactOrients(MatI& orients) {
+	MatI grid_orients;
+	ComputeGridOrients(grid_orients);
+
+	orients.Resize(geom->camera->image_size().y,
+								 geom->camera->image_size().x);
+	for (int y = 0; y < orients.Rows(); y++) {
+		int* row = orients[y];
+		for (int x = 0; x < orients.Cols(); x++) {
+			Vec2I grid_pt = RoundVector(geom->ImageToGrid(makeVector(x, y, 1.0)));
+			// each pixel *must* project inside the image bounds
+			CHECK_INTERVAL(grid_pt[0], 0, geom->grid_size[0]-1);
+			CHECK_INTERVAL(grid_pt[1], 0, geom->grid_size[1]-1);
+			row[x] = grid_orients[ grid_pt[1] ][ grid_pt[0] ];
 		}
 	}
 }
@@ -566,7 +673,6 @@ void ManhattanDP::DrawWireframeSolution(ImageRGB<byte>& canvas) const {
 
 
 
-
 MonocularPayoffGen::MonocularPayoffGen(const DPObjective& obj,
 																			 const DPGeometry& geom) {
 	Compute(obj, geom);
@@ -580,59 +686,53 @@ void MonocularPayoffGen::Compute(const DPObjective& obj,
 
 void MonocularPayoffGen::Configure(const DPObjective& obj,
 																	 const DPGeometry& geometry) {
-	empty = false;
 	geom = geometry;
 	wall_penalty = obj.wall_penalty;
 	occl_penalty = obj.occl_penalty;
 
-	// Compute per orientation, per pixel affinities
-	MatF grid_buffer;
-	for (int i = 0; i < 3; i++) {
-		// Allocate memory
-		grid_buffer.Resize(geom.grid_size[1], geom.grid_size[0], 0);
-		CHECK_EQ(obj.pixel_scores[i].Rows(), geom.camera->image_size().y);
-		CHECK_EQ(obj.pixel_scores[i].Cols(), geom.camera->image_size().x);
-
-		// Transform the scores according to ImageToGrid()
-		for (int y = 0; y < geom.camera->image_size().y; y++) {
-			const float* inrow = obj.pixel_scores[i][y];
-			for (int x = 0; x < geom.camera->image_size().x; x++) {
-				Vec2I grid_pt = RoundVector(geom.ImageToGrid(makeVector(x, y, 1.0)));
-				if (grid_pt[0] >= 0 && grid_pt[0] < geom.grid_size[0] &&
-						grid_pt[1] >= 0 && grid_pt[1] < geom.grid_size[1]) {
-					grid_buffer[ grid_pt[1] ][ grid_pt[0] ] += inrow[x];
-				}
-			}
-		}
-
-		// Compute the integral-col image
-		integ_scores[i].Compute(grid_buffer);
+	Vec2I obj_size = matrix_size(obj.pixel_scores[0]);
+	bool image_coords = (obj_size == asToon(geom.camera->image_size()));
+	if (!image_coords) {
+		CHECK_EQ(obj_size, geometry.grid_size)
+			<< "Objective must be same size as either image or grid";
 	}
+	
+	// Compute per orientation, per pixel affinities
+	MatF grid_buffer;  // don't give this a size yet
+	for (int i = 0; i < 3; i++) {
+		if (image_coords) {
+			// Transform the scores according to ImageToGrid()
+			geometry.TransformDataToGrid(obj.pixel_scores[i], grid_buffer);
+			integ_scores[i].Compute(grid_buffer);
+		} else {
+			integ_scores[i].Compute(obj.pixel_scores[i]);
+		}
+	}
+}
+
+bool MonocularPayoffGen::Empty() const {
+	return integ_scores[0].ny() == 0;
 }
 
 double MonocularPayoffGen::GetWallScore(const Vec2& grid_pt, int axis) const {
 	CHECK_GT(integ_scores[0].m_int.Rows(), 0) << "Configure() must be called before GetPayoff()";
 	CHECK_INTERVAL(grid_pt[0], 0, geom.grid_size[0]-1);
 
-	// Compute the row of the opposite face (floor <-> ceiling)
-	// TODO: go back to using opp_rows here
-	Vec2 opp_pt = geom.Transfer(grid_pt);
-	int opp_y = Clamp<int>(opp_pt[1], 0, geom.grid_size[1]-1);
-
-	// Rounding and clamping must come after Transfer()
 	int x = roundi(grid_pt[0]);
-	int y = Clamp<int>(roundi(grid_pt[1]), 0, geom.grid_size[1]-1);
-
-	// Compute the score for this segment
+	int y0, y1;
+	geom.GetWallExtent(grid_pt, axis, y0, y1);
 	int wall_orient = 1-axis;  // orients refer to normal direction rather than vpt index
-	int y0 = min(y, opp_y);
-	int y1 = max(y, opp_y);
+
 	return integ_scores[kVerticalAxis].Sum(x, 0, y0-1)
-		+ integ_scores[wall_orient].Sum(x, y0, y1-1)
-		+ integ_scores[kVerticalAxis].Sum(x, y1, geom.grid_size[1]-1);
+		+ integ_scores[wall_orient].Sum(x, y0, y1)
+		+ integ_scores[kVerticalAxis].Sum(x, y1+1, geom.grid_size[1]-1);
 }
 
 void MonocularPayoffGen::GetPayoffs(DPPayoffs& payoffs) const {
+	for (int i = 0; i < 3; i++) {
+		CHECK_EQ(matrix_size(integ_scores[i]), geom.grid_size+makeVector(0,1));
+	}
+
 	payoffs.Resize(geom.grid_size);
 	for (int i = 0; i < 2; i++) {
 		for (int y = 0; y < geom.grid_size[1]; y++) {
@@ -739,31 +839,6 @@ void ManhattanDPReconstructor::OutputGridViz(const string& path) {
 	grid_canvas.Clear(Colors::white());
 	dp.DrawWireframeGridSolution(grid_canvas);
 	WriteImage(path, grid_canvas);
-}
-
-void ManhattanDPReconstructor::OutputOppRowViz(const string& path) {
-	FileCanvas canvas(path, input->rgb);
-	for (int y = 5; y < input->ny(); y += 100) {
-		for (int x = 5; x < input->nx(); x += 100) {
-			Vec3 v = makeVector(x,y,1.0);
-			Vec2I grid = RoundVector(dp.geom->ImageToGrid(v));
-			int opp_row = dp.opp_rows[ grid[1] ][ grid[0] ];
-			Vec2 opp = project(dp.geom->GridToImage(makeVector(grid[0], opp_row)));
-
-			bool ceil = grid[1] < dp.geom->horizon_row;
-			PixelRGB<byte> color = ceil ? Colors::blue() : Colors::green();
-
-			canvas.DrawDot(project(v), 5, Colors::white());
-			canvas.DrawDot(project(v), 4, color);
-			canvas.DrawDot(opp, 2, color);
-			canvas.StrokeLine(project(v), opp, color);
-		}
-	}
-
-	// Draw the horizon line
-	Vec2 horizon_l = project(dp.geom->GridToImage(makeVector(0, dp.geom->horizon_row)));
-	Vec2 horizon_r = project(dp.geom->GridToImage(makeVector(input->nx(), dp.geom->horizon_row)));
-	canvas.StrokeLine(horizon_l, horizon_r, Colors::white());
 }
 
 }

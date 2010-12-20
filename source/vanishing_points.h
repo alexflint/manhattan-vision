@@ -87,7 +87,7 @@ public:
 
 	// Draw the line detections and vanishing points
 	void DrawVptViz(ImageRGB<byte>& canvas,
-	                const Camera& cam,
+	                const ATANCamera& cam,
 	                const ImageBundle& orig) const;
 };
 

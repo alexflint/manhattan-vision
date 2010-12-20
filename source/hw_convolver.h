@@ -23,11 +23,11 @@ public:
 	// running a dummy convolution.
 	static void Warmup();
 	// Load an image into device memory
-	void LoadImage(const ImageF& image);
+	void LoadImage(const MatF& image);
 	// Convolve an image in the device and retrieve the result.
 	void Convolve(const VecF& kernelx,
 								const VecF& kernely,
-								ImageF& output);
+								MatF& output);
 	// Take the different between two convolutions. Result is
 	// image*kernel1 - image*kernel2. Note that this _cannot_ be
 	// decomposed into image*(kernel1-kernel2)
@@ -35,7 +35,7 @@ public:
 										const VecF& kernely1,
 										const VecF& kernelx2,
 										const VecF& kernely2,
-										ImageF& output);
+										MatF& output);
 private:
 	static void CheckKernels(const VecF& kx, const VecF& ky,
 													 float** px, float** py, int* rad);

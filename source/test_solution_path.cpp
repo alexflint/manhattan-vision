@@ -15,11 +15,6 @@
 using namespace indoor_context;
 using namespace toon;
 
-// Pass the ground truth orientations as the initial orientations
-// Use this for testing the algorithm
-
-// To be moved elsewhere?
-
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
 	if (argc != 3) {
@@ -54,7 +49,7 @@ int main(int argc, char **argv) {
 
 		// Draw some vizualizations
 		format filepat("out/frame%02d_%s.png");
-		recon.OutputSolution(str(filepat % id % "soln"));
+		//recon.OutputSolution(str(filepat % id % "soln"));
 
 		// Compute accuracy
 		double accuracy = recon.GetAccuracy(gt_map.floorplan());
@@ -62,26 +57,70 @@ int main(int argc, char **argv) {
 		num_frames++;
 		DLOG << format("Accuracy: %.2f%%") % (accuracy*100);
 
+		// Get the exact orientations
+		MatI exact_orients;
+		TIMED("Compute exact orientations") recon.dp.ComputeExactOrients(exact_orients);
+
 		// Get the path
-		MatI path;
+		MatI old_path, path;
 		recon.dp.ComputeSolutionPath(path);
-		WriteMatrixImageRescaled(str(filepat % id % "path"), path);
-		double score = 0.0;
+		recon.dp.ComputeSolutionPathOld(old_path);
+
+		CHECK_SAME_SIZE(path, old_path);
+		for (int y = 0; y < path.Rows(); y++) {
+			for (int x = 0; x < path.Cols(); x++) {
+				if (path[y][x] != old_path[y][x]) {
+					DLOG << "path differs from old_path:\n"
+							 << "  path["<<y<<"]["<<x<<"] = " << path[y][x] << "\n"
+							 << "  old_path["<<y<<"]["<<x<<"] = " << old_path[y][x];
+				}
+			}
+		}
+
+		// Sum score over pixels
+		double pixel_score = 0.0;
+		for (int y = 0; y < exact_orients.Rows(); y++) {
+			const int* orientrow = exact_orients[y];
+			for (int x = 0; x < exact_orients.Cols(); x++) {
+				pixel_score += gen.objective.pixel_scores[ orientrow[x] ][y][x];
+			}
+		}
+		pixel_score -= recon.dp.soln_num_walls*recon.dp.payoffs->wall_penalty;
+		pixel_score -= recon.dp.soln_num_occlusions*recon.dp.payoffs->occl_penalty;
+		CHECK_EQ(pixel_score, recon.dp.solution.score);
+
+		// Sum score along path
+		recon.dp.ComputeSolutionPath(path);
+		double path_score = 0.0;
 		for (int y = 0; y < path.Rows(); y++) {
 			const int* prow = path[y];
 			for (int x = 0; x < path.Cols(); x++) {
 				if (prow[x] >= 0) {
-					score += recon.payoff_gen.payoffs.wall_scores[ prow[x] ][ y ][ x ];
+					path_score += recon.payoff_gen.payoffs.wall_scores[ prow[x] ][ y ][ x ];
 				}
 			}
 		}
-		DREPORT(score);
-		DREPORT(recon.dp.solution.score);
-		DREPORT(recon.dp.soln_num_walls);
-		DREPORT(recon.dp.soln_num_occlusions);
-		score -= recon.dp.soln_num_walls*recon.dp.payoffs->wall_penalty;
-		score -= recon.dp.soln_num_occlusions*recon.dp.payoffs->occl_penalty;
-		CHECK_EQ(score, recon.dp.solution.score);
+		path_score -= recon.dp.soln_num_walls*recon.dp.payoffs->wall_penalty;
+		path_score -= recon.dp.soln_num_occlusions*recon.dp.payoffs->occl_penalty;
+		CHECK_EQ(path_score, recon.dp.solution.score);
+
+		DREPORT(pixel_score, path_score, recon.dp.solution.score);
+
+		MatI grid_orients;
+		recon.dp.ComputeGridOrients(grid_orients);
+		WriteOrientationImage(str(filepat % id % "grid_orients"), grid_orients);
+
+		// Output exact versus approx orients
+		WriteOrientationImage(str(filepat % id % "exact_orients"), exact_orients);
+		WriteOrientationImage(str(filepat % id % "approx_orients"), recon.dp.soln_orients);
+
+		MatI diff(exact_orients.Rows(), exact_orients.Cols());
+		for (int y = 0; y < diff.Rows(); y++) {
+			for (int x = 0; x < diff.Cols(); x++) {
+				diff[y][x] = exact_orients[y][x] == recon.dp.soln_orients[y][x] ? 0 : 1;
+			}
+		}
+		WriteMatrixImageRescaled(str(filepat % id % "diff"), diff);
 
 		kf.UnloadImage();
 	}

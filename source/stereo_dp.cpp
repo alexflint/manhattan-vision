@@ -60,7 +60,7 @@ void MakeGradientImage(const PosedImage& orig,
 											 Gradients& container,
 											 PosedImage& out) {
 	out.pc().SetPose(orig.pc().pose());
-	out.pc().SetCamera(&orig.pc().camera());
+	out.pc().SetCamera(orig.pc().camera());
 	ImageCopy(orig.rgb, out.rgb);
 	container.Compute(orig);
 	MagToImage(container.magnitude_sqr, out.mono);

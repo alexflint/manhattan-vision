@@ -20,7 +20,7 @@ struct Edge {
 class FHSegmenter {
 public:
 	// The smoothed image, or empty if FHSegmenter.SmoothingSigma is 0
-	ImageF smoothed;
+	MatF smoothed;
 	// The final segmentation. Each pixel is labelled with its segment
 	// index (ranges from 0 to num_segments-1)
 	MatI segmentation;

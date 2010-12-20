@@ -16,10 +16,16 @@
 
 namespace indoor_context {
 
-// Get the size of a matrix
-template <int N, typename T>
-Vec2I dimensions(const toon::Matrix<N,2>& m) {
-	return makeVector(m.num_cols(), m.num_rows());
+// Distance computations for CHECK_EQ
+template <int N, typename T, typename U>
+double err(const toon::Vector<N,T>& a, const toon::Vector<N,T>& b) {
+	return norm_1(a-b);
+}
+
+// Distance computations for CHECK_EQ
+template <int M, int N, typename T, typename U>
+double err(const toon::Matrix<M,N,T>& a, const toon::Matrix<M,N,U>& b) {
+	return norm_1(a-b);
 }
 
 // defined in math_utils.cpp TODO: move these to .h
@@ -244,7 +250,11 @@ inline toon::Vector<N> GetAxis(const int i) {
 template <unsigned N>
 toon::Vector<N> RandomVector() {
 	double d = 1.0 / RAND_MAX;
-	return toon::makeVector(d*rand(), d*rand(), d*rand());
+	toon::Vector<N> v;
+	for (int i = 0; i < N; i++) {
+		v[i] = d*rand();
+	}
+	return v;
 }
 
 // Computes a bounding box for a sequence of vectors. It is assumed that the range

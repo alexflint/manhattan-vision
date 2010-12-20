@@ -40,6 +40,17 @@ namespace indoor_context {
 		const int& w = rawimage.nx();
 		const int& h = rawimage.ny();
 
+		// Convert to matrix
+		rawimage.BuildMono();
+		MatF m(rawimage.ny(), rawimage.nx());
+		for (int y = 0; y < rawimage.ny(); y++) {
+			const PixelF* in = rawimage.mono[y];
+			float* out = m[y];
+			for (int x = 0; x < rawimage.nx(); x++) {
+				out[x] = in[x].y;
+			}
+		}
+
 		// Lazily resize the containers
 		seg_counts.Resize(w*h);
 		seg_maxedge.Resize(w*h);
@@ -49,17 +60,17 @@ namespace indoor_context {
 
 		// Smooth if required
 		if (*gvSigma > 0) {
-			TIMED("Smoothing") SmoothGaussian(*gvSigma, rawimage.mono, smoothed);
+			TIMED("Smoothing") SmoothGaussian(*gvSigma, m, smoothed);
 		}
-		const ImageF& image = *gvSigma > 0 ? smoothed : rawimage.mono;
+		const MatF& image = *gvSigma > 0 ? smoothed : m;
 
 		// Join row neighbours closer than min_diff for efficiency
 		int count = 0;
 		TIMED("Horiz join") for (int r = 0; r < h; r++) {
-			const PixelF* row = image[r];
+			const float* row = image[r];
 			int* segrow = segmentation[r];
 			for (int c = 0; c < w; c++) {
-				if (c > 0 && fabsf(row[c].y - row[c-1].y) <= *gvMinDiff) {
+				if (c > 0 && fabsf(row[c] - row[c-1]) <= *gvMinDiff) {
 					segrow[c] = segrow[c-1];
 					seg_counts[segrow[c]]++;
 				} else {
@@ -72,8 +83,8 @@ namespace indoor_context {
 		// Extract edges
 		vector<Edge>::iterator e = edges.begin();
 		TIMED("Get edges") for (int r = 0; r < h-1; r++) {
-			const PixelF* row = image[r];
-			const PixelF* nextrow = image[r+1];
+			const float* row = image[r];
+			const float* nextrow = image[r+1];
 			const int* segrow = segmentation[r];
 			const int* nextsegrow = segmentation[r+1];
 			for (int c = 0; c < w-1; c++) {
@@ -81,12 +92,12 @@ namespace indoor_context {
 				if (segrow[c] != segrow[c+1]) {
 					e->src = segrow[c];
 					e->dest = segrow[c+1];
-					e->weight = fabsf(row[c].y - row[c+1].y);
+					e->weight = fabsf(row[c] - row[c+1]);
 					e++;
 				}
 				e->src = segrow[c];
 				e->dest = nextsegrow[c];
-				e->weight = fabsf(row[c].y - nextrow[c].y);
+				e->weight = fabsf(row[c] - nextrow[c]);
 				e++;
 			}
 		}

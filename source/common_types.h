@@ -31,10 +31,10 @@ namespace boost { namespace filesystem { } }
 namespace indoor_context {
 	using namespace std;
 	using boost::scoped_ptr;
-	using boost::shared_ptr;
 	using boost::scoped_array;
+	/*using boost::shared_ptr;
 	using boost::shared_array;
-	using boost::lexical_cast;
+	using boost::lexical_cast;*/
 	namespace fs=boost::filesystem;
 	namespace toon=TooN;
 

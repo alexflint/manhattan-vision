@@ -12,6 +12,7 @@
 
 #include "common_types.h"
 
+#include "matrix_traits.tpp"
 #include "polygon.tpp"
 
 namespace indoor_context {
@@ -112,23 +113,32 @@ void CopyImageInto(const ImageRGB<unsigned char>& image, int destr, int destc,
 // Downsample an image by a factor K
 template<typename Image>
 void Downsample(const Image& input, int k, Image& output) {
-	assert(output.GetWidth() == input.GetWidth()/k);
-	assert(output.GetHeight() == input.GetHeight()/k);
-	for (int r = 0; r < output.GetHeight(); r++) {
-		typename Image::PixelPtr in = input.GetRowStart(r * k);
-		typename Image::PixelPtr out = output.GetRowStart(r);
-		for (int c = 0; c < output.GetWidth(); c++) {
-			out[c] = in[c * k];
+	CHECK_EQ(matrix_size(output), matrix_size(input)/k);
+	for (int r = 0; r < matrix_height(output); r++) {
+		const typename matrix_traits<Image>::value_type* in = input[r*k];
+		typename matrix_traits<Image>::value_type* out = output[r];
+		for (int c = 0; c < matrix_width(output); c++) {
+			out[c] = in[c*k];
 		}
 	}
 }
 
-// Downsample an image by a factor K
-template<typename Image>
-Image* Downsample(const Image& input, int k) {
-	Image* output = new Image(input.GetWidth() / k, input.GetHeight() / k);
-	Downsample(input, k, *output);
-	return output;
+template<typename T>
+void ImageToMatrix(const ImageMono<T>& image, VNL::Matrix<T>& mat) {
+	mat.Resize(image.GetHeight(), image.GetWidth());
+	for (int y = 0; y < image.GetHeight(); y++) {
+		const PixelF* in = image[y];
+		float* out = mat[y];
+		for (int x = 0; x < image.GetWidth(); x++) {
+			out[x] = in[x].y;
+		}
+	}
+}
+
+template<typename T>
+void ImageToMatrix(const ImageBundle& image, VNL::Matrix<T>& mat) {
+	image.BuildMono();
+	ImageToMatrix(image.mono, mat);
 }
 
 template<typename T, typename S>

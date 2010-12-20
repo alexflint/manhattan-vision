@@ -22,6 +22,7 @@ namespace indoor_context {
 	using namespace toon;
 
 	const lazyvar<float> gvMinCompSize("LineDetector.MinCompSize");
+	const lazyvar<float> gvMinCompSizePixels("LineDetector.MinCompSizePixels");
 	const lazyvar<int> gvNumOrientBins("LineDetector.NumOrientBins");
 	const lazyvar<int> gvOrientTol("LineDetector.OrientTol");
 
@@ -42,26 +43,6 @@ namespace indoor_context {
 		DrawSpot(canvas, project(seg.start)+offs, color, thickness+1);
 		DrawSpot(canvas, project(seg.end)+offs, color, thickness+1);
 	}
-
-	/*
-	void LineDetection::DrawLine(ImageRGB<byte>& canvas,
-															 const PixelRGB<byte>& color,
-															 const toon::Vector<2> offs,
-															 int thickness) const {
-		if (thickness==1) {
-			indoor_context::DrawLine(canvas,
-															 project(seg.start)+offs,
-															 project(seg.end)+offs,
-															 color);
-		} else {
-			DrawThickLineClipped(canvas,
-													 project(seg.start)+offs,
-													 project(seg.end)+offs,
-													 color,
-													 thickness);
-		}
-		}*/
-
 
 
 	CannyLineDetector::CannyLineDetector() {
@@ -86,7 +67,7 @@ namespace indoor_context {
 		int nx = canny.edge_map.Cols();
 		int ny = canny.edge_map.Rows();
 		const int max_dim = max(nx, ny);
-		const int min_size = max(max_dim * *gvMinCompSize, 2);
+		const int min_size = max(max_dim * *gvMinCompSize, *gvMinCompSizePixels);
 
 		// Prepare buffers
 		detections.clear();
@@ -220,7 +201,7 @@ namespace indoor_context {
 					colors.push_back(BrightColors::Get(grouping[i]%256));
 				}
 			} else {
-				colors.push_back(RandomColor());
+				colors.push_back(BrightColors::Get(i));
 			}
 		}
 		// Draw the line segments

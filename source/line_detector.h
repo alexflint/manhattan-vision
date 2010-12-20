@@ -36,10 +36,6 @@ public:
 	                const PixelRGB<byte>& color,
 	                Vec2 offset=toon::Zeros,
 	                int thickness=1) const;
-	/*void DrawLine(ImageRGB<byte>& canvas,
-	              const PixelRGB<byte>& color,
-	              Vec2 offset=toon::Zeros,
-	              int thickness=1) const;*/
 };
 
 // Finds line segments using the algorithm of (Kosecka and Zhang, 2002)

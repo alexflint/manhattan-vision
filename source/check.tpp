@@ -8,6 +8,8 @@
 
 #include <exception>
 
+#include <boost/shared_ptr.hpp>
+
 #include "common_types.h"
 #include "log.tpp"
 
@@ -20,7 +22,7 @@
 		if (!(x))															\
 			if (DelayedError __delayed_error = -1)							\
 				__delayed_error <<											\
-					"Check failed: '" #x "'\n  at " __FILE__ ":" << __LINE__ <<endl
+					"Check failed: '" #x "'\n  at " __FILE__ ":" << __LINE__ << endl
 
 // Check that an arbitrary binary operation evaluates to true
 #define CHECK_BINOP(x,op,y)												\
@@ -38,7 +40,7 @@
 
 // Check that |x-y| < eps
 #define CHECK_EQ_TOL(x,y,eps) \
-		CHECK(abs((x)-(y))<=eps) << EXPR_STR(x) << EXPR_STR(y)
+	CHECK(err(x,y)<=eps) << EXPR_STR(x) << EXPR_STR(y)
 
 // Check that f(x) returns true. Will report the value of x on failure
 #define CHECK_PRED1(f,x)												\
@@ -63,11 +65,22 @@
 #define CHECK_INDEX(i,range) CHECK_INTERVAL(i, 0, size(range));
 
 // Check that two objects are the same size. Uses matrix_size() from matrix_utils.tpp
-#define CHECK_SAME_SIZE(a,b)																									\
+#define CHECK_SAME_SIZE(a,b)										\
 	CHECK_EQ(matrix_size(a), matrix_size(b))
 
+// Check that a 2D vector is within the bounds of a matrix
+#define CHECK_POS(pos, m)														\
+	CHECK(pos[0] >= 0 && pos[0] < matrix_width(m) &&	\
+				pos[1] >= 0 && pos[1] < matrix_height(m))		\
+	<< EXPR_STR(pos) << EXPR_STR(matrix_size(m))
 
 namespace indoor_context {
+
+// Distance computation for CHECK
+template <typename T, typename U>
+double err(const T& a, const U& b) {
+	return abs(a-b);
+}
 
 // The exception to throw when an assertion fails (and we're in kErrorModeThrow mode)
 class AssertionFailedException : public std::exception {
@@ -83,35 +96,21 @@ class AssertionManager {
 public:
 	// Error modes for assertion failures
 	enum ErrorModes {
-		kErrorModeCurrent = 0,  // Not an error mode: used to get the current error mode
+		kErrorModeCurrent = 0,  // Used to get the current error mode
 		kErrorModeThrow = 1,
 		kErrorModeExit = 2
 	};
 
 	// Get/set the current error mode
-	static int ErrorMode(ErrorModes mode=kErrorModeCurrent) {
-		static int cur_mode = kErrorModeExit;  // default to exiting on assertion failure
-		if (mode != kErrorModeCurrent) {
-			cur_mode = mode;
-		}
-		return cur_mode;
-	}
-
+	static int ErrorMode(ErrorModes mode=kErrorModeCurrent);
 	// CHECK* calls will throw exceptions on failure
-	static void SetExceptionMode() {
-		ErrorMode(kErrorModeThrow);
-	}
-
+	static void SetExceptionMode() { ErrorMode(kErrorModeThrow); }
 	// CHECK* calls will exit on failure
-	static void SetExitMode() {
-		ErrorMode(kErrorModeExit);
-	}
+	static void SetExitMode() { ErrorMode(kErrorModeExit); }
 
 	// Simple heuristic to guess whether a given string represents a
 	// literal C++ expression
-	static inline bool IsLiteral(const string& expr) {
-		return expr[0] == '"' || expr[0] == '\'' || expr[0] == '-' || isdigit(expr[0]);
-	}
+	static bool IsLiteral(const string& expr);
 
 	// Report a failed check
 	template <typename T>
@@ -132,26 +131,11 @@ public:
 // Represents an object that either exits or throws an exception on destruction
 class DelayedError {
 	int exitval;
-	shared_ptr<stringstream> ss;
+	boost::shared_ptr<stringstream> ss;
 public:
 	DelayedError(const int v) : exitval(v), ss(new stringstream) { }
-	virtual ~DelayedError() {
-		if (AssertionManager::ErrorMode() == AssertionManager::kErrorModeThrow) {
-			// It is bad practice (though perfectly legal C++) to throw exceptions
-			// from destructors. However, it's the only way to accomplish
-			// the syntax that looks like:
-			//     CHECK(foo) << "some extra information";
-			// DelayedError is never used except from CHECK() macros,
-			// guaranteeing that it will never be in a std::vector or similar
-			// situation in which it might cause memory leaks. Of course, CHECK(...)
-			// should never appear in another object's destructor.
-			throw AssertionFailedException(ss->str());
-		} else {
-			cerr << ss->str() << endl;
-			exit(-1);
-		}
-	}
-
+	// Throws an exception or calls exit(-1), depending on AssertionManager::ErrorMode().
+	virtual ~DelayedError();
 	// Allow this object to appear in an IF block
 	inline operator bool() const { return true; }
 

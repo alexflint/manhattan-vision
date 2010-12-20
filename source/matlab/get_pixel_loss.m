@@ -2,7 +2,6 @@ function delta = get_pixel_loss(model_a, model_b)
 
 if nargin==0
   test;
-  delta = [];
   return;
 end
 

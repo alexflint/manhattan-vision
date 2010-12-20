@@ -5,9 +5,7 @@
 #include <LU.h>
 
 #include "common_types.h"
-#include "guided_line_detector.h"
 #include "manhattan_dp.h"
-#include "vars.h"
 #include "map.pb.h"
 #include "map.h"
 #include "camera.h"
@@ -35,7 +33,8 @@ namespace indoor_context {
 	                    const PosedCamera& pc,
 	                    MatI& out_orients) {
 		FloorPlanRenderer re;
-		re.RenderOrients(floorplan, pc, out_orients);
+		re.Render(floorplan, pc);
+		out_orients = re.GetOrientations();
 	}
 
 	void GetTrueOrients(const proto::FloorPlan& floorplan,
@@ -43,7 +42,9 @@ namespace indoor_context {
 	                    MatI& out_orients,
 											MatD& out_depthmap) {
 		FloorPlanRenderer re;
-		re.RenderOrients(floorplan, pc, out_orients, out_depthmap);
+		re.Render(floorplan, pc);
+		out_orients = re.GetOrientations();
+		out_depthmap = re.GetDepthMap();
 	}
 
 	void GetGroundTruth(const proto::FloorPlan& fp,
@@ -51,8 +52,8 @@ namespace indoor_context {
 	                    MatI& orients,
 											int& nw,
 											int& no) {
-		GetTrueOrients(fp, pc, orients);
 		CountVisibleWalls(fp, pc, nw, no);
+		GetTrueOrients(fp, pc, orients);
 	}
 
 	void DownsampleOrients(const MatI& in, MatI& out, const Vec2I& res) {
@@ -220,9 +221,9 @@ namespace indoor_context {
 			Vec3 b_cam = ret_vrect * (pc.pose() * concat(verts[i+1], 0.0));
 			Vec3 a_flat = makeVector(a_cam[0], a_cam[2], 1.0);  // y coord no longer matters, and now homogeneous
 			Vec3 b_flat = makeVector(b_cam[0], b_cam[2], 1.0);  // y coord no longer matters, and now homogeneous
-			bool exists = ClipAgainstLine(a_flat, b_flat, focal_line, -1);
+			bool nonempty = ClipAgainstLine(a_flat, b_flat, focal_line, -1);
 			// this must come after clipping...
-			if (exists) {
+			if (nonempty) {
 				Vec2 a0 = project(a_flat);
 				Vec2 b0 = project(b_flat);
 				Interval iv(a0[0]/a0[1], b0[0]/b0[1]);
@@ -275,10 +276,10 @@ namespace indoor_context {
 
 		// Initialize
 		num_occlusions = 0;
-		num_walls = 1;  // walls are only counted once they begin inside
-		// the current view but there will always be
-		// exactly one wall that begins outside the image
-		// (i.e. the leftmost one)
+		num_walls = 1;  // walls are only counted if their leftmost edge
+		                // is inside the current view but there will
+		                // always be exactly one visible wall with
+		                // leftmost edge outside the image
 
 		// Walk from left to right
 		int prev = -1;

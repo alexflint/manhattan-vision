@@ -5,6 +5,7 @@ if isstruct(orients)
   orients = orients.orients;
 end
 
+% if bg is a string then treat it as a filename and read an image fromit
 if nargin>=2 && isstruct(bg)
   bg = imread(bg.image_file);
 end
@@ -17,5 +18,12 @@ canvas(:,:,3) = 255 * (orients == 2);
 
 % Blend with background image if one was provided
 if nargin>=2
-  canvas = uint8(0.5*canvas + 0.5*double(bg));
+  if mmax(bg) <= 1
+    % assume image is represented as [0,1]
+    bgscale = 0.5*255;
+  else
+    % assume image is represented as [0,255]
+    bgscale = 0.5;
+  end
+  canvas = uint8(0.5*canvas + bgscale*double(bg));
 end

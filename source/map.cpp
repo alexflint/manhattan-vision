@@ -65,7 +65,7 @@ void KeyFrame::RunGuidedLineDetector() {
 
 
 Map::Map() {
-	orig_camera.reset(new Camera);
+	orig_camera.reset(new ATANCamera);
 	if (*gvLinearizeCamera) {
 		// Use a fast approximation to the camera
 		Mat3 cam = orig_camera->Linearize();
@@ -101,7 +101,7 @@ void Map::Load(const string& path) {
 			bool lost = frame_elem->Attribute("lost") == "1";
 			f->initializing = norm_sq(lnPose) == 0;
 			f->lost = lost || f->initializing;
-			frame_specs.push_back(f);
+			frames.push_back(f);
 		}
 	}
 
@@ -250,7 +250,7 @@ void Map::Transform(const SE3<>& M) {
 	BOOST_FOREACH(KeyFrame& kf, kfs) {
 		kf.pc->Transform(M_inv);
 	}
-	BOOST_FOREACH(Frame& f, frame_specs) {
+	BOOST_FOREACH(Frame& f, frames) {
 		f.pc->Transform(M_inv);
 	}
 

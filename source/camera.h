@@ -1,5 +1,7 @@
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include <TooN/se3.h>
 
 #include "common_types.h"
@@ -11,6 +13,8 @@
 namespace indoor_context {
 // The vertical axis by convention is fixed as 2
 static const int kVerticalAxis = 2;
+
+using boost::shared_ptr;
 
 // Base class for cameras
 class CameraBase {
@@ -59,14 +63,13 @@ private:
 
 // Represents a projection from retina to image coordinates. Simply
 // wraps PTAMM::ATANCamera in a standard interface.  Emphatically NOT thread-safe!
-//TODO: rename this "ATANCamera"
-class Camera : public CameraBase {
+class ATANCamera : public CameraBase {
 public:
 	// Construct a camera for 0 by 0 images
-	Camera();
+	ATANCamera();
 	// Construct a camera for images of a specified size
-	Camera(const ImageRef& image_size);
-	Camera(const ImageRef& image_size, const string& cam_name);
+	ATANCamera(const ImageRef& image_size);
+	ATANCamera(const ImageRef& image_size, const string& cam_name);
 
 	// Transform retina -> image
 	Vec2 RetToIm(const Vec2& v) const;
@@ -133,15 +136,15 @@ public:
 	void SetCamera(const CameraBase* camera) { camera_ = camera; }
 
 	// Helpers to get size
-	int nx() const { return camera_->image_size().x; }
-	int ny() const { return camera_->image_size().y; }
+	int nx() const { return camera().image_size().x; }
+	int ny() const { return camera().image_size().y; }
 
 	// Get the image size
-	const ImageRef& image_size() const { return camera_->image_size(); }
+	const ImageRef& image_size() const { return camera().image_size(); }
 	// Get the image bounds (same info as image_size() but different format)
-	const Bounds2D<>& image_bounds() const { return camera_->image_bounds(); }
+	const Bounds2D<>& image_bounds() const { return camera().image_bounds(); }
 	// Get the bounds of the image in retina coordinates
-	const Bounds2D<>& retina_bounds() const { return camera_->retina_bounds(); }
+	const Bounds2D<>& retina_bounds() const { return camera().retina_bounds(); }
 	// Get the camera centre in world coordinates
 	const Vec3& world_centre() const { return invpose_.get_translation(); }
 
@@ -155,19 +158,19 @@ public:
 	}
 	// Transform homogeneous retina to image coordinates
 	Vec3 RetToIm(const Vec3& v) const {
-		return camera_->RetToIm(v);
+		return camera().RetToIm(v);
 	}
 	// Transform retina to image coordinates
 	Vec2 RetToIm(const Vec2& v) const {
-		return camera_->RetToIm(v);
+		return camera().RetToIm(v);
 	}
 	// Transform homogeneous image to retina coordinates
 	Vec3 ImToRet(const Vec3& v) const {
-		return camera_->ImToRet(v);
+		return camera().ImToRet(v);
 	}
 	// Transform image to retina coordinates
 	Vec2 ImToRet(const Vec2& v) const {
-		return camera_->ImToRet(v);
+		return camera().ImToRet(v);
 	}
 
 	// Transform the camera's pose by M. Note that this is equivalent to transforming

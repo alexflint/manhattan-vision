@@ -134,16 +134,16 @@ public:
 	int size() const { return n; }
 
 	// Iterator ranges
-	iterator begin() {
+	inline iterator begin() {
 		return data.get();
 	}
-	iterator end() {
+	inline iterator end() {
 		return data.get()+n;
 	}
-	const_iterator begin() const {
+	inline const_iterator begin() const {
 		return data.get();
 	}
-	const_iterator end() const {
+	inline const_iterator end() const {
 		return data.get()+n;
 	}
 private:

@@ -10,7 +10,7 @@
 #include "common_types.h"
 #include "clipping.h"
 
-#include "matrix_utils.tpp"
+#include "matrix_traits.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
@@ -42,20 +42,19 @@ int ComputeFillScanlines(const Range& poly,
 		if (norm(project(u)-project(v)) < 1e-9) {
 			ishoriz[i] = true;
 		} else {
-
-			toon::Vector<3> line = u ^ v;
+			Vec3 line = u ^ v;
 			ishoriz[i] = abs(line[0]) < 1e-6*abs(line[1]);
 			if (!ishoriz[i]) {
 				ms[i] = -line[1]/line[0];
 				cs[i] = -line[2]/line[0];
 			}
 
-			if (floori(ys[i]) < ymin) {
-				ymin = floori(ys[i]);
+			if (ceili(ys[i]) < ymin) {
+				ymin = ceili(ys[i]);
 				imin = i;
 			}
-			if (ceili(ys[i]) > ymax) {
-				ymax = ceili(ys[i]);
+			if (floori(ys[i]) > ymax) {
+				ymax = floori(ys[i]);
 				imax = i;
 			}
 		}

@@ -32,7 +32,7 @@ namespace indoor_context {
 	class TextonFeatures {
 	public:
 		// Filter bank
-		GaborFilterBank filters;
+		GaborFilters filters;
 		// Current image
 		const ImageBundle* input;
 		// Length of features (pre-computed for efficiency)

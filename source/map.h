@@ -1,7 +1,8 @@
 #pragma once
 
-#include "common_types.h"
+#include <boost/shared_ptr.hpp>
 
+#include "common_types.h"
 #include "image_bundle.h"
 #include "unwarped_image.h"
 #include "vanishing_points.h"
@@ -102,7 +103,7 @@ public:
 	// The number of keyframes in the dir (they might not all be loaded!)
 	int num_kfs_available;
 	// The frame information read from XML
-	ptr_vector<Frame> frame_specs;
+	ptr_vector<Frame> frames;
 
 	// The keyframes
 	ptr_vector<KeyFrame> kfs;
@@ -112,7 +113,7 @@ public:
 	vector<Vec3> pts;
 
 	// The camera model for frames in this map
-	shared_ptr<Camera> orig_camera;
+	shared_ptr<ATANCamera> orig_camera;
 	shared_ptr<CameraBase> camera;
 
 	// The undistort map, cached for performance

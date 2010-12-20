@@ -58,7 +58,7 @@ class Worker {
 	template <typename Function>
 	void Add(Function f) {
 		boost::mutex::scoped_lock lock(alive_mutex);
-		assert(alive);
+		CHECK(alive);
 		work_queue.push(new function_job<Function>(f));
 	}
 	// Get the number of threads to use by default for parallel tasks

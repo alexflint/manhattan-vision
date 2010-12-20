@@ -44,6 +44,9 @@ int main(int argc, char **argv) {
 		// Compute the cost function
 		LineSweepDPScore gen(kf.image);
 
+		//gen.objective.occl_penalty = 0;
+		//gen.objective.wall_penalty = -1;
+
 		// Perform the reconstruction
 		Mat3 fToC = GetFloorCeilHomology(kf.image.pc(), gt_map.floorplan());
 		recon.Compute(kf.image, fToC, gen.objective);

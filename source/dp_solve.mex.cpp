@@ -1,11 +1,3 @@
-/*
- * compatibility.mex.cpp
- * Compute a compatibility vector between an image and a proposed reconstruction.
- * Serves as the "feature function" to SVM struct.
- *
- *  Created on: 4 Aug 2010
- *      Author: alexf
- */
 #include <string>
 
 #include <boost/format.hpp>
@@ -34,42 +26,67 @@ lazyvar<float> gvOcclusionPenalty("ManhattanDP.DefaultOcclusionPenalty");
 
 void _mexFunction(int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[]) {
-	InitMex();
-	if (nrhs != 2) {
-		mexErrMsgTxt("Usage: orients=dp_solve(case, objective)\n");
+	if (nrhs < 2 || nrhs > 3) {
+		mexErrMsgTxt("Usage: orients=dp_solve(case, objective[, include_image_orients?])\n");
 	}
+	ConstMatlabStructure frame = FrameProto.From(prhs[0]);
 
 	// Construct the camera
-	ConstMatlabStructure frame = FrameProto.From(prhs[0]);
-	PosedCamera pc = MakeCamera(frame);
-	Mat3 fToC = asToon(MatlabArrayToMatrix(frame(0, "floor_to_ceil")));
+	LinearCamera camera;
+	PosedCamera pc;
+	FrameStructToCamera(frame, camera, pc);
 
-	// Construct the objective function
+	// Construct geometry
+	MatD mFtoC = MatlabArrayToMatrix(frame(0, "floor_to_ceil"));
+	CHECK_EQ(matrix_size(mFtoC), makeVector(3,3));
+	Mat3 fToC = asToon(mFtoC);
+	DPGeometry geom(pc, fToC);
+
+	// Extract the pixel-wise scores
 	ConstMatlabStructure objective = ObjectiveProto.From(prhs[1]);
-	VecI obj_dims = GetMatlabArrayDims(objective(0, "scores"));
-	CHECK_EQ(obj_dims[0], pc.ny());  // check that the scores are compatible with the image size
-	CHECK_EQ(obj_dims[1], pc.nx());
-	CHECK_EQ(obj_dims[2], 3);
-	DPObjective obj(asToon(pc.image_size()));
-	double* scoredata = mxGetPr(objective(0, "scores"));
+	VecI pix_dims = GetMatlabArrayDims(objective(0, "pixel_scores"));
+	CHECK_EQ(pix_dims.Size(), 3);
+	CHECK_EQ(asToon(pix_dims), makeVector(geom.ny(), geom.nx(), 3));
+
+	DPObjective obj(geom.grid_size);
+	double* pixeldata = mxGetPr(objective(0, "pixel_scores"));
 	for (int i = 0; i < 3; i++) {
 		// matlab arrays are stored column-major
-		for (int x = 0; x < pc.nx(); x++) {
-			for (int y = 0; y < pc.ny(); y++) {
-				obj.pixel_scores[i][y][x] = *scoredata++;
+		for (int x = 0; x < geom.nx(); x++) {
+			for (int y = 0; y < geom.ny(); y++) {
+				obj.pixel_scores[i][y][x] = *pixeldata++;
 			}
 		}
 	}
+
+	// Extract penalty terms -- must go above MonocularPayoffGen
 	obj.wall_penalty = MatlabArrayToScalar(objective(0, "wall_penalty"));
 	obj.occl_penalty = MatlabArrayToScalar(objective(0, "occlusion_penalty"));
-	CHECK_GE(obj.wall_penalty, 0);
-	CHECK_GE(obj.occl_penalty, 0);
+
+	// Compile the pixel-wise scores to payoffs
+	MonocularPayoffGen gen(obj, geom);
+
+	// Extract the column-wise scores
+	VecI wall_dims = GetMatlabArrayDims(objective(0, "wall_scores"));
+	CHECK_EQ(wall_dims.Size(), 3);
+	CHECK_EQ(asToon(wall_dims), makeVector(geom.ny(), geom.nx(), 2));
+	double* walldata = mxGetPr(objective(0, "wall_scores"));
+	for (int i = 0; i < 2; i++) {
+		// matlab array are stored column-major
+		for (int x = 0; x < geom.nx(); x++) {
+			for (int y = 0; y < geom.ny(); y++) {
+				gen.payoffs.wall_scores[i][y][x] += *walldata++;
+			}
+		}
+	}
 
 	// Do the reconstruction
-	DPGeometry geom(&pc, fToC);
-	MonocularPayoffGen gen(obj, geom);
 	ManhattanDP dp;
 	dp.Compute(gen.payoffs, geom);
+
+	// Get the exact orientations in grid coordinates
+	MatI grid_orients;
+	dp.ComputeGridOrients(grid_orients);
 
 	// Compute the path through the payoff matrix
 	MatI soln_path;
@@ -77,12 +94,11 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 
 	// Create the solution
 	MatlabStructure soln = SolutionProto.New(1);
-	soln.put(0, "orients", NewMatlabArrayFromMatrix(dp.soln_orients));
+	soln.put(0, "orients", NewMatlabArrayFromMatrix(grid_orients));
+	soln.put(0, "path", NewMatlabArrayFromMatrix(soln_path));
 	soln.put(0, "num_walls", NewMatlabArrayFromScalar(dp.soln_num_walls));
 	soln.put(0, "num_occlusions", NewMatlabArrayFromScalar(dp.soln_num_occlusions));
-	soln.put(0, "payoffs0", NewMatlabArrayFromMatrix(gen.payoffs.wall_scores[0]));
-	soln.put(0, "payoffs1", NewMatlabArrayFromMatrix(gen.payoffs.wall_scores[1]));
-	soln.put(0, "path", NewMatlabArrayFromMatrix(soln_path));
+	soln.put(0, "score", NewMatlabArrayFromScalar(dp.solution.score));
 
 	// Copy the results back
 	if (nlhs > 0) {

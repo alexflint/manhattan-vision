@@ -23,7 +23,6 @@
 #include <VW/Image/imagecopy.tpp>
 
 #include "io_utils.tpp"
-//#include "numeric_utils.tpp"
 #include "image_utils.tpp"
 #include "vector_utils.tpp"
 
@@ -135,9 +134,18 @@ namespace indoor_context {
 		
 
 	void TextonFeatures::Compute(const ImageBundle& image) {
-		// Build the mono and HSV images
-		image.BuildMono();
 		input = &image;
+
+		// Convert to matrix
+		image.BuildMono();
+		MatF m(image.ny(), image.nx());
+		for (int y = 0; y < image.ny(); y++) {
+			const PixelF* in = image.mono[y];
+			float* out = m[y];
+			for (int x = 0; x < image.nx(); x++) {
+				out[x] = in[x].y;
+			}
+		}
 
 		// Configure the filter bank
 		if (filters.filterbank.get() == NULL) {
@@ -146,11 +154,11 @@ namespace indoor_context {
 
 		// Run the filter bank
 		if (*gvFilterStrategy == "CPU") {
-			filters.Run(image.mono);
+			filters.Run(m);
 		} else if (*gvFilterStrategy == "CPUParallel") {
-			filters.RunParallel(image.mono);
+			filters.RunParallel(m);
 		} else if (*gvFilterStrategy == "GPU") {
-			filters.RunOnHardware(image.mono);
+			filters.RunOnHardware(m);
 		} else {
 			DLOG << "Unknown filter strategy: " << *gvFilterStrategy << endl;
 			exit(-1);
@@ -179,20 +187,19 @@ namespace indoor_context {
 		int px = x;
 		int py = y;
 		for (int i = 0; i < n; i++) {
-			const ImageF& cur = *filters.responses[i];
-			if (i > 0 && cur.GetHeight() < filters.responses[i-1]->GetHeight()) {
+			const MatF& cur = *filters.responses[i];
+			if (i > 0 && cur.Rows() < filters.responses[i-1]->Rows()) {
 				py /= 2;
 				px /= 2;
 			}
-			ftr[i] = gabor_weight * cur[py][px].y;
+			ftr[i] = gabor_weight * cur[py][px];
 		}
 
 		switch (color_info) {
 		case kMono: {
 			// TODO: what is ImageMono<float> normalized to, what should we
 			// divide by??
-			const PixelF& m = input->mono[y][x];
-			ftr[n] = mono_weight * m.y;
+			ftr[n] = mono_weight * input->mono[y][x].y;
 			break;
 		}
 		case kRGB: {

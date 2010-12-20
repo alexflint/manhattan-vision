@@ -10,20 +10,19 @@
 
 
 // There are several subtleties in automatically ending lines. The
-// DLOG macro creates an DelayedNewline object, which, upon
-// destruction, sends a special token to the stream. When the stream
-// recieves this it prints a newline character unless a newline
-// character immediately preceeded it (i.e. lines that have already
-// been ended will not be ended again since that would leave an empty
-// line).
+// DLOG macro creates a DelayedNewline object, which upon destruction
+// sends a special token to the stream, which causes the stream to
+// print a newline character unless a newline character immediately
+// preceeded it (i.e. lines that have already been ended will not be
+// ended again since that would leave an empty line).
 //
 // Streams contain internal buffering so it is important to
-// communicate by sending tokens rather than by direct method calls
-// (which might will out of sync with the stream if the buffer is
-// partially filled).
+// communicate by sending tokens rather than by direct method calls,
+// which will be out of sync with the stream if the buffer has not
+// been flushed.
 //
-// We also flush the stream after the end of each line. This is
-// slightly inefficient but very useful for logging purposes.
+// We also flush the stream after each newline. This is slightly
+// inefficient but very useful for logging purposes.
 
 #pragma once
 
@@ -114,6 +113,13 @@
 		NS::LogManager::ReportExprs(__VA_ARGS__ , 					\
 		                            NS::LogManager::ParseVaExprs(#__VA_ARGS__));
 
+// Represents a generic boost::iostreams character sink with a virtual
+// write() method.
+class GenericCharSink {
+public:
+	virtual std::streamsize write(const char* s, std::streamsize n) = 0;
+};
+
 namespace indoor_context {
 
 // Represents global log state
@@ -122,15 +128,17 @@ private:
 	static bool enabled;
 	static int indent_level;  // Global indent level
 public:
-	// Get the singleton log stream
+	// Get the singleton log stream.
 	static std::ostream& GetLogStream();
+	// Set the sink for the singleton log stream. LogManager will take
+	// ownership of the object's memory.
+	static void SetLogSink(GenericCharSink* sink);
 
 	// Flush the log stream
 	static bool Flush();
 
 	// Control the indent level
 	static void SetIndent(int new_level);
-
 	// Increase current indent level
 	static void IncreaseIndent(int n=2) {
 		SetIndent(indent_level+n);

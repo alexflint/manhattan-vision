@@ -20,8 +20,10 @@
 #include "dp_structures.h"
 #include "line_sweep_features.h"
 #include "landmark_payoffs.h"
+#include "floorplan_renderer.h"
+#include "building_features.h"
 
-#include "matrix_utils.tpp"
+#include "matrix_traits.tpp"
 #include "counted_foreach.tpp"
 
 using namespace std;
@@ -34,10 +36,10 @@ mxArray* MatrixVecToMatlabArray(const vector<const MatF*> matrices) {
 	double* p = mxGetPr(arr);
 	for (int i = 0; i < matrices.size(); i++) {
 		CHECK_SAME_SIZE(*matrices[i], *matrices[0]);
-		for (int y = 0; y < matrices[i]->Rows(); y++) {
-			const float* row = (*matrices[i])[y];
-			for (int x = 0; x < matrices[i]->Cols(); x++) {
-				*p++ = *row++;
+		// matlab arrays are stored column-major
+		for (int x = 0; x < matrices[i]->Cols(); x++) {
+			for (int y = 0; y < matrices[i]->Rows(); y++) {
+				*p++ = (*matrices[i])[y][x];
 			}
 		}
 	}
@@ -47,9 +49,8 @@ mxArray* MatrixVecToMatlabArray(const vector<const MatF*> matrices) {
 
 void _mexFunction(int nlhs, mxArray *plhs[],
                   int nrhs, const mxArray *prhs[]) {
-	InitMex();
-	if (nlhs != 1 || nrhs < 2 || nrhs > 3) {
-		mexErrMsgTxt("Usage: cases=dp_load_cases(sequence_name, ids_to_load, [feature_set])"); 
+	if (nlhs > 2 || nrhs < 2 || nrhs > 3) {
+		mexErrMsgTxt("Usage: cases=dp_load_cases(sequence_name, frame_ids[, feature_set])\n"); 
 	}
 
 	// Load the data
@@ -77,15 +78,23 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 
 	// Feature generator (placed here to allow memory to be shared
 	// across multiple invokations)
-	LineSweepFeatureGenerator gen;
+	//LineSweepFeatureGenerator gen;
+	BuildingFeatures ftrgen(feature_set);
+
+	// For rendering floorplans into the grid
+	FloorPlanRenderer grid_renderer;
+
+	// For holding features in grid coords
+	ptr_vector<MatF> grid_features;
 
 	// Generate features
 	format case_name_fmt("%s:%d");
 	COUNTED_FOREACH(int i, int id, ids) {
 		string case_name = str(case_name_fmt % sequence_name % id);
 		DLOG << "Loading frame " << id;
+		mexEvalString("drawnow");
 
-		// Copy to matrix form
+		// Load image
 		KeyFrame& kf = *map.KeyFrameByIdOrDie(id);
 		kf.LoadImage();
 		kf.image.BuildMono();
@@ -94,57 +103,44 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 		Mat3 fToC = GetFloorCeilHomology(kf.image.pc(), gt_map.floorplan());
 		DPGeometry geom(kf.image.pc(), fToC);
 
+		//
 		// Compute ground truth
+		//
 		MatI gt_orients;
 		int gt_num_walls, gt_num_occlusions;
 		GetGroundTruth(gt_map.floorplan(), kf.image.pc(),
 									 gt_orients, gt_num_walls, gt_num_occlusions);
 
-		//
-		// Generate pixel features
-		//
-		mxArray* pixel_ftrs = NULL;
-		if (feature_set == "default" || feature_set == "line_sweep") {
-			gen.Compute(kf.image);
-			int ftr_size = LineSweepFeatureGenerator::kFeatureLength;
-			pixel_ftrs = NewMatlabArray(kf.image.ny(), kf.image.nx(), ftr_size);
-			double* ftr_data = mxGetPr(pixel_ftrs);
-			for (int j = 0; j < ftr_size; j++) {
-				for (int x = 0; x < kf.image.nx(); x++) {
-					for (int y = 0; y < kf.image.ny(); y++) {
-						const LineSweepFeatureGenerator::FeatureVec* row = &gen.features[y*kf.image.nx()];
-						*ftr_data++ = gen.features[y*kf.image.nx()+x][j];
-					}
-				}
-			}
+		// Compute orientations in grid coordinates
+		toon::Matrix<3,4> grid_cam = geom.imageToGrid * kf.image.pc().Linearize();
+		grid_renderer.Render(gt_map.floorplan(), grid_cam, geom.grid_size);
+		const MatI& gt_grid_orients = grid_renderer.GetOrientations();
 
-		} else if (feature_set == "gt") {
-			int ftr_size = 3;
-			pixel_ftrs = NewMatlabArray(kf.image.ny(), kf.image.nx(), ftr_size);
-			double* ftr_data = mxGetPr(pixel_ftrs);
-			for (int j = 0; j < 3; j++) {
-				for (int x = 0; x < kf.image.nx(); x++) {
-					for (int y = 0; y < kf.image.ny(); y++) {
-						*ftr_data++ = gt_orients[y][x] == j ? 1.0 : 0.0;
-					}
-				}
-			}
-
-		} else if (feature_set == "sweeps_only") {
-			int ftr_size = 3;
-			pixel_ftrs = NewMatlabArray(kf.image.ny(), kf.image.nx(), ftr_size);
-			IsctGeomLabeller line_sweeper(kf.image);
-			double* ftr_data = mxGetPr(pixel_ftrs);
-			for (int j = 0; j < 3; j++) {
-				for (int x = 0; x < kf.image.nx(); x++) {
-					for (int y = 0; y < kf.image.ny(); y++) {
-						*ftr_data++ = line_sweeper.orient_map[y][x] == j ? 1.0 : 0.0;
-					}
+		// Compute the mask for the path
+		MatI gt_path(geom.ny(), geom.nx(), -1);
+		for (int x = 0; x < geom.nx(); x++) {
+			for (int y = 0; y < geom.ny(); y++) {
+				if (gt_grid_orients[y][x] != kVerticalAxis) {
+					gt_path[y == 0 ? y : y-1][x] = gt_grid_orients[y][x];
+					break;
 				}
 			}
 		}
 
-		CHECK_NOT_NULL(pixel_ftrs) << "Unrecognised feature set: '" << feature_set << "'";
+		//
+		// Generate pixel features
+		//
+		ftrgen.Compute(kf.image, &gt_orients);
+		//mxArray* full_pixel_ftrs = MatrixVecToMatlabArray(ftrgen.features);  // TODO: remove
+
+		// Convert to grid coords
+		vector<const MatF*> grid_feature_ptrs;
+		grid_features.resize(ftrgen.features.size());
+		for (int j = 0; j < ftrgen.features.size(); j++) {
+			geom.TransformDataToGrid(*ftrgen.features[j], grid_features[j]);
+			grid_feature_ptrs.push_back(&grid_features[j]);
+		}
+		mxArray* pixel_ftrs = MatrixVecToMatlabArray(grid_feature_ptrs);
 
 		//
 		// Generate wall features
@@ -156,7 +152,9 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 		ms.push_back(&occl);
 		mxArray* wall_ftrs = MatrixVecToMatlabArray(ms);
 
+		//
 		// Create geometry object
+		//
 		const PosedCamera& pc = kf.image.pc();
 		MatlabStructure frame = FrameProto.New(1);
 		frame.put(0, "camera_intrinsics", NewMatlabArrayFromMatrix(pc.camera().Linearize()));
@@ -164,19 +162,41 @@ void _mexFunction(int nlhs, mxArray *plhs[],
 		frame.put(0, "floor_to_ceil", NewMatlabArrayFromMatrix(fToC));
 		frame.put(0, "image", NewMatlabArrayFromImage(kf.image.rgb));
 
+		//
 		// Create ground truth
+		//
 		MatlabStructure gt = SolutionProto.New(1);
-		gt.put(0, "orients", NewMatlabArrayFromMatrix(gt_orients));
+		gt.put(0, "orients", NewMatlabArrayFromMatrix(gt_grid_orients));
+		gt.put(0, "path", NewMatlabArrayFromMatrix(gt_path));
 		gt.put(0, "num_walls", NewMatlabArrayFromScalar(gt_num_walls));
 		gt.put(0, "num_occlusions", NewMatlabArrayFromScalar(gt_num_occlusions));
 
-		// Set fields
+		//
+		// Add to output
+		//
 		cases.put(i, "sequence_name", NewMatlabArrayFromString(sequence_name));
 		cases.put(i, "frame_id", NewMatlabArrayFromScalar(kf.id));
 		cases.put(i, "image_file", NewMatlabArrayFromString(kf.image_file));
 		cases.put(i, "ground_truth", gt.get());
 		cases.put(i, "frame", frame.get());
 		cases.put(i, "pixel_features", pixel_ftrs);
+		//cases.put(i, "full_pixel_features", full_pixel_ftrs); // TODO: remove
 		cases.put(i, "wall_features", wall_ftrs);
+	}
+
+	// Produce meta-information
+	if (nlhs >= 2) {
+		MatlabStructure meta = MetaProto.New(1);
+		plhs[1] = meta.get();
+
+		CHECK_EQ(ftrgen.features.size(), ftrgen.feature_strings.size());
+		mwSize sz = ftrgen.feature_strings.size();
+		mxArray* strs = mxCreateCellArray(1, &sz);
+		TITLED("Features consist of:")
+			for (int i = 0; i < ftrgen.feature_strings.size(); i++) {
+				mxSetCell(strs, i, NewMatlabArrayFromString(ftrgen.feature_strings[i]));
+				DLOG << i << ": " << ftrgen.feature_strings[i];
+			}
+		meta.put(0, "feature_strings", strs);
 	}
 }

@@ -1,14 +1,13 @@
 #pragma once
 
-#include <boost/array.hpp>
-
-#include "manhattan_dp.h"
 #include "common_types.h"
 
 namespace indoor_context {
 	class ManhattanReconstruction;
 	class PosedCamera;
 	class Canvas;
+	class DPPayoffs;
+	class DPGeometry;
 
 	namespace proto {
 	class FloorPlan;

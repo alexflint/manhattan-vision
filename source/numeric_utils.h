@@ -10,7 +10,6 @@
 #include "common_types.h"
 
 namespace indoor_context {
-
 // Evaluate a 1D gaussion centred at m with variance s
 double Gauss1D(double x, double m, double s);
 

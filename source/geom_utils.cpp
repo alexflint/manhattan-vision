@@ -101,7 +101,9 @@ Vec3 GetCameraCentre(const Matrix<3,4>& camera) {
 	// The camera centre X is given by -inv(C)*t where C is the
 	// leftmost 3x3 cells of the camera matrix and t is the rightmost
 	// column.
-	return SVD<3>(camera.slice<0, 0, 3, 3> ()).backsub(-camera.T()[3]);
+	SVD<3> svd(camera.slice<0,0,3,3>());
+	Vec3 v = camera.T()[3];
+	return svd.backsub(-v);
 }
 
 double GetPlaneDepth(const Vec3& p, const Matrix<3,4>& camera, const Vec4& plane) {
@@ -232,7 +234,7 @@ Mat3 GetVerticalRectifier(const PosedCamera& pc,
 	Bounds2D<> rect_bounds = Bounds2D<>::ComputeBoundingBox(rect_outline);
 
 	// Add a translation and scale to fit the image within the bounds
-	double scale = min(
+	double scale = (1-1e-8) * min(   // add a margin for roundoff tolerance
 			out_bounds.width() / rect_bounds.width(),
 			out_bounds.height() / rect_bounds.height());  // preserve aspect ratio
 	Vec2 offset = out_bounds.center() - scale*rect_bounds.center();

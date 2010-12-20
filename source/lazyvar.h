@@ -3,7 +3,6 @@
 #include "common_types.h"
 
 namespace indoor_context {
-
 	using GVars3::gvar3;
 	using GVars3::gvar2;
 	using GVars3::GV3;
@@ -12,11 +11,17 @@ namespace indoor_context {
 	// Provides a compile-time mapping from a given type to the
 	// corresponding default gvar value. These must be functions, not
 	// constants, because they are accessed during static initialization.
-	template <typename T> struct default_value_map {
+	template <typename T>
+	struct default_value_map {
 		static inline T val() { return 0; }  // assume numeric types by default
 	};
-	template <> struct default_value_map<std::string> {
+	template <>
+	struct default_value_map<std::string> {
 		static inline std::string val() { return ""; }
+	};
+	template <int N, typename T>
+	struct default_value_map<toon::Vector<N,T> > {
+		static inline toon::Vector<N,T> val() { return toon::Zeros; }
 	};
 
 	// Lazy layer on top of gvars. A little slower since we now have to

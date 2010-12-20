@@ -13,6 +13,10 @@
 
 #include "common_types.h"
 #include "vars.h"
+#include "matlab_sink.h"
+
+#include "check.tpp"
+#include "log.tpp"
 
 namespace indoor_context {
 
@@ -20,21 +24,25 @@ void InitMex() {
 	// Use exceptions so that MATLAB doesn't die
 	AssertionManager::SetExceptionMode();
 
-	// Fix up paths
+	// Configure logging via mexPrintf
+	LogManager::SetLogSink(new MatlabSink);  // memory will be managed by LogManager
+
+	// Find homedir
 	fs::path homedir;
 	try {
 		homedir = getenv("HOME");
 	} catch (const std::exception& ex) {
-		mexErrMsgTxt("Could not read PATH environment variable.\n");
+		mexErrMsgTxt("Could not read HOME environment variable.\n");
 	}
 
+	// chdir to intended path
 	const fs::path basedir = homedir / "Code/indoor_context";  // ugly hack
 	const fs::path workingdir = basedir / "build";
 	try {
 		fs::current_path(workingdir);
 	} catch (...) {
-		mexPrintf("Could not chdir to %s\n", workingdir.string().c_str());
-		mexErrMsgTxt("Exiting.\n");
+		string message = string("Could not chdir to") + workingdir.string() + "\n";
+		mexErrMsgTxt(message.c_str());
 	}
 
 	// Load vars

@@ -2,6 +2,9 @@
 #include <exception>
 #include <mex.h>
 #include <google/profiler.h>
+
+#include "matlab_utils.h"
+
 #include "log.tpp"
 
 // name of the environment variable that activates profiling of MEX functions
@@ -20,6 +23,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
 			ProfilerStart(cpuprofile);
 		}
 		TITLED("Executing MEX function: " << mexFunctionName()) {
+			indoor_context::InitMex();
 			_mexFunction(nlhs, plhs, nrhs, prhs);
 		}
 		if (cpuprofile != NULL) {

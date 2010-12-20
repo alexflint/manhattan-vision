@@ -1,10 +1,13 @@
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include <VNL/Algo/cholesky.h>
 
 #include "common_types.h"
 
 namespace indoor_context {
+using boost::shared_ptr;
 
 // Represents a gaussian function in arbitrary dimension
 class Gaussian {

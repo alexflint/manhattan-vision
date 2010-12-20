@@ -18,7 +18,6 @@ namespace indoor_context {
 const lazyvar<float> gvSmoothingSigma("Gradients.SmoothingSigma");
 const lazyvar<float> gvThreshLow("Canny.ThreshLow");
 const lazyvar<float> gvThreshHigh("Canny.ThreshHigh");
-const lazyvar<float> gvMinCompSize("Canny.MinCompSize");
 const lazyvar<int> gvNumOrientBins("Canny.NumOrientBins");
 const lazyvar<int> gvNumThreads("Canny.NumThreads");
 
@@ -28,35 +27,6 @@ template <typename T>
 inline T GetClamped(const VNL::Matrix<T>& mat, const int& r, const int& c) {
 	return mat[Clamp(r, 0, mat.Rows()-1)][Clamp(c, 0, mat.Cols()-1)];
 }
-
-// Upsample an image by a factor of k
-void Upsample(const MatF& input, MatF& output, int k) {
-	assert(output.Cols() == input.Cols()*k);
-	assert(output.Rows() == input.Rows()*k);
-	for (int r = 0; r < output.Rows(); r++) {
-		const float* inrow1 = input[r/k];
-		const float* inrow2 = (r >= output.Rows()-k) ? inrow1 : input[r/k+1];
-		float* outrow = output[r];
-		for (int c = 0; c < output.Cols()-k; c++) {
-			const int t = c%k;
-			const int u = r%k;
-			const float A = (k-t) * (k-u) * inrow1[c/k];
-			const float B = t * (k-u) * inrow1[c/k+1];
-			const float C = (k-t) * u * inrow2[c/k];
-			const float D = t * u * inrow2[c/k+1];
-			outrow[c] = (A+B+C+D) / (k*k);
-		}
-		// Deal with the last K columns seperately to avoid reading past
-		// the end of rows
-		for (int c = output.Cols()-k; c < output.Cols(); c++) {
-			const int u = r%k;
-			const float A = (k-u) * inrow1[c/k];
-			const float C = u * inrow2[c/k];
-			outrow[c] = (A+C) / k;
-		}
-	}
-}
-
 
 void Gradients::ComputeMagSqrRow(int r) {
 	const int& w = diffx.GetWidth();
