@@ -95,7 +95,7 @@ public:
 class VanishingPoints {
 public:
 	// The long straight line detector
-	CannyLineDetector lines;
+	CannyLineDetector line_detector;
 	// The vanishing point detector
 	ManhattanFrameEstimator manhattan_est;
 	// The last input image

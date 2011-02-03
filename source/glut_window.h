@@ -33,17 +33,17 @@ namespace indoor_context {
 		 // Enter the GLUT loop in this thread, or, if it is already
 		 // running in a different thread, just sleep forever.
 		static void Loop();
-		 // Enter the GLUT loop in this thread or die it is already started.
+		 // Enter the GLUT loop in this thread or die if it is already started.
 		static void LoopOrDie();
 		 // If the GLUT loop is not already started then start it in a
-		 // paralle thread
+		 // parallel thread
 		static void LoopAsync();
 		// Start the GLUT loop in a different thread, or die if it is already started.
 		static void LoopAsyncOrDie();
 		// Returns true when called from the GLUT event loop, false otherwise.
 		static bool InGlutThread();
 		// Run a function in the GLUT loop next time glutIdleFunc is
-		// called. If the 
+		// called.
 		static void RunInGlutThread(boost::function<void()> f);
 
 		// Create the window. Might not actually show the window if the

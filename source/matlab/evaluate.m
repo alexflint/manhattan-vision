@@ -7,6 +7,7 @@ acc = zeros(length(cases),1);
 for i = 1:length(cases)
   soln = reconstruct(cases(i), weights);
   acc(i) = get_accuracy(soln, cases(i).ground_truth);
+  fprintf('case %d of %d\n', i, length(cases));
   if generate_images
     outfile = sprintf('out/frame%03d_orients.png', cases(i).frame_id);
     %imwrite(orientim(soln.orients, cases(i).frame.image), outfile);

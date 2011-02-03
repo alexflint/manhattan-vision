@@ -5,7 +5,7 @@
 #include "common_types.h"
 #include "camera.h"
 
-//#include "numeric_utils.tpp"
+#include "matrix_traits.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
@@ -167,7 +167,19 @@ Mat3 ConstructPlanarHomology(const Vec3& vertex,
 														 const Vec3& q) {
 	Mat3 I = Identity;
 	double cr = CrossRatio(vertex, p, q, p^q^axis);
-	return I + (cr-1)*(vertex.as_col()*axis.as_row())/(vertex*axis);
+	double dp = vertex * axis;
+	if (abs(dp) < 1e-8) {
+		DLOG << "Warning: vertex * axis is close to zero ("<<dp<<") -- error in GetManhattanHomology?";
+	}
+	if (isnan(cr)) {
+		DLOG << "Warning: cross ratio is NaN -- error in GetManhattanHomology?";
+	} else if (abs(cr) > 1e+15) {
+		DLOG << "Warning: cross ratio is very large ("<<cr<<") -- error in GetManhattanHomology?";
+	} else if (abs(cr-1) < 1e-15) {
+		DLOG << "Warning: cross ratio is very small ("<<cr<<") -- error in GetManhattanHomology?";
+	}
+	DREPORT(vertex.as_col() * axis.as_row(), cr, dp);
+	return I + (cr-1)*(vertex.as_col()*axis.as_row()) / dp;
 }
 
 Mat3 GetManhattanHomology(const Matrix<3,4>& cam, double z0, double z1) {
@@ -177,10 +189,14 @@ Mat3 GetManhattanHomology(const Matrix<3,4>& cam, double z0, double z1) {
 	Vec3 vertex = m * GetAxis<3>(2);
 	Vec3 axis = m_inv.T() * GetAxis<3>(2);
 
-	Vec3 p0 = cam * makeVector(0,0,z0,1);
-	Vec3 p1 = cam * makeVector(0,0,z1,1);
+	// TODO: X and Y position are arbitrary but it's important to pick
+	// something away from the focal plane
+	Vec3 p = cam * makeVector(10, -2, z0, 1);
+	Vec3 q = cam * makeVector(10, -2, z1, 1);
 
-	return ConstructPlanarHomology(vertex, axis, p0, p1);
+	DREPORT(cam, m, m_inv, vertex, axis, p, q);
+
+	return ConstructPlanarHomology(vertex, axis, p, q);
 }
 
 Mat3 GetManhattanHomology(const PosedCamera& pc, double z0, double z1) {
@@ -205,28 +221,13 @@ Mat3 GetVerticalRectifier(const PosedCamera& pc) {
 
 Mat3 GetVerticalRectifier(const PosedCamera& pc,
                           const Bounds2D<>& out_bounds) {
-	/*
-	// Here we assume that the Z axis represents the vertical direction
-	Vec3 up = pc.GetRetinaVpt(2);
-	if (up[1] < 0) up = -up;
-
-	// Build a rotation to move the vertical vanishing point to infinity.
-	// R must satisfy:
-	//   (1) R*up = [0,1,0] or [0,-1,0]  (depending on sign of up[1]
-	//   (2) R is as close to the identity as possible
-	//        (so that the other vpts are minimally affected)
-	Mat3 R_up;
-	R_up[0] = up ^ GetAxis<3>(2);
-	R_up[1] = up;
-	R_up[2] = R_up[0] ^ R_up[1];
-	*/
 	Mat3 H_ret = GetVerticalRectifierInRetina(pc);
 
 	// Compose it with the camera transform
 	// NOTE: perhaps we could just use the image vanishing points and avoid this.
 	Mat3 C = pc.camera().Linearize();
 	Mat3 C_inv = LU<>(C).get_inverse();
-	Mat3 H_rect = C * H_ret/*R_up*/ * C_inv;
+	Mat3 H_rect = C * H_ret * C_inv;
 
 	// Compute the image bounds after transformation
 	Polygon<4> outline = pc.camera().image_bounds().GetPolygon();
@@ -242,7 +243,13 @@ Mat3 GetVerticalRectifier(const PosedCamera& pc,
 	H_fit[0][0] = H_fit[1][1] = scale;
 	H_fit.slice<0,2,2,1>() = offset.as_col();
 
+	// Compose the transforms and do a sanity check
+	Mat3 H = H_fit * H_rect;
+	for (int i = 0; i < 4; i++) {
+		CHECK_POS(project(H*outline.verts[i]), pc.image_size()) << "i="<<i<<", outline[i]="<<outline.verts[i];
+	}
+
 	// Return the final transform
-	return H_fit * H_rect;
+	return H;
 }
 }

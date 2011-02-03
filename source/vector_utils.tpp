@@ -7,6 +7,7 @@
 #pragma once
 
 #include "TooN/se3.h"
+#include "TooN/LU.h"
 
 #include "common_types.h"
 #include "map.pb.h"
@@ -39,6 +40,17 @@ proto::Vec3 asProto(const toon::Vector<3>& x);
 proto::Vec4 asProto(const toon::Vector<4>& x);
 proto::Vec5 asProto(const toon::Vector<5>& x);
 proto::Vec6 asProto(const toon::Vector<6>& x);
+
+
+inline void toImageRef(const Vec2& v, ImageRef& p) {
+	p.x = v[0];
+	p.y = v[1];
+}
+
+inline void toImageRef(const Vec3& v, ImageRef& p) {
+	p.x = v[0]/v[2];
+	p.y = v[1]/v[2];
+}
 
 // Construct a full 3x4 matrix representing a rigid 3D transform
 toon::Matrix<3,4> as_matrix(const toon::SE3<>& se3);
@@ -217,11 +229,13 @@ toon::Vector<N+1,T> concat(const U& x, const toon::Vector<N,T>& v) {
 
 // Divide the elements of a vector by the last element, as in
 // unproject(project(v)).
-inline toon::Vector<3> atretina(const toon::Vector<3>& x) {
+template <typename T>
+inline toon::Vector<3,T> atretina(const toon::Vector<3,T>& x) {
 	return toon::makeVector(x[0]/x[2], x[1]/x[2], 1.0);
 }
 
-inline toon::Vector<4> atretina(const toon::Vector<4>& x) {
+template <typename T>
+inline toon::Vector<4,T> atretina(const toon::Vector<4,T>& x) {
 	return toon::makeVector(x[0]/x[3], x[1]/x[3], x[2]/x[3], 1.0);
 }
 
@@ -231,7 +245,7 @@ inline toon::Vector<3,T> col(const toon::SO3<T>& r, int i) {
 	return r.get_matrix().T()[i];
 }
 
-// Get a unit vector with positive Z coordinate in the specified
+// Get a unit vector with non-negative Z coordinate in the specified
 // direction
 template <typename T>
 inline toon::Vector<3,T> pve_unit(const toon::Vector<3,T>& x) {
@@ -274,4 +288,10 @@ ComputeBounds(const Range& vs) {
 	}
 	return make_pair(a, b);
 }
+
+template <typename T, int N>
+toon::Matrix<N,N,T> Inverse_LU(const toon::Matrix<N,N,T>& m) {
+	return toon::LU<N,T>(m).get_inverse();
+}
+
 }  // namespace indoor_context

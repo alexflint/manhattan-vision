@@ -249,6 +249,22 @@ void Canny::Compute(const ImageF& input) {
 	DetectEdges(gradients.magnitude_sqr, gradients.dir4);
 }
 
+void Canny::OutputEdgeViz(const string& path) {
+	WriteMatrixImageRescaled(path, edge_map);
+}
+
+void Canny::OutputMagnitudeViz(const string& path) {
+	WriteMatrixImageRescaled(path, gradients.magnitude_sqr);
+}
+
+void Canny::OutputXSobelViz(const string& path) {
+	WriteImage(path, gradients.diffx);
+}
+
+void Canny::OutputYSobelViz(const string& path) {
+	WriteImage(path, gradients.diffy);
+}
+
 void MultiScaleCanny::Compute(const ImageF& input) {
 	const int& w = input.GetWidth();
 	const int& h = input.GetHeight();

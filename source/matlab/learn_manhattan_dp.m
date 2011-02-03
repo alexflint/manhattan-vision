@@ -5,7 +5,7 @@ function [weights loaded_cases]=learn_manhattan_dp(cases)
   % pick an output directory
   v = clock;
   basedir = '/home/alex/Code/indoor_context/source/matlab';
-  outdir = sprintf('%s/runs/%02d:%02d.%02d %02d-%02d-%04d', basedir, round(v([4 5 6 3 2 1])));
+  outdir = sprintf('%s/runs/%04d-%02d-%02d %02d:%02d.%02d', basedir, round(v));
   r = mkdir(outdir);
   check r;
   
@@ -66,7 +66,7 @@ function [weights loaded_cases]=learn_manhattan_dp(cases)
   common_args = ' -o 2 -v 3 -y 1 ';
   basic_args = [common_args ' -c 0.00001'];
   caching_args = [common_args ' -c 0.01  -w 4  -f 5 '];
-  svm_struct_args = caching_args;
+  svm_struct_args = basic_args;
 
   begin_learn_time = tic;
   last_eval_time = tic;

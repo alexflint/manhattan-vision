@@ -108,6 +108,15 @@ public:
 	void Compute(const ImageBundle& input);
 	// Execute the edge detector for this image
 	void Compute(const ImageF& input);
+
+	// Visualize binary edge map
+	void OutputEdgeViz(const string& path);
+	// Visualize gradient magnitude
+	void OutputMagnitudeViz(const string& path);
+	// Visualize X sobel response MIGHT NOT WORK
+	void OutputXSobelViz(const string& path);
+	// Visualize Y sobel response MIGHT NOT WORK
+	void OutputYSobelViz(const string& path);
 };
 
 // Multiscale canny line detector, extended to multi-scale detection

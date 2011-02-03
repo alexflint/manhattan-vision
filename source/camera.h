@@ -99,6 +99,8 @@ public:
 
 	// Get the camera matrix
 	const Mat3& intrinsics() const { return m; }
+	// Get the inverse of the camera matrix
+	const Mat3& intrinsics_inverse() const { return m_inv; }
 	// Set the camera matrix
 	void SetIntrinsics(const Mat3& m);
 
@@ -208,6 +210,9 @@ public:
 	CalibratedImage(const CameraBase* camera) : camera_(camera) { }
 	CalibratedImage(const CameraBase* camera, const string& image_file)
 	: ImageBundle(image_file), camera_(camera) { }
+
+	// Allocate an image of size camera_->image_size()
+	void Allocate();
 
 	// Get/set camera
 	const CameraBase& camera() const { return *camera_; }

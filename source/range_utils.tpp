@@ -118,6 +118,20 @@ max_element(Range& r, Pred comp) {
 	return max_element(begin(r), end(r), comp);
 }
 
+// Get an iterator for the minimum element in a range (const version)
+template <typename Range>
+typename range_iterator<const Range>::type
+min_element(const Range& r) {
+	return max_element(r, greater<typename range_value<Range>::type>());
+}
+
+// Get an iterator for the minimum element in a range (non-const version)
+template <typename Range>
+typename range_iterator<Range>::type
+min_element(Range& r) {
+	return max_element(r, greater<typename range_value<Range>::type>());
+}
+
 // Turn an array into a range
 template <typename T>
 iterator_range<T*> ptr_range(T* a, T* b) {

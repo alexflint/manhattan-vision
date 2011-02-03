@@ -15,14 +15,7 @@ namespace indoor_context {
 		// If a weight is provided then this measurement contributes as if
 		// multiple copies measurements of this kind were made. That is
 		// _not_ the same as multiplying A and B by the weight!
-		inline void Add(double a, double b, double weight=1.0) {
-			sum_a += weight*a;
-			sum_b += weight*b;
-			sum_asqr += weight*a*a;
-			sum_bsqr += weight*b*b;
-			sum_ab += weight*a*b;
-			sum_wts += weight;
-		}
+		void Add(double a, double b, double weight=1.0);
 
 		// Compute the normalized cross-correlation for the current statistics
 		double CalculateNCC();
@@ -150,7 +143,7 @@ namespace indoor_context {
 
 
 	// Computes payoffs for DP reconstruction from stereo photoconsistency
-	class StereoPayoffs {
+	class StereoPayoffGen {
 	public:
 		const PosedImage* l_input;
 		const PosedImage* r_input;
@@ -171,12 +164,28 @@ namespace indoor_context {
 		// The final payoff matrix
 		boost::array<MatF,2> payoffs;
 
-		// Compute Payoffs
+		// Compute payoffs by calculating column-wise NCC scores for each
+		// element of the payoff matrix.
 		void Compute(const PosedImage& left_image,
 								 const PosedImage& right_image,
 								 const DPGeometry& geom,
 								 double zfloor,
 								 double zceil);
+
+		// Same as Compute() but uses square windows rather than individual pixels
+		void ComputeWin(const PosedImage& l_image,
+										const PosedImage& r_image,
+										const DPGeometry& geom,  // for left image
+										double zfloor,
+										double zceil);
+
+		// Compute payoffs by calculating NCC scores for patches around each
+		// corresponding pixel pair, for each element of the payoff matrix.
+		void ComputeFull(const PosedImage& l_image,
+										 const PosedImage& r_image,
+										 const DPGeometry& geom,  // for left image
+										 double zfloor,
+										 double zceil);
 
 		// Visualization
 		void OutputRectifiedLeft(const string& file);

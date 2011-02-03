@@ -41,10 +41,6 @@ void OutputTransformedImage(const string& file,
 	WriteImage(file, canvas);
 }
 
-
-
-
-
 void MagToImage(const MatF& m, ImageF& q) {
 	ResizeImage(q, m.Cols(), m.Rows());
 	for (int y = 0; y < m.Rows(); y++) {
@@ -60,7 +56,7 @@ void MakeGradientImage(const PosedImage& orig,
 											 Gradients& container,
 											 PosedImage& out) {
 	out.pc().SetPose(orig.pc().pose());
-	out.pc().SetCamera(orig.pc().camera());
+	out.pc().SetCamera(&orig.pc().camera());
 	ImageCopy(orig.rgb, out.rgb);
 	container.Compute(orig);
 	MagToImage(container.magnitude_sqr, out.mono);
@@ -72,7 +68,7 @@ int main(int argc, char **argv) {
 	if (argc != 4) {
 		DLOG << "Usage: "<<argv[0]<<" SEQUENCE TEST_IDS REL_AUX_IDS";
 		DLOG << "  example: "<<argv[0]<<" truthed_map.pro 5:5:50 -3:3";
-		DLOG << "           proceses frame 5,10,...,50 with +/-3 frame supporting";
+		DLOG << "           proceses frame 5,10,...,50 with a sliding window of 6 auxiliary frames";
 		return -1;
 	}
 
@@ -89,15 +85,11 @@ int main(int argc, char **argv) {
 	// Get the floor and ceiling positions
 	double zfloor = gt_map.floorplan().zfloor();
 	double zceil = gt_map.floorplan().zceil();
-	/*Vec3 vup = map.kfs[0].pc->pose_inverse() * makeVector(0,1,0);
-	if (Sign(zceil-zfloor) == Sign(vup[2])) {
-		swap(zfloor, zceil);
-		}*/
 
 	// The payoff generator
 	Gradients gradients;
-	StereoPayoffs payoff_gen;
-	boost::array<MatF,2> stereo_payoffs;
+	StereoPayoffGen payoff_gen;
+	DPPayoffs stereo_payoffs;
 
 	// Do the reconstructions
 	double sum_acc = 0;
@@ -107,33 +99,33 @@ int main(int argc, char **argv) {
 
 		// Get base frame
 		const PosedImage& base_image = map.ImageByIdOrDie(base_id);
-		DPGeometry geom(&base_image.pc(), zfloor, zceil);
+		DPGeometry geom(base_image.pc(), zfloor, zceil);
 
 		// Compute gradients
 		PosedImage base_gradients;
 		MakeGradientImage(base_image, gradients, base_gradients);
 
 		// Process each auxiliary frame
-		int n = 0;
-		stereo_payoffs[0].Resize(geom.grid_size[1], geom.grid_size[0], 0);  // must initialize to zero
-		stereo_payoffs[1].Resize(geom.grid_size[1], geom.grid_size[0], 0);
+		int denom = 0;
+		stereo_payoffs.Resize(geom.grid_size, 0.0);  // must initialize to zero
 		BOOST_FOREACH(int d, rel_aux_ids) {
 			int aux_id = base_id+d;
 			if (aux_id == base_id) continue;
 			PosedImage aux_gradients;
 			MakeGradientImage(map.ImageByIdOrDie(aux_id), gradients, aux_gradients);
 			TITLE("Computing payoffs w.r.t. aux frame " << aux_id);
-			payoff_gen.Compute(base_gradients, aux_gradients, geom, zfloor, zceil);
-			stereo_payoffs[0] += payoff_gen.payoffs[0];
-			stereo_payoffs[1] += payoff_gen.payoffs[1];
-			n++;
+			payoff_gen.ComputeWin(base_gradients, aux_gradients, geom, zfloor, zceil);
+			stereo_payoffs.wall_scores[0] += payoff_gen.payoffs[0];
+			stereo_payoffs.wall_scores[1] += payoff_gen.payoffs[1];
+			denom++;
 		}
-		stereo_payoffs[0] /= n;
-		stereo_payoffs[1] /= n;
+		stereo_payoffs.wall_scores[0] /= denom;
+		stereo_payoffs.wall_scores[1] /= denom;
 
 		// Do reconstruction
 		ManhattanDPReconstructor recon;
 		recon.Compute(base_image, geom, stereo_payoffs);
+		DREPORT(recon.dp.solution.score);
 
 		// Compare results with ground truth
 		double acc = recon.GetAccuracy(gt_map.floorplan());
@@ -144,7 +136,7 @@ int main(int argc, char **argv) {
 		GetTrueOrients(gt_map.floorplan(), base_image.pc(), gt);
 		WriteOrientationImage(str(filepat % base_id % "gt"), gt);
 
-		recon.OutputSolutionOrients(str(filepat % base_id % "soln"));
+		recon.OutputSolution(str(filepat % base_id % "soln"));
 		//recon.OutputGridViz("out/grid_soln.png");
 		//OutputTransformedImage("out/grid.png", base_image.rgb, geom.imageToGrid, geom.grid_size);
 

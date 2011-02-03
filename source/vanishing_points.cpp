@@ -32,7 +32,7 @@ using namespace toon;
 // These are documented in vanishing_points.cfg
 const lazyvar<string> gvDefaultStrategy("VanPts.DefaultStrategy");
 const lazyvar<int> gvNumVanPts("VanPts.NumVanishingPts");
-const lazyvar<int> gvNumClusters("VanPts.NumBootstrapClusters");
+const lazyvar<int> gvNumBootstrapClusters("VanPts.NumBootstrapClusters");
 const lazyvar<int> gvMinSupport("VanPts.MinBootstrapSupport");
 
 const lazyvar<double> gvErrorModelSigma("EMVanPts.ErrorModelSigma");
@@ -122,18 +122,21 @@ void ManhattanFrameEstimator::Prepare(const vector<LineDetection>& segments) {
 }
 
 void ManhattanFrameEstimator::Bootstrap(const vector<LineDetection>& segments) {
+	CHECK_GE(segments.size(), *gvNumBootstrapClusters)
+		<< "Too few segments were provided to bootstrap the vanishing point detector.";
+
 	// Run K-means on the line segment orientations
 	kmeans_owners.Resize(segments.size());
 	vector<VecD> thetas, clusters;
 	BOOST_FOREACH(const LineDetection& det, segments) {
-		Vector<2> tangent = unit(project(det.seg.end) - project(det.seg.start));
+		Vec2 tangent = unit(project(det.seg.end) - project(det.seg.start));
 		double theta = atan2(tangent[1], tangent[0]);
 		thetas.push_back(asVNL(makeVector(theta)));
 	}
-	KMeans::Estimate(thetas, *gvNumClusters, clusters, kmeans_owners);
+	KMeans::Estimate(thetas, *gvNumBootstrapClusters, clusters, kmeans_owners);
 
 	// Estimate vanishing points for each cluster
-	vector<Vector<3> > candidate_vpts;
+	vector<Vec3> candidate_vpts;
 	for (int i = 0; i < clusters.size(); i++) {
 		int support = 0;
 		Vector<> weights(segments.size());
@@ -149,9 +152,14 @@ void ManhattanFrameEstimator::Bootstrap(const vector<LineDetection>& segments) {
 		}
 	}
 
+	// Check that we have enough candidates to proceed
+	CHECK_GE(candidate_vpts.size(), 2)
+		<< "After clustering vanishing points and eliminating clusters with less than "
+		<< *gvMinSupport << " supporting lines, too few clusters were left for bootstrap.";
+
 	// Find the pair of vpts with minimal dot product
 	double mindp = INFINITY;
-	Vector<3> u, v;
+	Vec3 u = Zeros, v = Zeros;
 	const int num_cands = candidate_vpts.size();
 	for (int i = 0; i < num_cands; i++) {
 		for (int j = i+1; j < num_cands; j++) {
@@ -164,8 +172,13 @@ void ManhattanFrameEstimator::Bootstrap(const vector<LineDetection>& segments) {
 		}
 	}
 
+	// Check that the vanishing points were linearly independent
+	CHECK_GT(mindp, 1e-16 * max(norm(u), norm(v)))
+					 << "Error: Unable to bootstrap the vanishing point detector:"
+					 " There is no pair of linearly independent candidates";
+
 	// Create the initial rotation matrix
-	Matrix<3> R_init;
+	Mat3 R_init;
 	R_init.T()[0] = u;
 	R_init.T()[1] = (u^v);
 	R_init.T()[2] = u^(u^v);  // not simplifiable since u*v != 0 in general
@@ -246,16 +259,17 @@ void ManhattanFrameEstimator::Finish() {
 
 
 // static
-double ManhattanFrameEstimator::GetLogLik(const Vector<3>& vpt,
-                                          const Vector<3>& line) {
+double ManhattanFrameEstimator::GetLogLik(const Vec3& vpt, const Vec3& line) {
+	// TODO: make this more reasonable. At least add some normalization etc...
+	// Ideally do projected error at line end-points
 	const double& sigma = *gvErrorModelSigma;
 	// TODO: use PointLineDist here
 	const double dp = vpt * line;
 	return -dp*dp / (2.0 * sigma * sigma);
 }
 
-Vector<3> ManhattanFrameEstimator::FitIsct(const vector<LineDetection>& segments,
-                                           const Vector<>& weights) const {
+Vec3 ManhattanFrameEstimator::FitIsct(const vector<LineDetection>& segments,
+																			const Vector<>& weights) const {
 	// Set up the linear system
 	Matrix<> m(segments.size(), 3);
 	for (int i = 0; i < segments.size(); i++) {
@@ -270,8 +284,8 @@ Vector<3> ManhattanFrameEstimator::FitIsct(const vector<LineDetection>& segments
 	return svd.get_VT()[2];
 }
 
-Vector<3> ManhattanFrameEstimator::FitIsctRansac(const vector<LineDetection>& segments,
-                                                 const Vector<>& weights) const {
+Vec3 ManhattanFrameEstimator::FitIsctRansac(const vector<LineDetection>& segments,
+																						const Vector<>& weights) const {
 	// Generate cumulative weight vector
 	const double wsum = sum(weights);
 	Vector<> wcum(weights.size());
@@ -282,7 +296,7 @@ Vector<3> ManhattanFrameEstimator::FitIsctRansac(const vector<LineDetection>& se
 
 	// Iterate ransac
 	const int num_iters = min(100, max(wsum, wsum*wsum / 5));
-	Vector<3> max_isct;
+	Vec3 max_isct;
 	float max_score = -1;
 	for (int i = 0; i < num_iters; i++) {
 		int a, b;
@@ -292,7 +306,7 @@ Vector<3> ManhattanFrameEstimator::FitIsctRansac(const vector<LineDetection>& se
 			const double rb = rand() * wsum / RAND_MAX;
 			b = lower_bound(begin(wcum), end(wcum), rb) - begin(wcum);
 		} while (a == b);
-		Vector<3> isct = unit(segments[a].eqn ^ segments[b].eqn);
+		Vec3 isct = unit(segments[a].eqn ^ segments[b].eqn);
 		float score = 0.0;
 		for (int j = 0; j < segments.size(); j++) {
 			// TODO: use the propper error here as per PointLineDist
@@ -319,15 +333,39 @@ Vector<3> ManhattanFrameEstimator::FitIsctRansac(const vector<LineDetection>& se
 
 void VanishingPoints::Compute(const CalibratedImage& image, bool use_prev) {
 	input = &image;
-	lines.Compute(image);
-	manhattan_est.Compute(lines.detections, use_prev);
+	line_detector.Compute(image);
+	DREPORT(line_detector.detections.size());
+	if (line_detector.detections.size() < 3) {
+		DLOG << "Error: too few lines detected to proceed with vanishing point estimation";
+	} else {
+		// Transfer to calibrated domain
+		// TODO: implement this when we don't have a linear camera
+
+		// If M is a 3x3 matrix mapping points from one space to another,
+		// then M^-T is the corresponding mapping for lines. Since points
+		// are mapped through the _inverse_ of the camera intrinsics, we
+		// should map lines through the transpose of the (non-inverted)
+		// camera intrinsics.
+		Mat3 line_calib = ((LinearCamera&)image.camera()).intrinsics().T();
+		BOOST_FOREACH(LineDetection& det, line_detector.detections) {
+			det.eqn = line_calib * det.eqn;
+		}
+
+		// Do EM in the calibrated domain
+		manhattan_est.Compute(line_detector.detections, use_prev);
+
+		// Convert vanishing points back to the image domain
+		for (int i = 0; i < 3; i++) {
+			image_vpts[i] = image.camera().RetToIm(manhattan_est.vpts[i]);
+		}
+	}
 }
 
 void VanishingPoints::OutputLineViz(const string& filename) const {
 	ImageRGB<byte> viz(input->sz());
 	ImageCopy(input->rgb, viz);
 	ResetAlpha(viz);
-	lines.Draw(viz);
+	line_detector.Draw(viz);
 	WriteImage(filename, viz);
 };
 
@@ -371,14 +409,14 @@ void VanishingPoints::DrawVanPointViz(ImageRGB<byte>& canvas,
 		canvas.AllocImageData(input->nx()+pad*2,
 				input->ny()+pad*2);
 	}
-	Vector<2> offs = makeVector((canvas.GetWidth() - input->nx()) / 2,
+	Vec2 offs = makeVector((canvas.GetWidth() - input->nx()) / 2,
 			(canvas.GetHeight() - input->ny()) / 2);
 	canvas.Clear(PixelRGB<byte>(255, 255, 255));
 	CopyImageInto(input->rgb, offs[1], offs[0], canvas);
 
 	// Draw the extensions
-	vector<PixelRGB<byte> > line_colors(lines.detections.size());;
-	COUNTED_FOREACH (int i, const LineDetection& det, lines.detections) {
+	vector<PixelRGB<byte> > line_colors(line_detector.detections.size());;
+	COUNTED_FOREACH (int i, const LineDetection& det, line_detector.detections) {
 		if (det.axis == -1) {
 			line_colors[i] = kSpuriousColor;
 		} else {
@@ -388,29 +426,30 @@ void VanishingPoints::DrawVanPointViz(ImageRGB<byte>& canvas,
 			// far away by a point very far away. This produces near-identical
 			// vizualization. TODO: deal with vanishing points at infinity
 			// properly
-			Vector<3> vpt = image_vpts[det.axis];
+			Vec3 vpt = image_vpts[det.axis];
 			// Crude hack for line drawing:
 			if (abs(vpt[2]) < 1e-8) {
 				vpt[2] = 1e-8;
 			}
-			Vector<3> hstart = unit(det.seg.start);
-			Vector<3> hend = unit(det.seg.end);
-			const Vector<3>& endpt = hstart*vpt > hend*vpt ? hstart : hend;
-			const Vector<2> a = project(endpt) + offs;
-			const Vector<2> b = project(vpt) + offs;
+			Vec3 hstart = unit(det.seg.start);
+			Vec3 hend = unit(det.seg.end);
+			const Vec3& endpt = hstart*vpt > hend*vpt ? hstart : hend;
+			const Vec2 a = project(endpt) + offs;
+			const Vec2 b = project(vpt) + offs;
 			DrawLineClipped(canvas, a, b, line_colors[i], *gvVanLineAlpha);
 		}
 	}
 
 	// Draw the line segments over the extension lines
-	lines.Draw(canvas, line_colors, offs);
+	line_detector.Draw(canvas, line_colors, offs);
 
 	// Draw the vanishing points
 	PixelRGB<byte> white(255, 255, 255);
 	for (int i = 0; i < 3; i++) {
-		const Vector<3>& vpt = image_vpts[i];
+		const Vec3& vpt = image_vpts[i];
+		TITLED(i) DREPORT(vpt);
 		if (abs(vpt[2]) > 1e-8) {
-			const Vector<2> drawpos = project(vpt) + offs;
+			const Vec2 drawpos = project(vpt) + offs;
 			DrawSpot(canvas, drawpos, white, 4);
 			DrawSpot(canvas, drawpos, vpt_colors[i], 3);
 		}

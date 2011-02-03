@@ -10,7 +10,7 @@ namespace indoor_context {
 class KeyFrameWidget : public Widget3D {
 public:
 	// Projection of quad boundary onto the screen
-	toon::Vector<2> pa, pb, pc, pd;
+	Vec2 pa, pb, pc, pd;
 	// Distance from camera centre to image plane, in GL coordinates
 	double retina_z;
 	// The keyframe we represent
@@ -41,11 +41,11 @@ public:
 	// Draw the keyframe as a quad in 3D
 	virtual void OnRender();
 	// Return true if ths mouse location is inside the rendered keyframe
-	virtual bool HitTest(const toon::Vector<2>& mouse) const;
+	virtual bool HitTest(const Vec2& mouse) const;
 	// Click handler: prints the image filename
-	virtual void OnClick(int button, const toon::Vector<2>& mouse);
+	virtual void OnClick(int button, const Vec2& mouse);
 	// Double-click handler: makes this keyframe the center of rotation
-	virtual void OnDoubleClick(int button, const toon::Vector<2>& mouse);
+	virtual void OnDoubleClick(int button, const Vec2& mouse);
 
 	// Click handler for lines in the image
 	void Line_Click(int index, const string& label);
@@ -67,15 +67,15 @@ public:
 	void ConfigureBorder();
 
 	// Add a line widget for a line in retina coordinates
-	LineWidget& AddLineInRetina(const toon::Vector<3>& ret_a,
-	                            const toon::Vector<3>& ret_b,
+	LineWidget& AddLineInRetina(const Vec3& ret_a,
+	                            const Vec3& ret_b,
 	                            const float width,
 	                            const PixelRGB<byte>& color);
 
 	// Transform a point from undistorted image coordinates to the world
-	toon::Vector<3> ImagePtToWorld(const toon::Vector<2>& retinaPt);
+	Vec3 ImagePtToWorld(const Vec2& retinaPt);
 	// Project a world point to the retina (but still in world coords)
-	toon::Vector<3> WorldToRetina(const toon::Vector<3>& worldPt);
+	Vec3 WorldToRetina(const Vec3& worldPt);
 };
 
 
@@ -93,18 +93,18 @@ public:
 	Event<> SelectedPointChanged;
 	// Screen locations of the points. Updated in OnRender iff
 	// selectable() is true
-	vector<toon::Vector<2> > screen_pts;
+	vector<Vec2 > screen_pts;
 	// Initialize the widget
 	PointCloudWidget(const vector<Vec3>& points);
 	// Draw the map points as GL_POINTs
 	void OnRender();
 	// Handle clicks
-	void OnClick(int button, const toon::Vector<2>& mouse);
+	void OnClick(int button, const Vec2& mouse);
 	// Return true if the mouse is over a map point
-	bool HitTest(const toon::Vector<2>& mouse) const;
+	bool HitTest(const Vec2& mouse) const;
 	// Get the point at the given screen position, or -1 if there
 	// isn't one.
-	int GetPointAt(const toon::Vector<2>& mouse) const;
+	int GetPointAt(const Vec2& mouse) const;
 };
 
 

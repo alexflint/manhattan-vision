@@ -32,6 +32,9 @@ namespace indoor_context {
 	int matrix_width(const VNL::Matrix<T>& A) {
 		return A.Cols();
 	}
+	inline int matrix_width(const ImageRef& p) {  // ugly hack for CHECK_POS
+		return p.x;
+	}
 	template<typename T>
 	int matrix_width(const T& A) {
 		return A.nx();
@@ -58,6 +61,9 @@ namespace indoor_context {
 	template<typename T>
 	int matrix_height(const VNL::Matrix<T>& A) {
 		return A.Rows();
+	}
+	inline int matrix_height(const ImageRef& p) {  // ugly hack for CHECK_POS
+		return p.y;
 	}
 	template<typename T>
 	int matrix_height(const T& A) {

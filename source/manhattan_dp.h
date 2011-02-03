@@ -114,9 +114,9 @@ public:
 	void PathToOrients(const VecI& path, const VecI& path_axes, MatI& grid_orients) const;
 };
 
-
-
 ////////////////////////////////////////////////////////////////////////////////
+
+
 // Represents a cost function that ManhattanDP optimizes, in terms of
 // the cost of assigning label A to pixel [Y,X] (stored in
 // pixel_scores[A][Y][X]). An object of this form is converted to the
@@ -181,7 +181,7 @@ public:
 	// Clone this object
 	void CopyTo(DPPayoffs& other);
 	// Add a payoff matrix to wall_scores[0] and wall_scores[1], multiplied by a constant.
-	void Add(double weight, const MatF& delta);
+	void Add(const MatF& delta, double weight=1.0);
 private:
 	// Disallow copy constructor (use CopyTo explicitly instead)
 	DPPayoffs(const DPPayoffs& rhs);
@@ -357,6 +357,8 @@ public:
 	void OutputSolution(const string& path);
 	// Draw the solution in grid coordinates
 	void OutputGridViz(const string& path);
+	// Draw a visualization of the floor-to-ceiling mapping
+	void OutputManhattanHomologyViz(const string& path);
 };
 
 }

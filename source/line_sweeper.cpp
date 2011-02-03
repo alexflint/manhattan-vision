@@ -36,6 +36,7 @@ void LineSweeper::Compute(const PosedImage& image,
 	bounding_lines.push_back(image_bounds.bottom_eqn());      // bottom
 
 	// Build support maps for each direction
+	int nan_sweeps = 0;
 	vector<Vec3 > blocks;
 	blocks.reserve(lines[0].size() + lines[1].size() + lines[2].size()); // upper bound
 	for (int i = 0; i < 3; i++) {
@@ -127,16 +128,31 @@ void LineSweeper::Compute(const PosedImage& image,
 				}
 
 				// Compute the polygon vertices
-				vector<Vec3 > poly;
+				vector<Vec3> poly;
 				poly.push_back(front_line ^ vline1);
 				poly.push_back(front_line ^ vline2);
 				poly.push_back(back_line ^ vline2);
 				poly.push_back(back_line ^ vline1);
 
+				bool found_nan = false;
+				BOOST_FOREACH(const Vec3 v, poly) {
+					if (isnan(v)) {
+						found_nan = true;
+						nan_sweeps++;
+						break;
+					}
+				}
+
 				// Mark the area
-				FillPolygon(poly, support_maps[i], 1);
+				if (!found_nan) {
+					FillPolygon(poly, support_maps[i], 1);
+				}
 			}
 		}
+	}
+
+	if (nan_sweeps > 0) {
+		DLOG << "Warning: Ignored " << nan_sweeps << " sweeps due to NaN coordinates during line sweep";
 	}
 }
 

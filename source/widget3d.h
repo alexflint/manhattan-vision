@@ -119,10 +119,10 @@ public:
 
 	// Return true if this mouse location represents a hit. Use
 	// Viewer3D::ProjectToScreen() during OnRender() to implement this.
-	virtual bool HitTest(const toon::Vector<2>& mouse) const;
+	virtual bool HitTest(const Vec2& mouse) const;
 	// By invoking HitTest(mouse), determine which widget is at the
 	// given mouse location, or return NULL if there isn't one.
-	Widget3D* GetWidgetAt(const toon::Vector<2>& mouse);
+	Widget3D* GetWidgetAt(const Vec2& mouse);
 	// TODO: add a const version of the above, which also returns "const Widget3D*"
 
 	// Render the widget (all GL calls go in here)
@@ -130,20 +130,20 @@ public:
 	// Render the widget (all GL calls go in here)
 	virtual void OnRender() { }
 	// Called when the object is clicked (as determined by HitTest)
-	virtual void OnClick(int button, const toon::Vector<2>& mouse) { }
+	virtual void OnClick(int button, const Vec2& mouse) { }
 	// Called when the object is double-clicked
-	virtual void OnDoubleClick(int button, const toon::Vector<2>& mouse) { }
+	virtual void OnDoubleClick(int button, const Vec2& mouse) { }
 
 	// Fire various events and change some internal state. These are
 	// usually called only from Viewer3D. Some of these are recursive.
 	void NotifyRender();
 	void NotifyPreRender();
-	void NotifyMouseDown(int button, const toon::Vector<2>& mouse);
-	void NotifyMouseUp(int button, const toon::Vector<2>& mouse);
-	void NotifyMouseMove(const toon::Vector<2>& mouse);
-	void NotifyMouseDrag(int button, const toon::Vector<2>& mouse);
-	void NotifyClick(int button, const toon::Vector<2>& mouse);
-	void NotifyDoubleClick(int button, const toon::Vector<2>& mouse);
+	void NotifyMouseDown(int button, const Vec2& mouse);
+	void NotifyMouseUp(int button, const Vec2& mouse);
+	void NotifyMouseMove(const Vec2& mouse);
+	void NotifyMouseDrag(int button, const Vec2& mouse);
+	void NotifyClick(int button, const Vec2& mouse);
+	void NotifyDoubleClick(int button, const Vec2& mouse);
 	void NotifySelectedChanged(bool v);  // (de)selected by the user
 	void NotifyHoverChanged(bool v);  // mouse is (de)hovering
 	void NotifyAttached(Viewer3D* viewer);  // attached to a viewer
@@ -172,15 +172,15 @@ private:
 // Represents a quad
 class QuadWidget : public Widget3D {
 public:
-	toon::Vector<3> a, b, c, d;
+	Vec3 a, b, c, d;
 	PixelRGB<byte> color;
 	float border_width;
 
 	QuadWidget();
-	QuadWidget(const toon::Vector<3>& a,
-			const toon::Vector<3>& b,
-			const toon::Vector<3>& c,
-			const toon::Vector<3>& d);
+	QuadWidget(const Vec3& a,
+			const Vec3& b,
+			const Vec3& c,
+			const Vec3& d);
 	QuadWidget(const toon::Matrix<3,2>& m,
 			float left,
 			float right,
@@ -194,11 +194,11 @@ public:
 // Represents a widget displayed as a dot
 class PointWidget : public Widget3D {
 public:
-	toon::Vector<3> p;
+	Vec3 p;
 	float size;
 	PixelRGB<byte> color;
 	int depth_offset;
-	PointWidget(const toon::Vector<3>& x,
+	PointWidget(const Vec3& x,
 			float sz,
 			const PixelRGB<byte>& c,
 			int doffs=0)
@@ -222,8 +222,8 @@ public:
 	: width(w), depth_offset(doffs) { }
 
 	LineWidget& AddNewMember();
-	LineWidget& AddNewMember(const toon::Vector<3>& start,
-			const toon::Vector<3>& end,
+	LineWidget& AddNewMember(const Vec3& start,
+			const Vec3& end,
 			const PixelRGB<byte>& color);
 
 	virtual void OnRender();
@@ -250,8 +250,8 @@ public:
 
 	LineWidget();
 
-	LineWidget(const toon::Vector<3>& start,
-	           const toon::Vector<3>& end,
+	LineWidget(const Vec3& start,
+	           const Vec3& end,
 	           float width,
 	           const PixelRGB<byte>& color);
 
@@ -259,7 +259,7 @@ public:
 	           float width,
 	           const PixelRGB<byte>& color);
 
-	bool HitTest(const toon::Vector<2>& mouse) const;
+	bool HitTest(const Vec2& mouse) const;
 	void OnPreRender();
 	void OnRender();
 };

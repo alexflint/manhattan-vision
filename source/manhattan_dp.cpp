@@ -30,8 +30,8 @@ lazyvar<Vec2> gvGridSize("ManhattanDP.GridSize");
 lazyvar<float> gvLineJumpThreshold("ManhattanDP.LineJumpThreshold");
 
 namespace {
-	lazyvar<float> gvWallPenalty("ManhattanDP.DefaultWallPenalty");
-	lazyvar<float> gvOcclusionPenalty("ManhattanDP.DefaultOcclusionPenalty");
+	lazyvar<float> gvDefaultWallPenalty("ManhattanDP.DefaultWallPenalty");
+	lazyvar<float> gvDefaultOcclusionPenalty("ManhattanDP.DefaultOcclusionPenalty");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -186,7 +186,7 @@ Vec2 DPGeometry::ImageToGrid(const Vec3& x) const {
 }
 
 Vec2 DPGeometry::Transfer(const Vec2& grid_pt) const {
-	const Mat3& m = grid_pt[1] < horizon_row ? grid_ceilToFloor : grid_floorToCeil;
+	//const Mat3& m = grid_pt[1] < horizon_row ? grid_ceilToFloor : grid_floorToCeil;
 	return project(Transfer(unproject(grid_pt)));
 }
 
@@ -200,10 +200,10 @@ void DPGeometry::TransformDataToGrid(const MatF& in, MatF& out) const {
 	out.Resize(grid_size[1], grid_size[0], 0.0);
 
 	// Check that the four corners project within the grid bounds
-	CHECK_POS(ImageToGrid(makeVector(0, 0, 1)), out);
-	CHECK_POS(ImageToGrid(makeVector(0, in.Rows()-1, 1)), out);
-	CHECK_POS(ImageToGrid(makeVector(in.Cols()-1, 0, 1)), out);
-	CHECK_POS(ImageToGrid(makeVector(in.Cols()-1, in.Rows()-1, 1)), out);
+	CHECK_POS(ImageToGrid(makeVector(0, 0, 1)), out) << "in size="<<matrix_size(in);
+	CHECK_POS(ImageToGrid(makeVector(0, in.Rows()-1, 1)), out) << "in size="<<matrix_size(in);;
+	CHECK_POS(ImageToGrid(makeVector(in.Cols()-1, 0, 1)), out) << "in size="<<matrix_size(in);;
+	CHECK_POS(ImageToGrid(makeVector(in.Cols()-1, in.Rows()-1, 1)), out) << "in size="<<matrix_size(in);;
 
 	// Do the transform
 	for (int y = 0; y < in.Rows(); y++) {
@@ -249,11 +249,11 @@ void DPGeometry::PathToOrients(const VecI& path_ys, const VecI& path_axes, MatI&
 
 ////////////////////////////////////////////////////////////////////////////////
 DPPayoffs::DPPayoffs()
-	: wall_penalty(*gvWallPenalty), occl_penalty(*gvOcclusionPenalty) {
+	: wall_penalty(*gvDefaultWallPenalty), occl_penalty(*gvDefaultOcclusionPenalty) {
 }
 
 DPPayoffs::DPPayoffs(Vec2I size)
-	: wall_penalty(*gvWallPenalty), occl_penalty(*gvOcclusionPenalty) {
+	: wall_penalty(*gvDefaultWallPenalty), occl_penalty(*gvDefaultOcclusionPenalty) {
 	Resize(size);
 }
 
@@ -274,7 +274,7 @@ void DPPayoffs::CopyTo(DPPayoffs& other) {
 	other.occl_penalty = occl_penalty;
 }
 
-void DPPayoffs::Add(double weight, const MatF& delta) {
+void DPPayoffs::Add(const MatF& delta, double weight) {
 	CHECK_SAME_SIZE(delta, wall_scores[0]);
 	for (int i = 0; i < 2; i++) {
 		for (int y = 0; y < delta.Rows(); y++) {
@@ -319,7 +319,6 @@ void ManhattanDP::Compute(const DPPayoffs& po,
 			}
 		}
 	}
-
 	CHECK(feasible) << "No feasible solution found";
 
 	// Backtrack from the solution
@@ -500,6 +499,15 @@ void ManhattanDP::ComputeBacktrack() {
 											 geom->GridToImage(project(seg.end)),
 											 geom->GridToImage(geom->Transfer(project(seg.end))),
 											 geom->GridToImage(geom->Transfer(project(seg.start))) };
+			/*TITLE("foo") {
+				DREPORT(cur->col, cur->row, out->col, out->row);
+				DREPORT(geom->grid_ceilToFloor, geom->grid_floorToCeil);
+				DREPORT(seg.start, seg.end);
+				DREPORT(geom->Transfer(project(seg.start)));
+				DREPORT(geom->Transfer(project(seg.end)));
+				DREPORT(verts[0], verts[1], verts[2], verts[3]);
+				}*/
+
 			FillPolygon(array_range(verts, 4), soln_orients, orient);
 
 			out = NULL;
@@ -810,7 +818,7 @@ double ManhattanDPReconstructor::GetDepthError(const proto::FloorPlan& gt_floorp
 		const double* gt_row = gt_depth[y];
 		for (int x = 0; x < gt_depth.Cols(); x++) {
 			double rel_err = abs(soln_row[x]-gt_row[x]) / gt_row[x];
-			CHECK_PRED1(isfinite, rel_err) << "true=" << gt_row[x] << ", est=" << soln_row[x];
+			//CHECK_PRED1(isfinite, rel_err) << "true=" << gt_row[x] << ", est=" << soln_row[x];
 			sum_err += rel_err;
 		}
 	}
@@ -839,6 +847,21 @@ void ManhattanDPReconstructor::OutputGridViz(const string& path) {
 	grid_canvas.Clear(Colors::white());
 	dp.DrawWireframeGridSolution(grid_canvas);
 	WriteImage(path, grid_canvas);
+}
+
+void ManhattanDPReconstructor::OutputManhattanHomologyViz(const string& path) {
+	FileCanvas canvas(path, input->sz());
+	canvas.DrawImage(input->rgb);
+	for (int i = 0; i < 20; i++) {
+		int x = rand() % input->nx();
+		int y = rand() % input->ny();
+		Vec2 u = makeVector(x, y);
+		Vec2 v = project(geometry.GridToImage(geometry.Transfer(geometry.ImageToGrid(unproject(u)))));
+		if (u[1] > v[1]) swap(u,v);
+		canvas.StrokeLine(u, v, Colors::black());
+		canvas.DrawDot(u, 4.0, Colors::blue());
+		canvas.DrawDot(v, 4.0, Colors::red());
+	}
 }
 
 }

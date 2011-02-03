@@ -647,7 +647,8 @@ void GuidedLineDetector::OutputRayViz(const string& filename, int axis) {
 }
 
 void GuidedLineDetector::DrawSegments(ImageRGB<byte>& canvas, int axis) {
-	CHECK(false);
+	DrawSegPixels(canvas);
+
 	// TODO: implement this using canvas
 
 	/*

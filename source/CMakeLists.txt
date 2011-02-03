@@ -53,6 +53,28 @@ ENDIF( USE_CUDA )
 SET( GraphCuts_INCLUDE_DIR /usr/local/include/graphcuts )
 SET( GraphCuts_LIBRARIES -lgraphcuts )
 
+# Find Kinect driver
+# TODO: put these into FindFreenect.cmake
+# TODO: make these optional
+SET(libfreenect_LIBRARIES "freenect")
+SET(libfreenect_INCLUDE_DIR "/usr/local/include/libfreenect")
+SET(libfreenect_LIBRARY_DIRS "/usr/local/lib/libfreenect")
+INCLUDE_DIRECTORIES(${libfreenect_INCLUDE_DIR})
+LINK_DIRECTORIES(${libfreenect_LIBRARY_DIRS})
+
+# Eigen2 (only for kinect_transform)
+FIND_PACKAGE(Eigen2)
+INCLUDE_DIRECTORIES(${EIGEN2_INCLUDE_DIR})
+LINK_DIRECTORIES(${EIGEN2_LIBRARY_DIRS})
+LIST(APPEND LIBRARIES ${EIGEN2_LIBRARIES})
+
+# Yaml (only for kinect_transform)
+#FIND_PACKAGE(yaml-cpp)
+SET(Yaml-cpp_LIBRARIES "/usr/local/lib/libyaml-cpp.so")
+#INCLUDE_DIRECTORIES(${EIGEN2_INCLUDE_DIR})
+#LINK_DIRECTORIES(${EIGEN2_LIBRARY_DIRS})
+#LIST(APPEND LIBRARIES ${EIGEN2_LIBRARIES})
+
 # Configure CPU profiling
 IF ( USE_CPU_PROFILER )
 	MESSAGE( STATUS "Linking CPU Profiler" )
@@ -100,6 +122,7 @@ SET( EXTERNAL_LIBRARIES
 	${PROTOBUF_LIBRARY}
 	${GLUT_LIBRARIES}
 	${OPENGL_LIBRARIES}
+	${libfreenect_LIBRARIES}
 
 	# Enumerate specific libs to avoid linking Boost.Python to the core code
 	${Boost_system_LIBRARY_RELEASE}
@@ -107,6 +130,10 @@ SET( EXTERNAL_LIBRARIES
 	${Boost_filesystem_LIBRARY}
 	${Boost_iostreams_LIBRARY}
 	${Boost_thread_LIBRARY}
+
+	# Only for stereotracks
+	${EIGEN2_LIBRARIES}
+	${Yaml-cpp_LIBRARIES}
 
 	# Profiling libraries (empty unless USE_CPU_PROFILER / USE_TCMALLOC are true)
 	${CPU_PROFILER_LIBRARIES}
@@ -213,6 +240,9 @@ SET( CORE_HEADERS
 	line_sweep_features.h
 	landmark_payoffs.h
 	building_features.h
+
+	kinect_device.h
+	kinect_transform.hpp
 )
 
 SET( CORE_SOURCES 
@@ -289,6 +319,9 @@ SET( CORE_SOURCES
 	
 	simple_renderer.cpp
 	floorplan_renderer.cpp
+
+	kinect_device.cpp
+	kinect_transform.cpp
 )
 
 # Core library
@@ -350,6 +383,8 @@ SET( EXECUTABLES
 	test_solution_path
 
 	joint_vpt_calib
+
+	kinect_viewer
 )
 
 FOREACH( EXECUTABLE ${EXECUTABLES} )

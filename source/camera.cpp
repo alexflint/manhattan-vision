@@ -2,7 +2,6 @@
 
 #include "camera.h"
 #include "lazyvar.h"
-//#include "numeric_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
@@ -145,7 +144,6 @@ void LinearCamera::Linearize(const CameraBase& cam, Mat3& m) {
 	// to vary from one frame to the next!
 }
 
-
 ///// PosedCamera
 PosedCamera::PosedCamera(const toon::SE3<>& pose, const CameraBase* camera)
 : camera_(camera) {
@@ -183,6 +181,14 @@ void PosedCamera::Transform(const toon::SE3<>& m) {
 
 Matrix<3,4> PosedCamera::Linearize() const {
 	return camera_->Linearize() * as_matrix(pose_);
+}
+
+
+///// CalibratedImage
+void CalibratedImage::Allocate() {
+	if (!rgb.IsAlloced()) {
+		rgb.AllocImageData(camera().image_size().x, camera().image_size().y);
+	}
 }
 
 }

@@ -35,6 +35,9 @@ int ComputeFillScanlines(const Range& poly,
 	for (int i = 0; i < n; i++) {
 		const Vec3& u = poly[i];
 		const Vec3& v = poly[(i+1)%n];
+		if (isnan(u)) {
+			DLOG << "Warning: input vertex "<<i<<" has NaN coordinates in FillPolygon";
+		}
 
 		ys[i] = u[1] / u[2];
 
@@ -64,6 +67,7 @@ int ComputeFillScanlines(const Range& poly,
 	int left = (imin+n-1)%n;  // ring decrement
 	int right = imin;
 
+	bool encountered_nan = false;
 	y0 = max(ymin, 0);
 	int yb = min(ymax, imsize[1]);
 	for (int y = y0; y < yb; y++) {
@@ -77,8 +81,8 @@ int ComputeFillScanlines(const Range& poly,
 		double xxa = ms[left]*y + cs[left];
 		double xxb = ms[right]*y + cs[right];
 		if (isnan(xxa) || isnan(xxb)) {
-			DLOG << "Warning: NaN coordinates at y=" << y << " in FillPolygonFast";
 			// ignore and move to next row
+			encountered_nan = true;
 			continue;
 		}
 
@@ -86,6 +90,10 @@ int ComputeFillScanlines(const Range& poly,
 		int xb = Clamp(xxb, 0, imsize[0]-1);
 		count += abs(xa-xb);
 		scanlines.push_back(make_pair(min(xa,xb), max(xa,xb)));
+	}
+
+	if (encountered_nan) {
+		DLOG << "Warning: NaN coordinates were computed during FillPolygon";
 	}
 }
 
