@@ -12,12 +12,13 @@
 #include "bld_helpers.h"
 #include "geom_utils.h"
 #include "line_segment.h"
+#include "monocular_payoffs.h"
 
 #include "fill_polygon.tpp"
-#include "integral_col_image.tpp"
 #include "numeric_utils.tpp"
 #include "io_utils.tpp"
 #include "image_utils.tpp"
+#include "image_transforms.tpp"
 #include "range_utils.tpp"
 #include "vector_utils.tpp"
 #include "histogram.tpp"
@@ -29,10 +30,8 @@ using namespace toon;
 lazyvar<Vec2> gvGridSize("ManhattanDP.GridSize");
 lazyvar<float> gvLineJumpThreshold("ManhattanDP.LineJumpThreshold");
 
-namespace {
-	lazyvar<float> gvDefaultWallPenalty("ManhattanDP.DefaultWallPenalty");
-	lazyvar<float> gvDefaultOcclusionPenalty("ManhattanDP.DefaultOcclusionPenalty");
-}
+lazyvar<float> gvDefaultWallPenalty("ManhattanDP.DefaultWallPenalty");
+lazyvar<float> gvDefaultOcclusionPenalty("ManhattanDP.DefaultOcclusionPenalty");
 
 ////////////////////////////////////////////////////////////////////////////////
 DPState::DPState() : row(-1), col(-1), axis(-1), dir(-1) { }
@@ -72,14 +71,14 @@ ostream& operator<<(ostream& s, const DPState& x) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-DPSolution::DPSolution()
+DPSubSolution::DPSubSolution()
 : score(numeric_limits<double>::quiet_NaN()), src(DPState::none) { }
-DPSolution::DPSolution(double s)
+DPSubSolution::DPSubSolution(double s)
 : score(s), src(DPState::none) { }
-DPSolution::DPSolution(double s, const DPState& state)
+DPSubSolution::DPSubSolution(double s, const DPState& state)
 : score(s), src(state) { }
 
-bool DPSolution::ReplaceIfSuperior(const DPSolution& other,
+bool DPSubSolution::ReplaceIfSuperior(const DPSubSolution& other,
                                    const DPState& state,
                                    double delta) {
 	if (other.score+delta > score) {
@@ -90,7 +89,7 @@ bool DPSolution::ReplaceIfSuperior(const DPSolution& other,
 	return false;
 }
 
-ostream& operator<<(ostream& s, const DPSolution& x) {
+ostream& operator<<(ostream& s, const DPSubSolution& x) {
 	s << "<score=" << x.score << ", src=" << x.src << ">";
 	return s;
 }
@@ -106,7 +105,7 @@ void DPCache::reset(const Vector<2,int>& grid_size) {
 }
 
 void DPCache::clear() {
-	table.Fill(DPSolution());
+	table.Fill(DPSubSolution());
 }
 
 DPCache::iterator DPCache::find(const DPState& x) {
@@ -116,11 +115,40 @@ DPCache::iterator DPCache::find(const DPState& x) {
 	return isnan(y->score) ? end() : y;
 }
 
-DPSolution& DPCache::operator[](const DPState& x) {
+DPSubSolution& DPCache::operator[](const DPState& x) {
 	// This particular ordering helps the OS to do locality-based caching
 	return table(x.col, x.row, x.axis, x.dir);
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+double DPSolution::GetTotalPayoff(const DPPayoffs& payoffs,
+																	bool subtract_penalties) const {
+	CHECK_EQ(path_ys.Size(), payoffs.wall_scores[0].Cols());
+	CHECK_EQ(path_axes.Size(), payoffs.wall_scores[0].Cols());
+	CHECK_SAME_SIZE(payoffs.wall_scores[0], payoffs.wall_scores[1]);
+
+	double score = 0.0;
+	for (int x = 0; x < path_ys.Size(); x++) {
+		score += payoffs.wall_scores[ path_axes[x] ][ path_ys[x] ][ x ];
+	}
+	if (subtract_penalties) {
+		score -= num_walls * payoffs.wall_penalty;
+		score -= num_occlusions * payoffs.occl_penalty;
+	}
+	return score;
+}
+
+double DPSolution::GetPathSum(const MatF& payoffs) const {
+	CHECK_EQ(path_ys.Size(), payoffs.Cols());
+	CHECK_EQ(path_axes.Size(), payoffs.Cols());
+
+	double score = 0.0;
+	for (int x = 0; x < path_ys.Size(); x++) {
+		score += payoffs[ path_ys[x] ][ x ];
+	}
+	return score;
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -156,7 +184,13 @@ void DPGeometry::Configure(const PosedCamera& cam, const Mat3& fToC) {
 
 	// Locate the vanishing points in grid coordinates
 	for (int i = 0; i < 3; i++) {
-		vpt_cols[i] = ImageToGrid(cam.GetImageVpt(i))[0];
+		Vec3 grid_vpt = imageToGrid * cam.GetImageVpt(i);
+		if (abs(grid_vpt[2]) < 1e-8) {
+			// hack to avoid vanishing points at infinity
+			vpt_cols[i] = HalfSign(grid_vpt[0]*grid_vpt[2]) * 1e+8;
+		} else {
+			vpt_cols[i] = project(grid_vpt)[0];
+		}
 	}
 
 	// Calculate the horizon row
@@ -165,10 +199,19 @@ void DPGeometry::Configure(const PosedCamera& cam, const Mat3& fToC) {
 	// the image even though the vertical vanishing point is
 	// guaranteed to be at infinity. The horizon is, however,
 	// guaranteed to be horizontal in the image.
-	double y0 = ImageToGrid(cam.GetImageVpt(0))[1];
-	double y1 = ImageToGrid(cam.GetImageVpt(1))[1];
-	CHECK_EQ_TOL(y0, y1, 1e-6) << "The horizon is not horizontal in the image.";
-	horizon_row = roundi((y0 + y1)/2.0);
+	Vec3 vpt0 = imageToGrid * cam.GetImageVpt(0);
+	Vec3 vpt1 = imageToGrid * cam.GetImageVpt(1);
+	Vec3 horizon = vpt0 ^ vpt1;
+
+	// If the horizon is horizontal then its equation is independent of x-coord
+	CHECK_LE(abs(horizon[0]), 1e-8) << "The horizon is not horizontal in the image.";
+
+	// Compute the horizon at the left and right of the image
+	Vec2 horizon_at_left = project(horizon ^ makeVector(-1,0,0));
+	Vec2 horizon_at_right = project(horizon ^ makeVector(-1,0,cam.image_size().x));
+	CHECK(!isnan(horizon_at_left)) << "horizon does not intersect the left image boundary!";
+	CHECK(!isnan(horizon_at_right)) << "horizon does not intersect the right image boundary!";
+	horizon_row = roundi(0.5*horizon_at_left[1] + 0.5*horizon_at_right[1]);
 
 	// Check that image is not flipped. This should be guaranteed by GetVerticalRectifier
 	Vec2 floor_pt = makeVector(0, horizon_row+1);
@@ -215,6 +258,13 @@ void DPGeometry::TransformDataToGrid(const MatF& in, MatF& out) const {
 	}
 }
 
+void DPGeometry::TransformToGrid(const ImageRGB<byte>& in,
+																 ImageRGB<byte>& out) const {
+	ResizeImage(out, grid_size[0], grid_size[1]);
+	out.Clear(Colors::black());
+	TransformImage(in, out, imageToGrid);
+}
+
 void DPGeometry::GetWallExtent(const Vec2& grid_pt, int axis, int& y0, int& y1) const {
 	Vec2 opp_pt = Transfer(grid_pt);
 	int opp_y = Clamp<int>(opp_pt[1], 0, grid_size[1]-1);
@@ -248,6 +298,35 @@ void DPGeometry::PathToOrients(const VecI& path_ys, const VecI& path_axes, MatI&
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+DPObjective::DPObjective()
+	: wall_penalty(*gvDefaultWallPenalty), occl_penalty(*gvDefaultOcclusionPenalty) {
+}
+
+DPObjective::DPObjective(const Vec2I& size)
+	: wall_penalty(*gvDefaultWallPenalty), occl_penalty(*gvDefaultOcclusionPenalty) {
+	Resize(size);
+}
+
+void DPObjective::Resize(const Vec2I& size) {
+	for (int i = 0; i < 3; i++) {
+		// Note that the third parameter below forces an overwrite of the
+		// entire matrix. This is slightly inefficient but protects
+		// against the case that the user forgets to do this manually
+		// (e.g. iterating over an image and writing into grid coordinates
+		// will only write to the grid section inside image bounds)
+		pixel_scores[i].Resize(size[1], size[0], 0);
+	}
+}
+
+void DPObjective::CopyTo(DPObjective& rhs) {
+	for (int i = 0; i < 3; i++) {
+		rhs.pixel_scores[i] = pixel_scores[i];
+	}
+	rhs.wall_penalty = wall_penalty;
+	rhs.occl_penalty = occl_penalty;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 DPPayoffs::DPPayoffs()
 	: wall_penalty(*gvDefaultWallPenalty), occl_penalty(*gvDefaultOcclusionPenalty) {
 }
@@ -257,25 +336,33 @@ DPPayoffs::DPPayoffs(Vec2I size)
 	Resize(size);
 }
 
+void DPPayoffs::Clear(float fill) {
+	wall_scores[0].Fill(fill);
+	wall_scores[1].Fill(fill);
+}
+
 void DPPayoffs::Resize(Vec2I size) {
-	wall_scores[0].Resize(size[1], size[0]);
-	wall_scores[1].Resize(size[1], size[0]);
+	wall_scores[0].Resize(size[1], size[0], 0);
+	wall_scores[1].Resize(size[1], size[0], 0);
 }
 
-void DPPayoffs::Resize(Vec2I size, float fill) {
-	wall_scores[0].Resize(size[1], size[0], fill);
-	wall_scores[1].Resize(size[1], size[0], fill);
-}
-
-void DPPayoffs::CopyTo(DPPayoffs& other) {
-	other.wall_scores[0] = wall_scores[0];
-	other.wall_scores[1] = wall_scores[1];
-	other.wall_penalty = wall_penalty;
-	other.occl_penalty = occl_penalty;
+void DPPayoffs::Add(const DPPayoffs& other, double weight) {
+	CHECK_SAME_SIZE(other.wall_scores[0], wall_scores[0]);
+	CHECK_SAME_SIZE(other.wall_scores[1], wall_scores[1]);
+	for (int i = 0; i < 2; i++) {
+		for (int y = 0; y < wall_scores[i].Rows(); y++) {
+			const float* in = other.wall_scores[i][y];
+			float* out = wall_scores[i][y];
+			for (int x = 0; x < wall_scores[i].Cols(); x++) {
+				out[x] += weight*in[x];
+			}
+		}
+	}
 }
 
 void DPPayoffs::Add(const MatF& delta, double weight) {
 	CHECK_SAME_SIZE(delta, wall_scores[0]);
+	CHECK_SAME_SIZE(delta, wall_scores[1]);
 	for (int i = 0; i < 2; i++) {
 		for (int y = 0; y < delta.Rows(); y++) {
 			const float* in = delta[y];
@@ -285,6 +372,13 @@ void DPPayoffs::Add(const MatF& delta, double weight) {
 			}
 		}
 	}
+}
+
+void DPPayoffs::CopyTo(DPPayoffs& other) {
+	other.wall_scores[0] = wall_scores[0];
+	other.wall_scores[1] = wall_scores[1];
+	other.wall_penalty = wall_penalty;
+	other.occl_penalty = occl_penalty;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -305,8 +399,8 @@ void ManhattanDP::Compute(const DPPayoffs& po,
 	cache.reset(geom->grid_size);
 
 	// Begin the search
-	DPSolution best(-INFINITY);
-	DPState init(-1, geom->grid_size[0]/*yes x-coord is _past_ the image bounds*/, -1, -1, DPState::DIR_OUT);
+	DPSubSolution best(-INFINITY);
+	DPState init(-1, geom->grid_size[0]/*yes x-coord is _past_ the image boundary*/, -1, -1, DPState::DIR_OUT);
 	max_depth = cur_depth = 0;
 	bool feasible = false;
 	TIMED("Core DP")
@@ -322,14 +416,11 @@ void ManhattanDP::Compute(const DPPayoffs& po,
 	CHECK(feasible) << "No feasible solution found";
 
 	// Backtrack from the solution
-	solution = best;
-	ComputeBacktrack();	
+	PopulateSolution(best);	
 }
 
-const DPSolution& ManhattanDP::Solve(const DPState& state) {
+const DPSubSolution& ManhattanDP::Solve(const DPState& state) {
 	cache_lookups++;
-	//CHECK_GE(state.row, geom->horizon_row);
-	//	DREPORT(state);
 
 	// unordered_map::insert actually does a lookup first and returns
 	// an existing element if there is one, or returns an iterator
@@ -338,7 +429,7 @@ const DPSolution& ManhattanDP::Solve(const DPState& state) {
 	if (it == cache.end()) {
 		cur_depth++;
 		max_depth = max(max_depth, cur_depth);
-		const DPSolution& soln = (cache[state] = Solve_Impl(state));  // single equals sign intended!
+		const DPSubSolution& soln = (cache[state] = Solve_Impl(state));  // single equals sign intended!
 		cur_depth--;
 		return soln;
 	} else {
@@ -348,11 +439,11 @@ const DPSolution& ManhattanDP::Solve(const DPState& state) {
 	}
 }
 
-DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
+DPSubSolution ManhattanDP::Solve_Impl(const DPState& state) {
 	// This function is one of the few places where micro-optimizations
 	// make a real difference.
 
-	DPSolution best(-INFINITY);
+	DPSubSolution best(-INFINITY);
 	if (state.col == 0) {
 		// base case
 		best.score = 0;
@@ -462,9 +553,17 @@ DPSolution ManhattanDP::Solve_Impl(const DPState& state) {
 	return best;
 }
 
-void ManhattanDP::ComputeBacktrack() {
+void ManhattanDP::PopulateSolution(const DPSubSolution& soln_node) {
 	full_backtrack.clear();
 	abbrev_backtrack.clear();
+
+	// Initialize the solution
+	solution.node = soln_node;
+	solution.score = soln_node.score;
+	solution.num_walls = 0;
+	solution.num_occlusions = 0;
+
+	// TODO: move these to DPSolution
 	soln_segments.clear();
 	soln_seg_orients.clear();
 	soln_orients.Resize(geom->camera->image_size().y,
@@ -472,9 +571,7 @@ void ManhattanDP::ComputeBacktrack() {
 											kVerticalAxis);
 
 	// Trace the solution
-	soln_num_walls = 0;  // there is always one wall
-	soln_num_occlusions = 0;
-	const DPState* cur = &solution.src;
+	const DPState* cur = &soln_node.src;
 	const DPState* out = NULL;
 	do {
 		const DPState& next = cache[*cur].src;
@@ -484,9 +581,9 @@ void ManhattanDP::ComputeBacktrack() {
 		if (cur->dir == DPState::DIR_IN && out != NULL) {
 			abbrev_backtrack.push_back(cur);
 
-			soln_num_walls++;
+			solution.num_walls++;
 			if (next.dir == DPState::DIR_UP || next.dir == DPState::DIR_DOWN) {
-				soln_num_occlusions++;
+				solution.num_occlusions++;
 			}
 
 			int orient = 1-cur->axis;
@@ -499,15 +596,6 @@ void ManhattanDP::ComputeBacktrack() {
 											 geom->GridToImage(project(seg.end)),
 											 geom->GridToImage(geom->Transfer(project(seg.end))),
 											 geom->GridToImage(geom->Transfer(project(seg.start))) };
-			/*TITLE("foo") {
-				DREPORT(cur->col, cur->row, out->col, out->row);
-				DREPORT(geom->grid_ceilToFloor, geom->grid_floorToCeil);
-				DREPORT(seg.start, seg.end);
-				DREPORT(geom->Transfer(project(seg.start)));
-				DREPORT(geom->Transfer(project(seg.end)));
-				DREPORT(verts[0], verts[1], verts[2], verts[3]);
-				}*/
-
 			FillPolygon(array_range(verts, 4), soln_orients, orient);
 
 			out = NULL;
@@ -518,9 +606,12 @@ void ManhattanDP::ComputeBacktrack() {
 
 		cur = &next;
 	} while (*cur != DPState::none);
+
+	// TODO: rearrange this in a nicer way
+	GetSolutionPath(solution.path_ys, solution.path_axes);
 }
 
-void ManhattanDP::ComputeSolutionPathOld(MatI& grid) const {
+/*void ManhattanDP::ComputeSolutionPathOld(MatI& grid) const {
 	grid.Resize(geom->grid_size[1], geom->grid_size[0], -1);
 	for (int i = 0; i < full_backtrack.size()-1; i++) {
 		const DPState& state = *full_backtrack[i];
@@ -536,9 +627,9 @@ void ManhattanDP::ComputeSolutionPathOld(MatI& grid) const {
 			}
 		}
 	}
-}
+	}*/
 
-void ManhattanDP::ComputeSolutionPath(MatI& grid) const {
+/*void ManhattanDP::ComputeSolutionPath(MatI& grid) const {
 	VecI path_ys, path_axes;
 	ComputeSolutionPath(path_ys, path_axes);
 	grid.Resize(geom->grid_size[1], geom->grid_size[0], -1);
@@ -548,8 +639,9 @@ void ManhattanDP::ComputeSolutionPath(MatI& grid) const {
 		grid[ path_ys[x] ][x] = path_axes[x];
 	}
 }
+*/
 
-void ManhattanDP::ComputeSolutionPath(VecI& path_ys, VecI& path_axes) const {
+void ManhattanDP::GetSolutionPath(VecI& path_ys, VecI& path_axes) const {
 	path_ys.Resize(geom->grid_size[0], -1);
 	path_axes.Resize(geom->grid_size[0], -1);
 	for (int i = 0; i < full_backtrack.size()-1; i++) {
@@ -574,9 +666,7 @@ void ManhattanDP::ComputeSolutionPath(VecI& path_ys, VecI& path_axes) const {
 }
 
 void ManhattanDP::ComputeGridOrients(MatI& grid_orients) {
-	VecI path_ys, path_axes;
-	ComputeSolutionPath(path_ys, path_axes);
-	geom->PathToOrients(path_ys, path_axes, grid_orients);
+	geom->PathToOrients(solution.path_ys, solution.path_axes, grid_orients);
 }
 
 void ManhattanDP::ComputeExactOrients(MatI& orients) {
@@ -603,6 +693,7 @@ const MatD& ManhattanDP::ComputeDepthMap(double zfloor, double zceil) {
 	// Setup some geometry
 	Matrix<3,4> cam = geom->camera->Linearize();
 	Matrix<3,4> grid_cam = geom->imageToGrid * cam;
+	Vec2I size = asToon(geom->camera->image_size());
 
 	// The entire solution should be on one side of the horizon
 	double y0 = project(soln_segments[0].start)[1];
@@ -610,8 +701,10 @@ const MatD& ManhattanDP::ComputeDepthMap(double zfloor, double zceil) {
 	double opp_z =   y0 < geom->horizon_row ? zfloor : zceil;
 	Vec4 plane = makeVector(0, 0, 1, -plane_z);
 
+	//FileCanvas canvas("out/3d.png", size, Colors::white());
+
 	// Push each polygon through the renderer
-	renderer.Configure(cam, asToon(geom->camera->image_size()));
+	renderer.Configure(cam, size);
 	renderer.RenderInfinitePlane(zfloor, kVerticalAxis);
 	renderer.RenderInfinitePlane(zceil, kVerticalAxis);
 	BOOST_FOREACH(const LineSeg& seg, soln_segments) {
@@ -619,9 +712,28 @@ const MatD& ManhattanDP::ComputeDepthMap(double zfloor, double zceil) {
 		Vec3 tr = IntersectRay(seg.end, grid_cam, plane);
 		Vec3 bl = makeVector(tl[0], tl[1], opp_z);
 		Vec3 br = makeVector(tr[0], tr[1], opp_z);
-		renderer.Render(tl, br, tr, 0);  // we're only going to use the depth buffer
+		renderer.Render(tl, br, tr, 0);  // use 0 because we're only going to use the depth buffer
 		renderer.Render(tl, br, bl, 0);
+		/*
+		Vec2 a = project(cam*unproject(tl));
+		Vec2 b = project(cam*unproject(tr));
+		Vec2 c = project(cam*unproject(br));
+		Vec2 d = project(cam*unproject(bl));
+		TITLED("") {
+			DREPORT(tl,tr,bl,br,a,b,c,d);
+			DREPORT(zceil,zfloor);
+		}
+		canvas.StrokeLine(a, b, Colors::green());
+		canvas.StrokeLine(b, c, Colors::red());
+		canvas.StrokeLine(c, d, Colors::blue());
+		canvas.StrokeLine(d, a, Colors::black());*/
 	}
+
+	// Hack to remove infinities near horizon or at image borders
+	// (clipping errors)
+	renderer.SmoothInfiniteDepths();
+	
+	// Return the depth buffer
 	return renderer.depthbuffer();
 }
 
@@ -681,100 +793,37 @@ void ManhattanDP::DrawWireframeSolution(ImageRGB<byte>& canvas) const {
 
 
 
-MonocularPayoffGen::MonocularPayoffGen(const DPObjective& obj,
-																			 const DPGeometry& geom) {
-	Compute(obj, geom);
-}
-
-void MonocularPayoffGen::Compute(const DPObjective& obj,
-																 const DPGeometry& geom) {
-	Configure(obj, geom);
-	GetPayoffs(payoffs);
-}
-
-void MonocularPayoffGen::Configure(const DPObjective& obj,
-																	 const DPGeometry& geometry) {
-	geom = geometry;
-	wall_penalty = obj.wall_penalty;
-	occl_penalty = obj.occl_penalty;
-
-	Vec2I obj_size = matrix_size(obj.pixel_scores[0]);
-	bool image_coords = (obj_size == asToon(geom.camera->image_size()));
-	if (!image_coords) {
-		CHECK_EQ(obj_size, geometry.grid_size)
-			<< "Objective must be same size as either image or grid";
-	}
-	
-	// Compute per orientation, per pixel affinities
-	MatF grid_buffer;  // don't give this a size yet
-	for (int i = 0; i < 3; i++) {
-		if (image_coords) {
-			// Transform the scores according to ImageToGrid()
-			geometry.TransformDataToGrid(obj.pixel_scores[i], grid_buffer);
-			integ_scores[i].Compute(grid_buffer);
-		} else {
-			integ_scores[i].Compute(obj.pixel_scores[i]);
-		}
-	}
-}
-
-bool MonocularPayoffGen::Empty() const {
-	return integ_scores[0].ny() == 0;
-}
-
-double MonocularPayoffGen::GetWallScore(const Vec2& grid_pt, int axis) const {
-	CHECK_GT(integ_scores[0].m_int.Rows(), 0) << "Configure() must be called before GetPayoff()";
-	CHECK_INTERVAL(grid_pt[0], 0, geom.grid_size[0]-1);
-
-	int x = roundi(grid_pt[0]);
-	int y0, y1;
-	geom.GetWallExtent(grid_pt, axis, y0, y1);
-	int wall_orient = 1-axis;  // orients refer to normal direction rather than vpt index
-
-	return integ_scores[kVerticalAxis].Sum(x, 0, y0-1)
-		+ integ_scores[wall_orient].Sum(x, y0, y1)
-		+ integ_scores[kVerticalAxis].Sum(x, y1+1, geom.grid_size[1]-1);
-}
-
-void MonocularPayoffGen::GetPayoffs(DPPayoffs& payoffs) const {
-	for (int i = 0; i < 3; i++) {
-		CHECK_EQ(matrix_size(integ_scores[i]), geom.grid_size+makeVector(0,1));
-	}
-
-	payoffs.Resize(geom.grid_size);
-	for (int i = 0; i < 2; i++) {
-		for (int y = 0; y < geom.grid_size[1]; y++) {
-			float* outrow = payoffs.wall_scores[i][y];
-			for (int x = 0; x < geom.grid_size[0]; x++) {
-				outrow[x] = GetWallScore(makeVector(x,y), i);
-			}
-		}
-	}
-	payoffs.wall_penalty = wall_penalty;
-	payoffs.occl_penalty = occl_penalty;
-}
-
-
-
 
 
 
 ////////////////////////////////////////////////////////////////////////////////
-void ManhattanDPReconstructor::Compute(const PosedImage& image,
-																			 const Mat3& floorToCeil,
-																			 const DPObjective& objective) {
-	input = &image;
-	geometry.Configure(image.pc(), floorToCeil);
-	payoff_gen.Compute(objective, geometry);
-	Compute(image, geometry, payoff_gen.payoffs);
+ManhattanDPReconstructor::ManhattanDPReconstructor() {
+}
+
+ManhattanDPReconstructor::~ManhattanDPReconstructor() {
 }
 
 void ManhattanDPReconstructor::Compute(const PosedImage& image,
 																			 const DPGeometry& geom,
-																			 const DPPayoffs& payoffs) {
+																			 const DPObjective& objective) {
 	input = &image;
+	geometry = geom; //.Configure(image.pc(), floorToCeil);
+
+	if (!payoff_gen) {
+		payoff_gen.reset(new MonocularPayoffGen);
+	}
+	payoff_gen->Compute(objective, geometry);
+
+	Compute(image, geometry, payoff_gen->payoffs);
+}
+
+void ManhattanDPReconstructor::Compute(const PosedImage& image,
+																			 const DPGeometry& geom,
+																			 const DPPayoffs& po) {
+	input = &image;
+	payoffs = &po;
 	geometry = geom;  // we're copying here, but nothing big (yet)
-	TIMED("Complete DP") dp.Compute(payoffs, geometry);
+	TIMED("Complete DP") dp.Compute(po, geometry);
 }
 
 void ManhattanDPReconstructor::ReportBacktrack() {
@@ -793,41 +842,31 @@ double ManhattanDPReconstructor::GetAccuracy(const MatI& gt_orients) {
 	return ComputeAgreementPct(dp.soln_orients, gt_orients);
 }
 
-double ManhattanDPReconstructor::GetAccuracy(const proto::FloorPlan& gt_floorplan) {
-	MatI gt_orients;
-	GetTrueOrients(gt_floorplan, input->pc(), gt_orients);
-	return GetAccuracy(gt_orients);
+double ManhattanDPReconstructor::GetAccuracy(const ManhattanGroundTruth& gt) {
+	return GetAccuracy(gt.orientations());
 }
 
-double ManhattanDPReconstructor::ReportAccuracy(const proto::FloorPlan& gt_floorplan) {
-	double acc = GetAccuracy(gt_floorplan);
-	DLOG << format("Accuracy: %25.0f%%") % (acc*100);
+double ManhattanDPReconstructor::ReportAccuracy(const ManhattanGroundTruth& gt) {
+	double acc = GetAccuracy(gt);
+	DLOG << format("Labelling accuracy: %|40t|%.0f%%") % (acc*100);
 	return acc;
 }
 
-double ManhattanDPReconstructor::GetDepthError(const proto::FloorPlan& gt_floorplan) {
-	const MatD& soln_depth = dp.ComputeDepthMap(gt_floorplan.zfloor(), gt_floorplan.zceil());
-	MatI gt_orients;
-	MatD gt_depth;
-	GetTrueOrients(gt_floorplan, input->pc(), gt_orients, gt_depth);
-	CHECK_EQ(gt_depth.Rows(), soln_depth.Rows());
-	CHECK_EQ(gt_depth.Cols(), soln_depth.Cols());
-	double sum_err = 0;
-	for (int y = 0; y < gt_depth.Rows(); y++) {
-		const double* soln_row = soln_depth[y];
-		const double* gt_row = gt_depth[y];
-		for (int x = 0; x < gt_depth.Cols(); x++) {
-			double rel_err = abs(soln_row[x]-gt_row[x]) / gt_row[x];
-			//CHECK_PRED1(isfinite, rel_err) << "true=" << gt_row[x] << ", est=" << soln_row[x];
-			sum_err += rel_err;
-		}
-	}
-	return sum_err / (gt_depth.Rows() * gt_depth.Cols());
+void ManhattanDPReconstructor::GetDepthErrors(const ManhattanGroundTruth& gt, MatF& errors) {
+	const MatD& gt_depth = gt.depthmap();
+	const MatD& soln_depth = dp.ComputeDepthMap(gt.zfloor(), gt.zceil());
+	ComputeDepthErrors(gt_depth, soln_depth, errors);
 }
 
-double ManhattanDPReconstructor::ReportDepthError(const proto::FloorPlan& gt_floorplan) {
-	double acc = GetDepthError(gt_floorplan);
-	DLOG << format("Mean depth error: %25.3f%%") % (acc*100);
+double ManhattanDPReconstructor::GetMeanDepthError(const ManhattanGroundTruth& gt) {
+	MatF errors;	// TODO: move to a class variable (or external?)
+	GetDepthErrors(gt, errors);
+	return ComputeMeanDepthError(errors);
+}
+
+double ManhattanDPReconstructor::ReportDepthError(const ManhattanGroundTruth& gt) {
+	double acc = GetMeanDepthError(gt);
+	DLOG << format("Mean depth error: %|40t|%.1f%%") % (acc*100);
 	return acc;
 }
 
@@ -862,6 +901,28 @@ void ManhattanDPReconstructor::OutputManhattanHomologyViz(const string& path) {
 		canvas.DrawDot(u, 4.0, Colors::blue());
 		canvas.DrawDot(v, 4.0, Colors::red());
 	}
+}
+
+void ManhattanDPReconstructor::OutputPayoffsViz(int orient, const string& path) {
+	// Draw payoffs
+	ImageRGB<byte> payoff_image(geometry.grid_size[0], geometry.grid_size[1]);
+	DrawMatrixRecentred(payoffs->wall_scores[orient], payoff_image);
+	dp.DrawWireframeGridSolution(payoff_image);
+
+	// Draw image in grid coords
+	ImageRGB<byte> grid_image;
+	geometry.TransformToGrid(input->rgb, grid_image);
+
+	// Blend together
+	FileCanvas canvas(path, grid_image);
+	canvas.DrawImage(payoff_image, 0.6);
+}
+
+void ManhattanDPReconstructor::OutputDepthErrorViz(const ManhattanGroundTruth& gt,
+																									 const string& path) {
+	MatF depth_errors;
+	GetDepthErrors(gt, depth_errors);
+	WriteMatrixImageRescaled(path, depth_errors);
 }
 
 }

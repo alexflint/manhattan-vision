@@ -1,6 +1,8 @@
 #include "camera.h"
 #include "manhattan_dp.h"
 
+#include "integral_image.tpp"
+
 namespace indoor_context {
 	// Represents five statistics of two datasets from which NCC can be
 	// computed.
@@ -57,7 +59,7 @@ namespace indoor_context {
 		// for values above ~1e+7 when using floats can cause the
 		// denominator to be *much* less than zero in certain cases. This
 		// is to do with the cumulative sums held inside the integral
-		// images; the inputs can safely remain as floats.
+		// images; the inputs to Compute() etc can safely remain as floats.
 		IntegralColImage<double> intg_a;
 		IntegralColImage<double> intg_b;	
 		IntegralColImage<double> intg_asqr;
@@ -156,13 +158,12 @@ namespace indoor_context {
 		// NCC integral images
 		HomographyNCC floor_ncc;
 		HomographyNCC ceil_ncc;
-
 		// Transposed and rectified intensity images
 		MatF l_vrect_im_tr;
 		MatF r_vrect_im_tr;
 	
 		// The final payoff matrix
-		boost::array<MatF,2> payoffs;
+		MatF payoffs;
 
 		// Compute payoffs by calculating column-wise NCC scores for each
 		// element of the payoff matrix.

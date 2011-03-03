@@ -4,13 +4,16 @@
 #include <boost/function.hpp>
 
 #include "common_types.h"
-#include "line_detector.h"
+#include "guided_line_detector.h"
+#include "line_sweeper.h"
 #include "camera.h"
 #include "progress_reporter.h"
-#include "map.h"  // TODO: remove when debugging done
+#include "simple_renderer.h"
 
 namespace indoor_context {
+	class ManhattanGroundTruth;
 
+///////////////////////////////////////////////////////////////////////
 struct ManhattanEdge {
 	Vec3 start, end, eqn;
 	int axis;
@@ -21,6 +24,7 @@ struct ManhattanEdge {
 	bool Contains(const Vec3& p) const;
 };
 
+///////////////////////////////////////////////////////////////////////
 struct ManhattanCorner {
 	Vec3 div_eqn; // homogeneous line equation of this edge,
 	// positive side is always to the left in the
@@ -37,6 +41,7 @@ struct ManhattanCorner {
 	}
 };
 
+///////////////////////////////////////////////////////////////////////
 struct ManhattanBuilding {
 	typedef list<ManhattanCorner>::iterator CnrIt;
 	typedef list<ManhattanCorner>::const_iterator ConstCnrIt;
@@ -46,6 +51,7 @@ struct ManhattanBuilding {
 	bool ContainsEdge(int id) const;
 };
 
+///////////////////////////////////////////////////////////////////////
 // Generates predictions from building hypotheses
 class ManhattanEvaluator {
 public:
@@ -65,10 +71,7 @@ public:
 	// Toggles between h1_axis and h2_axis
 	int OtherHorizAxis(int a) const;
 
-	////////////////////////////////////////////
 	// Vizualization
-	////////////////////////////////////////////
-
 	void DrawBuilding(const ManhattanBuilding& bld, ImageRGB<byte>& canvas);
 	void DrawPrediction(const ManhattanBuilding& bld, ImageRGB<byte>& canvas);
 	void DrawOrientations(const MatI& orients, ImageRGB<byte>& canvas);
@@ -86,7 +89,8 @@ public:
 	void WriteBuilding(const ManhattanBuilding& bld, const string& filename);
 };
 
-// Represents the branch and bound that explores the space of possible Manhattan buildings.
+///////////////////////////////////////////////////////////////////////
+// Represents the branch-and-bound that explores the space of possible Manhattan buildings.
 // We only use retina coordinates here
 class ManhattanBranchAndBound {
 public:
@@ -105,10 +109,10 @@ public:
 	vector<const ManhattanEdge*> floor_edges[3];
 
 	// The set of starting hypotheses
-	ptr_vector<ManhattanBuilding> init_hypotheses;
+	boost::ptr_vector<ManhattanBuilding> init_hypotheses;
 
 	// The current visit function that we call for each node
-	function<void(const ManhattanBuilding&)> visitor;
+	boost::function<void(const ManhattanBuilding&)> visitor;
 
 	// Inirialize the reconstructor with the given pose and camera
 	ManhattanBranchAndBound();
@@ -118,7 +122,7 @@ public:
 
 	// Enumerate hypotheses, invoking visit(x) on each
 	bool Compute(const vector<ManhattanEdge> edges[],
-	             function<void(const ManhattanBuilding&)> visitor);
+	             boost::function<void(const ManhattanBuilding&)> visitor);
 
 	// Initialize the list of buildings
 	void Initialize(const vector<ManhattanEdge> edges[]);
@@ -181,34 +185,31 @@ public:
 	                       const Vec3& p);
 };
 
-
+	///////////////////////////////////////////////////////////////////////
 // Represents the single-image Manhattan recovery algorithm.
 class MonocularManhattanBnb {
 public:
 	const PosedCamera* pc;	// the complete camera model
 	int vert_axis;  // axis indices
-	Vec3 horizon;  // the horizon line
 
 	// The best hypothesis
 	ManhattanBuilding soln;
 	int soln_score;
 	MatI soln_orients;
-
 	// The estimated orientations (from line sweep etc)
 	MatI est_orients;
-
 	// The number of hypotheses enumerated so far
 	int hypothesis_count;
 
 	// The buffer used to compute predictions
-	// (beware: this makes Compute() un-parallelizable!)
+	// (beware: this makes Compute() un-parallelizable)
 	mutable MatI predict_buffer;
-
 	// The object that explores the search tree
 	ManhattanBranchAndBound enumerator;
-
 	// The object that maps models to their predicted pixel labellings
-	ManhattanEvaluator renderer;
+	ManhattanEvaluator evaluator;
+	// Used to compute depth of the solution
+	SimpleRenderer depth_renderer;
 
 	// Do the reconstruction
 	bool Compute(const PosedCamera& pcam,
@@ -218,24 +219,65 @@ public:
 	// Score a model according to its agreement with an orientation estimate
 	void EvaluateHypothesis(const ManhattanBuilding& bld);
 
-	//////////////////////////////////////////////
-	// 3D Reconstruction
-	//////////////////////////////////////////////
-
 	// Toggles between h1_axis and h2_axis
 	int OtherHorizAxis(int a) const;
+
 	// Project points into the world
 	Vec3 FloorPoint(const Vec3& p, double z);
-	Vec3 CeilPoint(const Vec3& p,
-	                          const Vec3& floor_pt);
+	Vec3 CeilPoint(const Vec3& p, const Vec3& floor_pt);
 
 	// Transfer a building between frames. PredictOrientations is a
 	// special case of this for orig_pose = new_pose.
-	void TransferBuilding(const ManhattanBuilding& bld,
-	                      //const toon::SE3<>& orig_pose,
-	                      const toon::SE3<>& new_pose,
+	void TransferBuilding(const toon::SE3<>& new_pose,
 	                      double floor_z,
 	                      MatI& predicted);
+
+	// Compute depth
+	const MatD& ComputeDepthMap(double zfloor, double zceil);
+};
+
+
+
+
+
+
+class ManhattanBnbReconstructor {
+public:
+	const PosedImage* input;
+	GuidedLineDetector line_detector;
+	IsctGeomLabeller line_sweeper;
+	MonocularManhattanBnb bnb;
+	bool success;
+	double bnb_time_ms;
+
+	// Run the reconstruction algorithm for the given frame
+	void Compute(const PosedImage& input);
+
+	// Compute accuracy w.r.t. ground truth
+	double GetAccuracy(const MatI& gt_orients);
+	// Compute accuracy w.r.t. the ground truth floorplan
+	double GetAccuracy(const ManhattanGroundTruth& gt);
+
+	// Compute per-pixel relative-depth-error
+	void GetDepthErrors(const ManhattanGroundTruth& gt,
+											MatF& out_errors);
+	// Compute mean relative-depth-error
+	double GetMeanDepthError(const ManhattanGroundTruth& gt);
+	// Report and return mean relative-depth-error
+	double ReportDepthError(const ManhattanGroundTruth& gt);
+
+	// Draw the original image
+	void OutputOrigViz(const string& path);
+	// Draw lines and line sweeps
+	void OutputOrientViz(const string& path);
+	// Draw the line detections
+	void OutputLineViz(const string& path);
+	// Draw the predicted model
+	void OutputSolutionOrients(const string& path);
+	// Transfer the solution to an auxilliary view
+	void GetAuxOrients(const PosedCamera& aux, double zfloor, MatI& aux_orients);
+	// Draw the solution in an auxilliary view
+	void OutputSolutionInView(const string& path, const PosedImage& aux, double zfloor);
 };
 
 }

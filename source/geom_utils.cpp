@@ -178,7 +178,6 @@ Mat3 ConstructPlanarHomology(const Vec3& vertex,
 	} else if (abs(cr-1) < 1e-15) {
 		DLOG << "Warning: cross ratio is very small ("<<cr<<") -- error in GetManhattanHomology?";
 	}
-	DREPORT(vertex.as_col() * axis.as_row(), cr, dp);
 	return I + (cr-1)*(vertex.as_col()*axis.as_row()) / dp;
 }
 
@@ -193,8 +192,6 @@ Mat3 GetManhattanHomology(const Matrix<3,4>& cam, double z0, double z1) {
 	// something away from the focal plane
 	Vec3 p = cam * makeVector(10, -2, z0, 1);
 	Vec3 q = cam * makeVector(10, -2, z1, 1);
-
-	DREPORT(cam, m, m_inv, vertex, axis, p, q);
 
 	return ConstructPlanarHomology(vertex, axis, p, q);
 }

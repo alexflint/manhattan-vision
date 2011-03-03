@@ -6,8 +6,7 @@
 #include "canvas.h"
 #include "manhattan_dp.h"
 #include "line_sweep_features.h"
-
-#include "integral_col_image.tpp"
+#include "monocular_payoffs.h"
 
 namespace indoor_context {
 	////////////////////////////////////////////////////////////////////////////////
@@ -67,12 +66,12 @@ namespace indoor_context {
 		// The base frame
 		const PosedImage* base_frame;
 		const DPObjective* base_objective;
-		LineSweepDPScore base_gen;  // only kept for visualisation
+		LineSweepObjectiveGen base_gen;  // only kept for visualisation
 
 		// The auxiliary frames
 		vector<const PosedImage*> aux_frames;
 		vector<const DPObjective*> aux_objectives;  // only kept for visualisation
-		boost::ptr_vector<LineSweepDPScore> aux_gen;  // only kept for visualisation
+		boost::ptr_vector<LineSweepObjectiveGen> aux_gen;  // only kept for visualisation
 
 		// The reconstructor
 		MultiViewPayoffs joint_payoff_gen;

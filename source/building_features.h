@@ -6,7 +6,21 @@
 #include "guided_line_detector.h"
 #include "line_sweeper.h"
 
+#include "integral_image.tpp"
+
 namespace indoor_context {
+	// Accumulates features in a local neighbourhood and for neighbours
+	class AccumulatedFeatures {
+	public:
+		Vec2I size;  // size of input matrix
+		IntegralImage<float> integ;
+		boost::ptr_vector<MatF> results;
+		void Prepare(const MatF& input);
+		void Compute(int radius);
+		void Compute(const MatF& input, int radius);
+	};
+
+	// Generates a range of features
 	class BuildingFeatures {
 	public:
 		const PosedImage* input;
@@ -30,6 +44,8 @@ namespace indoor_context {
 		GuidedLineDetector line_detector;
 		IsctGeomLabeller line_sweeper;
 		boost::ptr_vector<MatF> sweep_features;
+		// accum_sweeps
+		AccumulatedFeatures accum[3];
 
 		// Ground truth
 		boost::ptr_vector<MatF> gt_features;
@@ -41,7 +57,7 @@ namespace indoor_context {
 
 		// Configure the features with a string describing the feature set
 		// Example feature set:
-		//   "rgb,hsv,sweeps"
+		//   "rgb,hsv,sweeps,accum_sweeps"
 		//   "all,-rgb,-hsv"   -- all except RGB and HSV
 		//   "all,gt"          -- all including ground truth orientations
 		//   "default"         -- use the feature spec in the relevant gvar

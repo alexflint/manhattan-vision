@@ -28,7 +28,7 @@ void LineSweeper::Compute(const PosedImage& image,
 	input = &image;
 
 	// Get bounding lines for the image
-	Bounds2D<double> image_bounds = Bounds2D<double>::FromSize(image.sz());
+	Bounds2D<double> image_bounds = Bounds2D<double>::FromSize(image.size());
 	vector<Vec3 > bounding_lines;
 	bounding_lines.push_back(image_bounds.left_eqn());      // left
 	bounding_lines.push_back(image_bounds.top_eqn());      // top

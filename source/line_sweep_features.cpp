@@ -14,7 +14,7 @@ namespace indoor_context {
 		lazyvar<float> gvOcclusionPenalty("ManhattanDP.DefaultOcclusionPenalty");
 	}
 
-	void LineSweepDPScore::OutputOrientViz(const string& path) {
+	void LineSweepObjectiveGen::OutputOrientViz(const string& path) {
 		ImageRGB<byte> orient_canvas;
 		ImageCopy(input_image->rgb, orient_canvas);
 		line_sweeper.DrawOrientViz(orient_canvas);
@@ -22,7 +22,7 @@ namespace indoor_context {
 		WriteImage(path, orient_canvas);
 	}
 
-	void LineSweepDPScore::OutputLineViz(const string& path) {
+	void LineSweepObjectiveGen::OutputLineViz(const string& path) {
 		FileCanvas canvas(path, asToon(input_image->sz()));
 		canvas.DrawImage(input_image->rgb);
 		canvas.SetLineWidth(3.0);
@@ -35,17 +35,17 @@ namespace indoor_context {
 
 
 
-	void LineSweepDPScore::Compute(const PosedImage& image) {
+	void LineSweepObjectiveGen::Compute(const PosedImage& image) {
 		input_image = &image;
 
-		// Detect lines and guess initial orientation
-		TIMED("Detect lines")
-			line_detector.Compute(image);
-		TIMED("Estimate orientations")
-			line_sweeper.Compute(image, line_detector.detections);
+		// Detect lines and sweep
+		//TIMED("Detect lines")
+		line_detector.Compute(image);
+		//TIMED("Estimate orientations")
+		line_sweeper.Compute(image, line_detector.detections);
 
 		// Convert the line sweeper labels to a score matrix
-		objective.Resize(image.nx(), image.ny());
+		objective.Resize(image.size());
 		for (int y = 0; y < image.ny(); y++) {
 			const int* inrow = line_sweeper.orient_map[y];
 			for (int i = 0; i < 3; i++) {

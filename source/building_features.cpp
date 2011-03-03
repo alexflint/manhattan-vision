@@ -8,12 +8,67 @@
 
 #include "io_utils.tpp"
 #include "image_utils.tpp"
+#include "vector_utils.tpp"
+#include "format_utils.tpp"
 
 namespace indoor_context {
 
 	lazyvar<string> gvDefaultFeatureSet("BuildingFeatures.DefaultSet");
 	lazyvar<int> gvGaborScales("BuildingFeatures.GaborScales");
 	lazyvar<int> gvGaborOrientations("BuildingFeatures.GaborOrientations");
+
+	lazyvar<int> gvFirstWindowForSweeps("BuildingFeatures.FirstWindowForSweeps");
+	lazyvar<int> gvNumScalesForSweeps("BuildingFeatures.NumScalesForSweeps");
+
+
+	void AccumulatedFeatures::Prepare(const MatF& input) {
+		size = matrix_size(input);
+		results.clear();
+		integ.Compute(input);
+	}
+
+	void AccumulatedFeatures::Compute(const MatF& input, int radius) {
+		Prepare(input);
+		Compute(radius);
+	}
+
+	void AccumulatedFeatures::Compute(int r) {
+		CHECK_GT(integ.m_int.Rows(), 0) << "AccumulatedFeatures::Prepare() must be called before Compute()";
+
+		int k = results.size();
+		results.resize(results.size()+5);
+
+		// Acumulate features in local neighbourhoods
+		Vec2I tl, br;
+		results[k].Resize(size[1], size[0]);
+		MatF& accumulated = results[k];
+		for (int y = 0; y < size[1]; y++) {
+			tl[1] = Clamp<int>(y-r, 0, size[1]-1);
+			br[1] = Clamp<int>(y+r, 0, size[1]-1);
+			float* row = results[k][y];
+			for (int x = 0; x < size[0]; x++) {
+				tl[0] = Clamp<int>(x-r, 0, size[0]-1);
+				br[0] = Clamp<int>(x+r, 0, size[0]-1);
+				row[x] = integ.Sum(tl, br) / ((br[0]-tl[0]+1)*(br[1]-tl[1]+1));
+			}
+		}
+		k++;
+
+		// Compute neighbour features
+		for (int t = -1; t <= 1; t += 2) {
+			// Horizontal shift
+			results[k].Resize(size[1], size[0]);
+			ShiftVert(accumulated, results[k], roundi(t*r));
+			k++;
+
+			// Vertical shift
+			results[k].Resize(size[1], size[0]);
+			ShiftHoriz(accumulated, results[k], roundi(t*r));
+			k++;
+		}
+	}
+
+
 
 	BuildingFeatures::BuildingFeatures() {
 	}
@@ -32,20 +87,24 @@ namespace indoor_context {
 			feature_set = config;
 		}
 
-		// Build the set of all available components
-		const char* known_comps[5] = {"rgb", "hsv", "gabor", "sweeps", "gt"};
-		set<string> available;
-		for (int i = 0; i < 5; i++) {
-			available.insert(known_comps[i]);
-		}
-		
 		// Build a list of components to be included when "all" is specified
-		const char* normal_comps[4] = {"rgb", "hsv", "gabor", "sweeps"};
 		set<string> normal;
-		for (int i = 0; i < 4; i++) {
-			normal.insert(normal_comps[i]);
-		}
+		normal.insert("rgb");
+		normal.insert("hsv");
+		normal.insert("gabor");
+		normal.insert("sweeps");
+		normal.insert("accum_sweeps");
 
+		// Build the set of "special" components
+		set<string> special;
+		special.insert("gt");
+
+		// Build the set of all available components
+		set<string> available;
+		set_union(normal.begin(), normal.end(),
+							special.begin(), special.end(),
+							inserter(available, available.begin()));
+		
 		// Parse the config string
 		bool use_all = false;
 		set<string> include, exclude;
@@ -175,13 +234,13 @@ namespace indoor_context {
 			for (int i = 0; i < gabor.responses.size(); i++) {
 				const MatF& response = *gabor.responses[i];
 				gabor_features[i].Resize(image.ny(), image.nx());
-				Upsample(response, gabor_features[i], image.ny()/response.Rows());
+				Upsample(response, image.ny()/response.Rows(), gabor_features[i]);
 				features.push_back(&gabor_features[i]);
 
 				int orient_index = i/gabor.num_scales;
 				float orient = orient_index*180.0/gabor.num_orients;  // conversion to degrees from MakeGaborFilters in filters.cpp
 				int scale = 1<<(i%gabor.num_orients);
-				feature_strings.push_back(str(format("Gabor orient=%.1f scale=%dx") % orient % scale));
+				feature_strings.push_back(fmt("Gabor orient=%.1f scale=%dx", orient, scale));
 			}
 		}
 		CHECK_EQ(features.size(), feature_strings.size());
@@ -189,6 +248,9 @@ namespace indoor_context {
 		//
 		// Line sweeps
 		//
+		CHECK(!IsActive("accum_sweeps") || IsActive("sweeps"))
+			<< "If 'accum_sweeps' is selected then 'sweeps' must also be.";
+
 		if (IsActive("sweeps")) {
 			line_detector.Compute(image);
 			line_sweeper.Compute(image, line_detector.detections);
@@ -196,7 +258,7 @@ namespace indoor_context {
 			for (int i = 0; i < 3; i++) {
 				sweep_features[i].Resize(image.ny(), image.nx());
 				features.push_back(&sweep_features[i]);
-				feature_strings.push_back(str(format("Line sweeps for orient %d")%i));
+				feature_strings.push_back(fmt("Line sweeps for orient %d", i));
 			}
 			for (int y = 0; y < image.ny(); y++) {
 				int* sweeprow = line_sweeper.orient_map[y];
@@ -207,8 +269,29 @@ namespace indoor_context {
 					}
 				}
 			}
+
+			if (IsActive("accum_sweeps")) {
+				int base_radius = *gvFirstWindowForSweeps;
+				int num_scales = *gvNumScalesForSweeps;
+				for (int i = 0; i < 3; i++) {
+					accum[i].Prepare(sweep_features[i]);
+					int radius = 1;
+					for (int j = 0; j < num_scales; j++) {
+						radius *= base_radius;
+						accum[i].Compute(radius);
+						feature_strings.push_back(fmt("Accumulated sweeps (orientation %d, radius %d, centre)", i, radius));
+						for (int k = 0; k < 4; k++) {
+							feature_strings.push_back(fmt("Accumulated sweeps (orientation %d, radius %d, neighbour %d)", i, radius, k));
+						}
+					}
+					BOOST_FOREACH(const MatF& m, accum[i].results) {
+						features.push_back(&m);
+					}
+				}
+			}
 		}
 		CHECK_EQ(features.size(), feature_strings.size());
+
 
 		//
 		// Ground truth
@@ -222,7 +305,7 @@ namespace indoor_context {
 			for (int i = 0; i < 3; i++) {
 				gt_features[i].Resize(image.ny(), image.nx());
 				features.push_back(&gt_features[i]);
-				feature_strings.push_back(str(format("Ground truth for orient %d")%i));
+				feature_strings.push_back(fmt("Ground truth for orient %d", i));
 			}
 			for (int y = 0; y < image.ny(); y++) {
 				const int* gtrow = (*gt_orients)[y];

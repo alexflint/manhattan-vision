@@ -15,12 +15,11 @@ namespace indoor_context {
 	namespace {
 		using namespace boost;
 		using namespace toon;
-		using namespace Cairo;
 	}
 
 	template <typename T>
 	void Canvas::Attach(T surface) {
-    c_ = Context::create(surface);
+    c_ = Cairo::Context::create(surface);
 	}
 	
 	template <typename Range>

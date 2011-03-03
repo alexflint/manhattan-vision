@@ -9,6 +9,7 @@
 #include "textons.h"
 #include "line_detector.h"
 #include "guided_line_detector.h"
+#include "map.pb.h"
 
 namespace indoor_context {
 
@@ -17,8 +18,6 @@ namespace { using namespace boost; }
 
 // forward decls
 class Map;
-namespace proto { class TruthedMap; }
-
 
 // Represents a measurement of a 3D landmark in a particular frame
 class Measurement {
@@ -39,9 +38,6 @@ public:
 
 	// The raw image from the camera together with its pose
 	PosedImage image;
-	// Pose of this keyframe, or null if the camera was lost
-	// Equal to &this->image.pc()
-	PosedCamera* pc;
 
 	// Path to the image file for this frame (if any)
 	string image_file;
@@ -61,8 +57,7 @@ public:
 	               int id,
 	               const string& image_file,
 	               const toon::SE3<>& pose);
-	// Load the image into this->rawimage. If undistort is true, also use the camera
-	// model to undistort the image.
+	// Load the image
 	void LoadImage(bool undistort=false);
 	void UnloadImage();
 	// Undistort the current image using the camera model
@@ -77,8 +72,6 @@ public:
 
 	// The canny line detector
 	CannyLineDetector line_detector;
-	// Posed image, initialized in RunGuidedLineDetector
-	//scoped_ptr<PosedImage> pim;
 	// The guided line detector (for after canonical frame is established)
 	GuidedLineDetector guided_line_detector;
 
@@ -87,12 +80,10 @@ public:
 	// Vanishing points in the image plane
 	Vec3 image_vpts[3];
 
-	// Load a keyframe from a file
-	//void Load(const string& image_file, const string& pose_file);
-	// Compute textons for this keyframe's image
-	void ComputeTextonMap(const TextonVocab& vocab);
 	// Run the guided line detector: this->pc must be initialized
 	void RunGuidedLineDetector();
+	// Output a vector of all points measured in this frame
+	void GetMeasuredPoints(vector<Vec3>& out) const;
 };
 
 // Represents a map from PTAM

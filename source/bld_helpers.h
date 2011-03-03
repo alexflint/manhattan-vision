@@ -18,25 +18,6 @@ namespace indoor_context {
 	// if the sequence is not found.
 	string GetMapPath(const string& sequence_name);
 
-	// Get the ground truth orientation map for a frame by rendering the floorplan.
-	void GetTrueOrients(const proto::FloorPlan& floorplan,
-	                    const PosedCamera& pc,
-	                    MatI& out_orients);
-
-	// Get the ground truth orientation map for a frame by rendering the floorplan.
-	// Also provide a depthmap for the rendered floorplan
-	void GetTrueOrients(const proto::FloorPlan& floorplan,
-	                    const PosedCamera& pc,
-	                    MatI& out_orients,
-											MatD& out_depthmap);
-
-	// Get the ground truth orientation map for a frame by rendering the floorplan.
-	void GetGroundTruth(const proto::FloorPlan& floorplan,
-	                    const PosedCamera& pc,
-	                    MatI& out_orients,
-											int& out_num_walls,
-											int& out_num_occlusions);
-
 	// Get the number of agreeing pixels
 	int ComputeAgreement(const MatI& a, const MatI& b);
 	// Get percentage of agreeing pixels
@@ -54,13 +35,6 @@ namespace indoor_context {
 	// Get the floor->ceiling homology
 	Mat3 GetFloorCeilHomology(const PosedCamera& pc, const proto::FloorPlan& fp);
 
-	// Get the number of visible walls and occlusions given a particular
-	// view of a floorplan.
-	void CountVisibleWalls(const proto::FloorPlan& fp,
-												 const PosedCamera& pc,
-												 int& num_walls,
-												 int& num_occlusions);
-
 	// Draw an array of dots to visualize the given payoffs
 	void DrawPayoffs(Canvas& canvas,
 									 const DPPayoffs& payoffs,
@@ -71,4 +45,12 @@ namespace indoor_context {
 												const ImageRGB<byte>& orig,
 												const DPPayoffs& payoffs,
 												const DPGeometry& geom);
+
+	// Compute per--pixel relative depth errors
+	void ComputeDepthErrors(const MatD& estimaged_depth,
+													const MatD& gt_depth,
+													MatF& depth_errors);
+
+	// Compute per--pixel relative depth errors
+	double ComputeMeanDepthError(const MatF& errors);
 }

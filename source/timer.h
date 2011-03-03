@@ -26,13 +26,16 @@
 // the loop: XX.XXms
 
 #define TIMED(str) if (scoped_timer __t = str)
+#define TIMED_SECTION(str) TITLED(str) if (scoped_timer __t = "Time taken")
 
 namespace indoor_context {
 	// Starts a timer on construction and reports its value on destruction
 	struct scoped_timer {
 		const string str;
 		VW::Timer timer;
-		inline scoped_timer(const char* s = "") : str(s) { }
+		inline scoped_timer() { }
+		inline scoped_timer(const char* s) : str(s) { }
+		inline scoped_timer(const string& s) : str(s) { }
 		inline ~scoped_timer() {
 			DLOG << str << ": " << timer << endl;
 		}

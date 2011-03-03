@@ -140,30 +140,29 @@ public:
 // Represents a set of filters operating over scales
 class FilterBank {
 public:
-	int nscales;
-	scoped_ptr<SeperatedFilter> lowpass;  // applied before downsampling
+	// The child filters
 	vector<shared_ptr<DiffFilter> > filters;
 
-	mutable int nworkers;  // number of workers for parallel impl
+	// Number of workers for parallel impl
+	mutable int nworkers;
+	// The array of workers (only used for RunParallel)
 	mutable scoped_array<Worker> workers;
-
-	// Hardware handles for cuda impl
-	mutable vector<shared_ptr<HwConvolver> > convs;
+	// The hardware handle for CUDA implementation
+	mutable scoped_ptr<HwConvolver> hw;
 
 	// Initialize a filter bank with the specified nubmer of scales
-	FilterBank(int nscales);
+	FilterBank();
 	// Kill the worker threads when this filterbank is destroyed
 	~FilterBank();
 
 	// Get the number of output images to be produced
-	inline int size() const { return nscales * filters.size(); }
+	inline int size() const { return filters.size(); }
 	// Run the filter bank, storing output images in the supplied vector
 	void RunSequential(const MatF& input, vector<shared_ptr<MatF> >* output) const;
 	// Run the filter bank using multiple threads. Exactly the same
 	// result as above, but faster.
 	void RunParallel(const MatF& input,
 	                 vector<shared_ptr<MatF> >* output) const;
-
 	// Run the filter bank using multiple threads. Same result as above
 	// (except for perhaps some small differences due to different
 	// hardware).
@@ -175,11 +174,47 @@ private:
 	                  MatF& output) const;
 };
 
+// Represents a pyramid of filters. Downsampling between levels always
+// uses a Gaussian, but the filters performed at each level are
+// user-specified.
+class FilterPyramid {
+public:
+	// The number of levels in the pyramid
+	int num_scales;
+	// The filter applied before downsampling between levels
+	scoped_ptr<SeperatedFilter> lowpass;
+	// The filters applied at each level
+	FilterBank filter_bank;
+
+	// Initialize with zero scales
+	FilterPyramid();
+	// Initialize with the specified number of scales
+	FilterPyramid(int nscales);
+	// Configure with the specified number of scales
+	void Configure(int nscales);
+
+	// Run the filter, storing output images in the supplied vector
+	void RunSequential(const MatF& input,
+										 vector<shared_ptr<MatF> >* output) const;
+	// Run the filter using multiple threads
+	void RunParallel(const MatF& input,
+	                 vector<shared_ptr<MatF> >* output) const;
+	// Run the filters using multiple threads.
+	void RunOnHardware(const MatF& input,
+	                   vector<shared_ptr<MatF> >* output) const;
+	// Low-pass and sub-sample, caller owns returned memory
+	MatF* NextLevel(const MatF& cur) const;
+
+	// Get the number of output images to be produced
+	inline int size() const { return num_scales * filter_bank.size(); }
+};
+
+
 class GaborFilters {
 public:
 	int num_scales;
 	int num_orients;
-	scoped_ptr<FilterBank> filterbank;
+	FilterPyramid pyramid;
 	vector<shared_ptr<MatF> > responses;
 
 	// Initialize empty
@@ -192,6 +227,8 @@ public:
 	// Run the filter bank using the strategy specified in the
 	// "FilterStrategy" gvar.
 	void Run(const MatF& input);
+	// Run the filter bank using the strategy specified as a string.
+	void Run(const MatF& input, const string& strategy);
 	// Run the filter bank, storing output images in the supplied vector
 	void RunSequential(const MatF& input);
 	// Run the filter bank using multiple threads. Exactly the same

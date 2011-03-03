@@ -5,7 +5,7 @@
 
 namespace indoor_context {
 	// Compute costs by sweeping lines
-	class LineSweepDPScore {
+	class LineSweepObjectiveGen {
 	public:
 		const PosedImage* input_image;
 		GuidedLineDetector line_detector;
@@ -13,9 +13,9 @@ namespace indoor_context {
 		DPObjective objective;
 
 		// Initialize empty
-		LineSweepDPScore() { }
+		LineSweepObjectiveGen() { }
 		// Initialize and compute
-		LineSweepDPScore(const PosedImage& image) {
+		LineSweepObjectiveGen(const PosedImage& image) {
 			Compute(image);
 		}
 

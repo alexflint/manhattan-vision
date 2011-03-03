@@ -32,6 +32,8 @@ public:
 	inline int ny() const { return rgb.GetHeight(); }
 	// Get image size
 	inline ImageRef sz() const { return rgb.GetSize(); }
+	// Get image size
+	inline Vec2I size() const { return toon::makeVector(nx(),ny()); }
 	// True iff the location is within the image bounds
 	bool contains(const ImageRef& ir) const;
 	// Read an image file into this->rgb

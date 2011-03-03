@@ -150,102 +150,7 @@ PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS map.proto)
 ###############################################################################
 # BUILD CORE LIBRARY
 ###############################################################################
-SET( CORE_HEADERS
-	tinyxml.h
-	tinystr.h
-
-	${PROTO_HDRS}
-
-	log.tpp
-	check.tpp
-
-	canny.h
-	common_types.h
-	concurrent_queue.h
-	eigensystem2d.h
-	fast_sobel.h 
-	fhsegmenter.h
-	filters.h
-	gaussian.h
-	hw_convolver.h
-	kmeans.h
-	lazyvar.h
-	counted_foreach.h 
-	progress_reporter.h 
-	timer.h 
-	union_find.h 
-	vanishing_points.h 
-	worker.h 
-	image_bundle.h
-	textons.h
-	clipping.h
-	line_sweeper.h
-	unwarped_image.h
-	rotation_estimator.h
-	map.h
-	vars.h
-	hotspot.h
-	colors.h
-	mean_shift.h
-	line_segment.h
-	
-	image_utils.h
-	numeric_utils.h
-	generic_char_sink.h
-
-	image_utils.tpp
-	io_utils.tpp
-	range_utils.tpp
-	numeric_utils.tpp
-	vector_utils.tpp
-
-	matrix_traits.tpp
-
-	viewer3d.h
-	widget3d.h
-	glut_window.h
-	invokation_serializer.h
-
-	canvas.h
-	canvas.tpp
-
-	line_detector.h
-	guided_line_detector.h
-	camera.h
-	
-	event.h
-	floorplan_editor.h
-	
-	manhattan_bnb.h
-	manhattan_dp.h
-	bld_helpers.h
-	
-	table.tpp
-	integral_col_image.tpp
-	histogram.tpp
-	fill_polygon.tpp
-	polygon.tpp
-
-	ATANCamera.h
-	
-	colored_points.h
-	read_ply.h
-	
-	floorplan_renderer.h
-
-	manhattan_bnb.h
-	manhattan_dp.h
-	multiview_reconstructor.h
-	stereo_payoffs.h
-	line_sweep_features.h
-	landmark_payoffs.h
-	building_features.h
-
-	kinect_device.h
-	kinect_transform.hpp
-)
-
-SET( CORE_SOURCES 
+ADD_LIBRARY( core SHARED 
 	tinyxml.cpp
 	tinystr.cpp
 	tinyxmlerror.cpp
@@ -298,18 +203,9 @@ SET( CORE_SOURCES
 	line_detector.cpp
 	guided_line_detector.cpp
 	
-	manhattan_bnb.cpp
-	manhattan_dp.cpp
-	multiview_reconstructor.cpp
-	stereo_payoffs.cpp
-	line_sweep_features.cpp
-	landmark_payoffs.cpp
-	building_features.cpp
-	
 	camera.cpp
 	glut_window.cpp
 	floorplan_editor.cpp
-	bld_helpers.cpp
 	histogram.cpp
 	
 	ATANCamera.cpp
@@ -324,13 +220,37 @@ SET( CORE_SOURCES
 	kinect_transform.cpp
 )
 
-# Core library
-ADD_LIBRARY( core SHARED ${CORE_SOURCES} )
+
+###############################################################################
+# BUILD MANHATTAN LIBRARY
+###############################################################################
+ADD_LIBRARY( manhattan SHARED
+	manhattan_dp.cpp
+	manhattan_ground_truth.cpp
+
+	multiview_reconstructor.cpp
+
+	monocular_payoffs.cpp
+	stereo_payoffs.cpp
+	point_cloud_payoffs.cpp
+
+	manhattan_bnb.cpp
+
+	line_sweep_features.cpp
+	building_features.cpp
+	bld_helpers.cpp
+
+	svm_light_wrappers.cpp
+	svm_helpers.cpp
+
+	gaussian_pyramid.cpp  # TODO: move to core
+)
 
 ###############################################################################
 # BUILD EXECUTABLES
 ###############################################################################
 SET( EXECUTABLES
+	sweep_lines
 	test
 	map_viewer
 
@@ -360,6 +280,7 @@ SET( EXECUTABLES
 	include_test
 	render_test
 	rectification_test
+	filter_test
 
 	poster_lines
 	poster_vpts
@@ -375,6 +296,7 @@ SET( EXECUTABLES
 	evaluate_mv
 	stereo_dp
 	point_dp
+	joint_dp
 
 	inspect_geometry
 	test_gt_walls
@@ -385,11 +307,18 @@ SET( EXECUTABLES
 	joint_vpt_calib
 
 	kinect_viewer
+	kinect_dp
+
+	generate_svm_problem
+	bootstrap_train_dp
+	oneshot_train_dp
+
+	brostow
 )
 
 FOREACH( EXECUTABLE ${EXECUTABLES} )
 	ADD_EXECUTABLE( ${EXECUTABLE} ${EXECUTABLE}.cpp )
-	TARGET_LINK_LIBRARIES( ${EXECUTABLE} core ${EXTERNAL_LIBRARIES} )
+	TARGET_LINK_LIBRARIES( ${EXECUTABLE} core manhattan ${EXTERNAL_LIBRARIES} )
 ENDFOREACH( EXECUTABLE )
 
 
@@ -458,13 +387,12 @@ IF ( MATLAB_FOUND )
     INCLUDE_DIRECTORIES( ${MATLAB_INCLUDE_DIR} )
     
     # This library contains common matlab utilities
-    SET( MATUTILS_SOURCES
+    ADD_LIBRARY( matutils
 			matlab_utils.h        matlab_utils.cpp
 			matlab_sink.h         matlab_sink.cpp
 			matlab_structure.h    matlab_structure.cpp
 			dp_structures.h       dp_structures.cpp
 			)
-    ADD_LIBRARY( matutils ${MATUTILS_SOURCES} )
     
     # The code with the mexFunction(...) stub 
     SET( MEX_STUB_SOURCE mex_stub.cpp )

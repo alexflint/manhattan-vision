@@ -26,15 +26,13 @@
 #include <gvars3/instances.h>
 
 // forward-declare boost::filesystem in order to introduce namespace alias
+#define BOOST_FILESYSTEM_VERSION 2  // TODO: change to 3
 namespace boost { namespace filesystem { } }
 
 namespace indoor_context {
 	using namespace std;
 	using boost::scoped_ptr;
 	using boost::scoped_array;
-	/*using boost::shared_ptr;
-	using boost::shared_array;
-	using boost::lexical_cast;*/
 	namespace fs=boost::filesystem;
 	namespace toon=TooN;
 

@@ -16,7 +16,6 @@
 #include "io_utils.tpp"
 
 #include "counted_foreach.tpp"
-//#include "numeric_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
@@ -32,7 +31,6 @@ void Frame::Configure(Map* m, int i, const string& im_file, const SE3<>& pose) {
 	image_file = im_file;
 	image.pc().SetPose(pose);
 	image.pc().SetCamera(map->camera.get());
-	pc = &image.pc();
 }
 
 void Frame::LoadImage(bool undistort) {
@@ -60,6 +58,14 @@ void Frame::UndistortImage() {
 void KeyFrame::RunGuidedLineDetector() {
 	guided_line_detector.Compute(image);
 }
+
+void KeyFrame::GetMeasuredPoints(vector<Vec3>& out) const {
+	CHECK(map != NULL);
+	BOOST_FOREACH(const Measurement& msm, measurements) {
+		out.push_back(map->pts[msm.point_index]);
+	}
+}
+
 
 
 
@@ -184,7 +190,7 @@ void Map::LoadWithGroundTruth(const string& path, proto::TruthedMap& gt_map) {
 
 	double zfloor = gt_map.floorplan().zfloor();
 	double zceil = gt_map.floorplan().zceil();
-	Vec3 vup = kfs[0].pc->pose_inverse() * makeVector(0,1,0);
+	Vec3 vup = kfs[0].image.pc().pose_inverse() * makeVector(0,1,0);
 	if (Sign(zceil-zfloor) == Sign(vup[2])) {
 		swap(zfloor, zceil);
 		gt_map.mutable_floorplan()->set_zfloor(zfloor);
@@ -248,10 +254,10 @@ void Map::Transform(const SE3<>& M) {
 	// Transform the frames
 	SE3<> M_inv = M.inverse();
 	BOOST_FOREACH(KeyFrame& kf, kfs) {
-		kf.pc->Transform(M_inv);
+		kf.image.pc().Transform(M_inv);
 	}
 	BOOST_FOREACH(Frame& f, frames) {
-		f.pc->Transform(M_inv);
+		f.image.pc().Transform(M_inv);
 	}
 
 	// Transform the points
@@ -270,7 +276,7 @@ void Map::DetectLines() {
 	segments.clear();
 	COUNTED_FOREACH(int i, KeyFrame& kf, kfs) {
 		// TODO: check that this still works, or go back to kf.vpt_homog_dual
-		Mat3 vpt_homog = kf.pc->pose().get_rotation().inverse() * kf.unwarped.image_to_retina;
+		Mat3 vpt_homog = kf.image.pc().pose().get_rotation().inverse() * kf.unwarped.image_to_retina;
 		Mat3 vpt_homog_inv = LU<3>(vpt_homog).get_inverse();
 
 		CHECK_GT(kf.unwarped.image.nx(), 0)
@@ -290,7 +296,7 @@ void Map::InitializeUndistorter(const Vec2I& imsize) {
 	if (sz[0] == 0 && sz[1] == 0) {
 		CHECK(!kfs.empty())	<< "If no size is passed to Map::InitializeUndistorter then "
 				<< "there must be at least one keyframe loaded";
-		sz = asToon(kfs[0].image.sz());
+		sz = kfs[0].image.size();
 	}
 	undistorter.Compute(asIR(sz));
 }
@@ -312,8 +318,8 @@ void Map::RunManhattanEstimator() {
 	// Propagate vanishing points back to keyframes
 	BOOST_FOREACH(KeyFrame& kf, kfs) {
 		for (int i = 0; i < 3; i++) {
-			kf.retina_vpts[i] = kf.pc->pose().get_rotation() * col(manhattan_est.R, i);
-			kf.image_vpts[i] = kf.pc->RetToIm(kf.retina_vpts[i]);
+			kf.retina_vpts[i] = kf.image.pc().pose().get_rotation() * col(manhattan_est.R, i);
+			kf.image_vpts[i] = kf.image.pc().RetToIm(kf.retina_vpts[i]);
 		}
 	}
 }

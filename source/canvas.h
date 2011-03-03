@@ -90,6 +90,9 @@ public:
 	template <typename Range>
 	void AddPath(const Range& verts);
 
+	// Draw a polygon that fills the entire image with the specified color
+	void Clear(const PixelRGB<byte>& bgcolor);
+
 	// Insert an image
 	void DrawImage(const ImageRGB<byte>& image, double alpha=1.0);
 	// Insert an image with scaling and translation
@@ -126,12 +129,14 @@ public:
 	// file. Format is determined by inspecting the file extension,
 	// which must be one of .png, .pdf, .svg, .ps, or .eps.
 	FileCanvas(const string& filename, const Vec2I& size);
-	FileCanvas(const string& filename, const ImageRGB<byte>& bg);
+	FileCanvas(const string& filename, const Vec2I& size, const PixelRGB<byte>& bgcolor);
+	FileCanvas(const string& filename, const ImageRGB<byte>& bgimage);
 	FileCanvas(const string& filename, const MatF& bg_greyscale);
 	// Construct an empty canvas that will write to the specified file.
-	FileCanvas(Format format, const string& filename, const Vec2I& size);
-	FileCanvas(Format format, const string& filename, const ImageRGB<byte>& bg);
-	FileCanvas(Format format, const string& filename, const MatF& bg_greyscale);
+	/*FileCanvas(Format format, const string& filename, const Vec2I& size);
+	FileCanvas(Format format, const string& filename, const PixelRGB<byte>& bgcolor);
+	FileCanvas(Format format, const string& filename, const ImageRGB<byte>& bgimage);
+	FileCanvas(Format format, const string& filename, const MatF& bg_greyscale);*/
 	// Destructor
 	~FileCanvas();
 	// Write the canvas to the file specified at construction
@@ -141,7 +146,7 @@ public:
 	// Get size
 	int nx() const { return size_[0]; }
 	int ny() const { return size_[1]; }
-	Vec2I sz() const { return size_; }
+	Vec2I size() const { return size_; }
 private:
 	// The filename passed to the constructor
 	string filename_;

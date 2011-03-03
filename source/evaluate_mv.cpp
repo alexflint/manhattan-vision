@@ -16,9 +16,7 @@
 #include "timer.h"
 
 #include "io_utils.tpp"
-#include "integral_col_image.tpp"
 #include "vector_utils.tpp"
-//#include "numeric_utils.tpp"
 
 using std::set;
 

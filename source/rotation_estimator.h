@@ -9,15 +9,18 @@ namespace indoor_context {
 	// Minimization is by gradient descent.
 	class RotationEstimator {
 	public:
+		int max_steps;  // initialized from gvar, can be changed after construction
 		vector<double> residuals; // residual from all steps
 		toon::SO3<> R;  // Current rotation estimate
-		toon::Vector<3> Jf;  // Jacobian of cost function
+		Vec3 Jf;  // Jacobian of cost function
 		double residual;  // residual
 		int num_steps;  // Number of steps since Reset()
 		bool converged;  // Whether we've converged
 
+		// Constructor: reads some gvars
+		RotationEstimator();
 		// Estimate a rotation for the given data
-		toon::SO3<>& Compute(const vector<toon::Vector<3> >& xs,
+		toon::SO3<>& Compute(const vector<Vec3>& xs,
 												 const toon::Matrix<>& responsibilities,
 												 const toon::SO3<>& initial_guess);
 		// Reset the gradient descent to the identity

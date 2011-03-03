@@ -11,7 +11,6 @@
 #include "canvas.h"
 #include "geom_utils.h"
 
-#include "integral_col_image.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
@@ -58,9 +57,10 @@ namespace indoor_context {
 		CHECK(!base_payoff_gen.Empty()) << "Configure() must be called before Compute()";
 
 		// Configure the payoff matrices
-		payoffs.Resize(base_geom.grid_size, 0);
+		payoffs.Resize(base_geom.grid_size);
 		BOOST_FOREACH(AuxiliaryView& aux, aux_views) {
-			aux.contrib_payoffs.Resize(base_geom.grid_size, -1);  // for visualization only
+			aux.contrib_payoffs.Resize(base_geom.grid_size);  // for visualization only
+			aux.contrib_payoffs.Clear(-1);  // for visualization only
 		}
 
 		for (int orient = 0; orient < 2; orient++) {
@@ -182,7 +182,7 @@ namespace indoor_context {
 
 	void MultiViewReconstructor::AddFrame(const PosedImage& frame) {
 		CHECK(base_frame) << "AddFrame() was called before Configure()";
-		aux_gen.push_back(new LineSweepDPScore(frame));
+		aux_gen.push_back(new LineSweepObjectiveGen(frame));
 		AddFrame(frame, aux_gen.back().objective);
 	}
 

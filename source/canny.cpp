@@ -289,7 +289,7 @@ void MultiScaleCanny::Compute(const ImageF& input) {
 			cur_mag_sqr = &gradients[i]->magnitude_sqr;
 		} else {
 			mag_sqr_upsampled.Resize(h, w);
-			Upsample(gradients[i]->magnitude_sqr, mag_sqr_upsampled, 1<<i);
+			Upsample(gradients[i]->magnitude_sqr, 1<<i, mag_sqr_upsampled);
 			cur_mag_sqr = &mag_sqr_upsampled;
 		}
 

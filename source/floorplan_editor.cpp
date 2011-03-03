@@ -312,9 +312,9 @@ namespace indoor_context {
 		CHECK_LT(selectedFrameIndex_, map.kfs.size())
 			<< "There are only " << map.kfs.size() << " keyframes";
 		const KeyFrame& kf = map.kfs[selectedFrameIndex_];
-		ImageRef sz = kf.pc->image_size();
-		Vector<2> tl = kf.pc->retina_bounds().tl();
-		Vector<2> br = kf.pc->retina_bounds().br();
+		ImageRef sz = kf.image.pc().image_size();
+		Vector<2> tl = kf.image.pc().retina_bounds().tl();
+		Vector<2> br = kf.image.pc().retina_bounds().br();
 
 		// Setup a projection matching that of the camera
 		glMatrixMode(GL_PROJECTION);
@@ -410,8 +410,8 @@ namespace indoor_context {
 
 		// Draw the frame
 		if (camViewState == ViewType::WIREFRAME) {
-			Vector<2> tl = kf.pc->retina_bounds().tl();
-			Vector<2> br = kf.pc->retina_bounds().br();
+			Vector<2> tl = kf.image.pc().retina_bounds().tl();
+			Vector<2> br = kf.image.pc().retina_bounds().br();
 			glColorP(Colors::white());
 			camTextures.Select(&kf.image);
 			WITHOUT(GL_BLEND) WITH(GL_TEXTURE_2D) GL_PRIMITIVE(GL_QUADS) {
@@ -428,8 +428,8 @@ namespace indoor_context {
 
 		// Transform to camera coords
 		Matrix<4> mv = Identity;
-		mv.slice<0,0,3,3>() = kf.pc->pose().get_rotation().get_matrix();
-		mv.slice<0,3,3,1>() = kf.pc->pose().get_translation().as_col();
+		mv.slice<0,0,3,3>() = kf.image.pc().pose().get_rotation().get_matrix();
+		mv.slice<0,3,3,1>() = kf.image.pc().pose().get_translation().as_col();
 		TransformGL(mv);
 
 		// Draw the floorplan

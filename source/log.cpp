@@ -174,6 +174,11 @@ bool LogManager::Flush() {
 	return GetLogStreamImpl().strict_sync();
 }
 
+void LogManager::EndCurrentLine() {
+	GetLogStream().put(SpecialLogTokens::kEndToken);
+	GetLogStream() << flush;	
+}
+
 LogManager::DelayedNewline::~DelayedNewline() {
 	s.put(SpecialLogTokens::kEndToken);
 	s << flush;

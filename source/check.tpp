@@ -12,6 +12,7 @@
 
 #include "common_types.h"
 #include "log.tpp"
+#include "matrix_traits.tpp"  // for CHECK_SAME_SIZE etc, generates no extra includes
 
 // Turn a C++ expression into "expr: <value-of-expr>\n"
 #define EXPR_STR(x) AssertionManager::GetExprStr(#x,x)
@@ -36,7 +37,7 @@
 #define CHECK_GT(x,y) CHECK_BINOP(x,>,y)
 #define CHECK_GE(x,y) CHECK_BINOP(x,>=,y)
 #define CHECK_NULL(x) CHECK_EQ(x,NULL)
-#define CHECK_NOT_NULL(x) CHECK_NE(x,NULL)
+#define CHECK_NOT_NULL(x) CHECK(x != NULL)
 
 // Check that |x-y| < eps
 #define CHECK_EQ_TOL(x,y,eps) \
@@ -62,7 +63,7 @@
 //    int i;
 //    cin >> i;
 // Any container compatible with Boost.Range can be used.
-#define CHECK_INDEX(i,range) CHECK_INTERVAL(i, 0, size(range));
+#define CHECK_INDEX(i,range) CHECK_INTERVAL(i, 0, size(range)-1);
 
 // Check that two objects are the same size. Uses matrix_size() from matrix_utils.tpp
 #define CHECK_SAME_SIZE(a,b)										\

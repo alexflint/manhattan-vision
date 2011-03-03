@@ -58,6 +58,9 @@ public:
 	// Compute vanishing points
 	void Compute(vector<LineDetection>& segments, bool use_prev = false);
 
+	// Compute the (approximate) log posterior for a hypothesized coordinate frame
+	double GetLogPosterior(const toon::SO3<>& hypothesis);
+
 	//
 	// Detailed control over EM
 	//

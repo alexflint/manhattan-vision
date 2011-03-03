@@ -4,19 +4,25 @@
 
 #include <VW/Image/imagecopy.tpp>
 
+#include <TooN/SVD.h>
+
 #include "common_types.h"
 #include "clipping.h"
 #include "geom_utils.h"
 #include "image_utils.h"
 #include "bld_helpers.h"
 #include "timer.h"
+#include "line_sweeper.h"
+#include "manhattan_ground_truth.h"
 
+#include "canvas.tpp"
 #include "counted_foreach.tpp"
 #include "fill_polygon.tpp"
 #include "range_utils.tpp"
 #include "image_utils.tpp"
 #include "io_utils.tpp"
 #include "vector_utils.tpp"
+#include "format_utils.tpp"
 
 namespace indoor_context {
 using namespace toon;
@@ -72,7 +78,7 @@ bool MonocularManhattanBnb::Compute(const PosedCamera& pcam,
 	}
 
 	enumerator.Configure(pcam, vert_axis);
-	renderer.Configure(pcam, vert_axis);
+	evaluator.Configure(pcam, vert_axis);
 
 	DownsampleOrients(orients, est_orients, makeVector(*gvOrientRes, *gvOrientRes));
 
@@ -80,8 +86,8 @@ bool MonocularManhattanBnb::Compute(const PosedCamera& pcam,
 	hypothesis_count = 0;
 	if (enumerator.Compute(edges,
 			bind(&MonocularManhattanBnb::EvaluateHypothesis, this, _1))) {
-		renderer.PredictImOrientations(soln, soln_orients);
-		DLOG << "Searched " << hypothesis_count << " hypotheses";
+		evaluator.PredictImOrientations(soln, soln_orients);
+		DLOG << "Evaluated " << hypothesis_count << " hypotheses";
 		return true;
 	} else {
 		return false;
@@ -89,7 +95,7 @@ bool MonocularManhattanBnb::Compute(const PosedCamera& pcam,
 }
 
 void MonocularManhattanBnb::EvaluateHypothesis(const ManhattanBuilding& bld) {
-	renderer.PredictGridOrientations(bld, predict_buffer);
+	evaluator.PredictGridOrientations(bld, predict_buffer);
 	int score = ComputeAgreement(predict_buffer, est_orients);
 	if (score > soln_score) {
 		soln_score = score;
@@ -103,41 +109,36 @@ int MonocularManhattanBnb::OtherHorizAxis(int a) const {
 }
 
 Vec3 MonocularManhattanBnb::FloorPoint(const Vec3& p, double z) {
-	// Note that p appear in the numerator _and_ the denominator
-	// below, so linear scaling has no effect (as expected for
-	// homogeneous coordinates)
-	return -z*p / (p*horizon);
+	// Note that p appear in the numerator and the denominator below, so
+	// linear scaling has no effect, as expected for homogeneous coordinates
+	return -z*p / (p*enumerator.horizon);
 }
 
 Vec3 MonocularManhattanBnb::CeilPoint(const Vec3& p,
-                                   const Vec3& floor_pt) {
+																			const Vec3& floor_pt) {
 	Matrix<3,2> m;
 	Vec3 u = unit(p);
 	// unit() below is important because it affects the weighting of the least-squares problem
 	m.slice<0,0,3,1>() = u.as_col();
-	m.slice<0,1,3,1>() = -horizon.as_col();
+	m.slice<0,1,3,1>() = -enumerator.horizon.as_col();
 	Vec2 soln = SVD<3,2>(m).backsub(floor_pt);
 	return soln[0] * u;
 }
 
-void MonocularManhattanBnb::TransferBuilding(const ManhattanBuilding& bld,
-                                             const SE3<>& new_pose,
+void MonocularManhattanBnb::TransferBuilding(const SE3<>& new_pose,
                                              double floor_z,
                                              MatI& orients) {
 	// Compute scaling (TODO: actually use this)
 	DiagonalMatrix<3> Mscale(makeVector(1.0*orients.Cols()/pc->image_size().x,
-			1.0*orients.Rows()/pc->image_size().y,
-			1.0));
+																			1.0*orients.Rows()/pc->image_size().y,
+																			1.0));
 
 	// Invert the pose
 	const SE3<> orig_inv = pc->pose().inverse();
 
-	// Draw each wall segment
-	//Viewer3D v;
-
 	orients.Fill(vert_axis);
-	for (ManhattanBuilding::ConstCnrIt left_cnr = bld.cnrs.begin();
-			successor(left_cnr) != bld.cnrs.end();
+	for (ManhattanBuilding::ConstCnrIt left_cnr = soln.cnrs.begin();
+			successor(left_cnr) != soln.cnrs.end();
 			left_cnr++) {
 		ManhattanBuilding::ConstCnrIt right_cnr = successor(left_cnr);
 
@@ -155,28 +156,11 @@ void MonocularManhattanBnb::TransferBuilding(const ManhattanBuilding& bld,
 			tl = -tl;
 			tr = -tr;
 		}
-		//DREPORT(project(left_cnr->right_ceil));
-		//DREPORT(bl,br,tl,tr);
-
 		// Compute vertices in the 3D global frame
 		Vec3 world_tl = orig_inv * tl;
 		Vec3 world_tr = orig_inv * tr;
 		Vec3 world_bl = orig_inv * bl;
 		Vec3 world_br = orig_inv * br;
-
-		// Project into the viewer
-		/*Vec3 floor_c = orig_inv.get_translation();
-			 Vec3 ceil_c = orig_inv.get_translation();
-			 floor_c[2] = floor_z;
-			 ceil_c[2] = world_tl[2];
-			 QuadWidget* w;
-			 v.AddOwned(w = new QuadWidget(world_tl, world_tr, world_br, world_bl));
-			 w->color = Colors::primary(axis);
-			 v.AddOwned(w = new QuadWidget(world_bl, world_br, floor_c, floor_c));
-			 w->color = Colors::blue();
-			 v.AddOwned(w = new QuadWidget(world_tl, world_tr, ceil_c, ceil_c));
-			 w->color = Colors::white();
-			 v.AddOwned(new MapWidget(&map));*/
 
 		// Compute the wall corners in the other camera
 		Vec3 ret_tl = new_pose * world_tl;
@@ -200,8 +184,41 @@ void MonocularManhattanBnb::TransferBuilding(const ManhattanBuilding& bld,
 		poly.push_back(im_tr);
 		FillPolygon(poly, orients, axis);
 	}
+}
 
-	//v.Run();
+const MatD& MonocularManhattanBnb::ComputeDepthMap(double zfloor, double zceil) {
+	// Configure and clear the depth renderer
+	depth_renderer.Configure(*pc);
+	depth_renderer.RenderInfinitePlane(zfloor, kVerticalAxis);
+	depth_renderer.RenderInfinitePlane(zceil, kVerticalAxis);
+
+	// Invert the pose
+	int i = 0;
+	const SE3<> inv = pc->pose().inverse();
+	for (ManhattanBuilding::ConstCnrIt left_cnr = soln.cnrs.begin();
+			successor(left_cnr) != soln.cnrs.end();
+			left_cnr++) {
+		ManhattanBuilding::ConstCnrIt right_cnr = successor(left_cnr);
+		int axis = OtherHorizAxis(left_cnr->right_axis);
+
+		// Compute vertices in the 3D camera frame
+		Vec3 bl = FloorPoint(left_cnr->right_floor, zfloor);
+		Vec3 br = FloorPoint(right_cnr->left_floor, zfloor);
+		Vec3 tl = CeilPoint(left_cnr->right_ceil, bl);
+		Vec3 tr = CeilPoint(right_cnr->left_ceil, br);
+		if (bl[2] < 0) {
+			bl = -bl;
+			br = -br;
+			tl = -tl;
+			tr = -tr;
+		}
+
+		// Project into renderer
+		depth_renderer.Render(inv*tl, inv*br, inv*tr, axis);
+		depth_renderer.Render(inv*tl, inv*br, inv*bl, axis);
+	}
+
+	return depth_renderer.depthbuffer();
 }
 
 
@@ -326,10 +343,10 @@ void ManhattanBranchAndBound::Initialize(const vector<ManhattanEdge> edges[]) {
 				right.left_axis = init_axis;
 				right.rightmost = true;
 
-				ManhattanBuilding * bld = new ManhattanBuilding;
-				bld->cnrs.push_back(left);
-				bld->cnrs.push_back(right);
-				init_hypotheses.push_back(bld); // memory now managed by the ptr_vector
+				ManhattanBuilding* h = new ManhattanBuilding;
+				h->cnrs.push_back(left);
+				h->cnrs.push_back(right);
+				init_hypotheses.push_back(h); // memory now managed by the ptr_vector
 			}
 		}
 	}
@@ -337,8 +354,7 @@ void ManhattanBranchAndBound::Initialize(const vector<ManhattanEdge> edges[]) {
 
 void ManhattanBranchAndBound::Enumerate() {
 	CHECK(!init_hypotheses.empty());
-	DREPORT(init_hypotheses.size());
-
+	DLOG << "Num initial hypotheses: " << init_hypotheses.size();
 	BOOST_FOREACH(const ManhattanBuilding& bld, init_hypotheses) {
 		BranchFrom(bld);
 	}
@@ -358,7 +374,6 @@ void ManhattanBranchAndBound::BranchFrom(const ManhattanBuilding& bld) {
 // Generate all building cnrss reachable by adding a single
 // horizontal edge to the specified building
 int ManhattanBranchAndBound::HorizBranchFrom(const ManhattanBuilding& bld) {
-	//ptr_vector<ManhattanBuilding>& out) {
 	int count = 0;
 
 	for (int a = 1; a <= 2; a++) {
@@ -367,11 +382,9 @@ int ManhattanBranchAndBound::HorizBranchFrom(const ManhattanBuilding& bld) {
 			const vector<const ManhattanEdge*>& es =
 					surf ? ceil_edges[new_axis] : floor_edges[new_axis];
 
-			BOOST_FOREACH(const ManhattanEdge* e, es)
-			{
+			BOOST_FOREACH(const ManhattanEdge* e, es) {
 				// Don't add the same edge twice
 				if (bld.ContainsEdge(e->id)) {
-					//DLOG << "culled because edge already present";
 					continue;
 				}
 
@@ -379,70 +392,48 @@ int ManhattanBranchAndBound::HorizBranchFrom(const ManhattanBuilding& bld) {
 				LocateStripe(bld, e->start, l_cnr, r_cnr);
 
 				// Check that the stripe fully contains the edge
-				if (!StripeContains(l_cnr->div_eqn, r_cnr->div_eqn,
-						e->end)) {
-					// Horizontal segment spans multiple stripes
-					// TODO: make this a threshold rather than a hard rule
-					// TODO: maybe even remove this rule?
-					//DLOG << "culled because end point outside stripe";
+				if (!StripeContains(l_cnr->div_eqn, r_cnr->div_eqn, e->end)) {
 					continue;
 				}
 
 				// Check that the stripe is generated from the opposite axis
 				if (l_cnr->right_axis == e->axis) {
-					//DLOG << "culled because axis already matches";
 					continue;
 				}
 
-				Vec3 seg = surf ? l_cnr->right_ceil
-						^ r_cnr->left_ceil : l_cnr->right_floor
-						^ r_cnr->left_floor;
+				Vec3 seg = surf ?
+					l_cnr->right_ceil ^ r_cnr->left_ceil : 
+					l_cnr->right_floor ^ r_cnr->left_floor;
 				Vec3 isct = e->eqn ^ seg;
 				Vec3 new_div = DivVec(isct ^ vert_vpt);
 
 				// Check that the intersection is within the stripe
-				if (!StripeContains(l_cnr->div_eqn, r_cnr->div_eqn,
-						isct)) {
-					//DLOG << "culled because intersection outside stripe";
+				if (!StripeContains(l_cnr->div_eqn, r_cnr->div_eqn, isct)) {
 					continue;
 				}
 
 				// Don't add the div if too close to an existing edge
-				double margin = GetStripeMargin(*l_cnr, *r_cnr,
-						isct);
+				double margin = GetStripeMargin(*l_cnr, *r_cnr, isct);
 				if (margin < *gvMinCornerMargin * px_diam) {
-					//DLOG << "culled because margin is " << margin;
 					continue;
 				}
 
 				// case 1: change the stripe on the left
-				if (!StripeContains(l_cnr->div_eqn, new_div,
-						vpts[e->axis])) {
-					//DLOG << "Adding with change to left";
-					// TODO: avoid all this copying by adding the corner and then removing it
+				if (!StripeContains(l_cnr->div_eqn, new_div, vpts[e->axis])) {
 					ManhattanBuilding new_bld = bld;
-					if (AddCorner(new_bld, e->id, new_div, e->axis,
-							true)) {
+					if (AddCorner(new_bld, e->id, new_div, e->axis, true)) {
 						BranchFrom(new_bld);
 						count++;
 					}
-				} else {
-					//DLOG << "culled left due to vpt";
 				}
 
 				// case 2: change the stripe on the right
-				if (!StripeContains(new_div, r_cnr->div_eqn,
-						vpts[e->axis])) {
-					//DLOG << "Adding with change to right";
-					// TODO: avoid all this copying by adding the corner and then removing it
+				if (!StripeContains(new_div, r_cnr->div_eqn, vpts[e->axis])) {
 					ManhattanBuilding new_bld = bld;
-					if (AddCorner(new_bld, e->id, new_div, e->axis,
-							false)) {
+					if (AddCorner(new_bld, e->id, new_div, e->axis, false)) {
 						BranchFrom(new_bld);
 						count++;
 					}
-				} else {
-					//DLOG << "culled right due to vpt";
 				}
 			}
 		}
@@ -453,11 +444,9 @@ int ManhattanBranchAndBound::HorizBranchFrom(const ManhattanBuilding& bld) {
 // Generate all building cnrss reachable by adding a single
 // vertical edge to the specified building
 int ManhattanBranchAndBound::VertBranchFrom(const ManhattanBuilding& bld) {
-	//ptr_vector<ManhattanBuilding>& out) {
 	int count = 0;
 
-	BOOST_FOREACH(const ManhattanEdge* e, vert_edges)
-	{
+	BOOST_FOREACH(const ManhattanEdge* e, vert_edges) {
 		// Don't add the same edge twice
 		if (bld.ContainsEdge(e->id))
 			continue;
@@ -480,8 +469,8 @@ int ManhattanBranchAndBound::VertBranchFrom(const ManhattanBuilding& bld) {
 		Vec3 floor = l_cnr->right_floor ^ r_cnr->left_floor;
 
 		// Don't add the corner if it crosses the existing floor or ceiling lines
-		if ((Sign(ceil * e->start) == Sign(floor * e->start))
-				|| (Sign(ceil * e->end) == Sign(floor * e->end))) {
+		if ((Sign(ceil * e->start) == Sign(floor * e->start)) ||
+				(Sign(ceil * e->end)   == Sign(floor * e->end))) {
 			continue;
 		}
 
@@ -490,7 +479,6 @@ int ManhattanBranchAndBound::VertBranchFrom(const ManhattanBuilding& bld) {
 
 		// case 1: change the stripe on the left
 		if (!StripeContains(l_cnr->div_eqn, new_div, vpts[new_axis])) {
-			// TODO: avoid all this copying by adding the corner and then removing it
 			ManhattanBuilding new_bld = bld;
 			if (AddCorner(new_bld, e->id, new_div, new_axis, true)) {
 				BranchFrom(new_bld);
@@ -500,7 +488,6 @@ int ManhattanBranchAndBound::VertBranchFrom(const ManhattanBuilding& bld) {
 
 		// case 2: change the stripe on the right
 		if (!StripeContains(new_div, r_cnr->div_eqn, vpts[new_axis])) {
-			// TODO: avoid all this copying by adding the corner and then removing it
 			ManhattanBuilding new_bld = bld;
 			if (AddCorner(new_bld, e->id, new_div, new_axis, false)) {
 				BranchFrom(new_bld);
@@ -535,8 +522,6 @@ bool ManhattanBranchAndBound::AddCorner(ManhattanBuilding& bld, int edge_id,
 	ManhattanBuilding::CnrIt new_cnr_it = bld.cnrs.insert(r_cnr, new_cnr);
 	Vec3 new_floor = vpts[new_axis] ^ new_cnr.left_floor;
 	Vec3 new_ceil = vpts[new_axis] ^ new_cnr.left_ceil;
-
-	//DLOG << "updating " << (update_left ? "left" : "right") << " stripe";
 
 	if (update_left) {
 		return UpdateStripe(*l_cnr, *new_cnr_it, new_floor, new_ceil, new_axis);
@@ -581,8 +566,7 @@ bool ManhattanBranchAndBound::OcclusionValid(ManhattanCorner& cnr) {
 
 	// is the other vpt between the div and the vpt
 	bool opp_vpt_between = PointSign(vpts[opp_axis], cnr.div_eqn) == vpt_side
-			&& abs(cnr.div_eqn * vpts[opp_axis]) < abs(cnr.div_eqn
-					* vpts[occl_axis]);
+			&& abs(cnr.div_eqn * vpts[opp_axis]) < abs(cnr.div_eqn * vpts[occl_axis]);
 
 	// the occlusion is valid iff vpt_behind <=> opp_vpt_between
 	return vpt_behind == opp_vpt_between;
@@ -598,9 +582,10 @@ bool ManhattanBranchAndBound::UpdateOcclusion(ManhattanCorner& cnr) {
 		return true;
 	}
 
-	if (!BelowHorizon(cnr.left_floor) || !BelowHorizon(cnr.right_floor)
-			|| !AboveHorizon(cnr.left_ceil) || !AboveHorizon(cnr.right_ceil)) {
-		//DLOG << "culled because intersection on wrong side of horizon";
+	if (!BelowHorizon(cnr.left_floor) ||
+			!BelowHorizon(cnr.right_floor) ||
+			!AboveHorizon(cnr.left_ceil) ||
+			!AboveHorizon(cnr.right_ceil)) {
 		return false;
 	}
 
@@ -613,9 +598,9 @@ bool ManhattanBranchAndBound::UpdateOcclusion(ManhattanCorner& cnr) {
 		cnr.occl_side = 0;
 	} else {
 		if (!BelowHorizon(cnr.left_floor)) {
-			WITH_DLOG			DREPORT(cnr.left_floor, horizon,
-			         			        cnr.left_floor*horizon,
-			         			        PointSign(cnr.left_floor, horizon));
+			WITH_DLOG DREPORT(cnr.left_floor, horizon,
+												cnr.left_floor*horizon,
+												PointSign(cnr.left_floor, horizon));
 		}
 		CHECK_PRED1(BelowHorizon, cnr.left_floor);
 		CHECK_PRED1(BelowHorizon, cnr.right_floor);
@@ -644,15 +629,10 @@ bool ManhattanBranchAndBound::UpdateStripe(ManhattanCorner& left_cnr,
 	right_cnr.left_ceil = right_cnr.div_eqn ^ ceil_line;
 	right_cnr.left_axis = new_axis;
 
-	if (!UpdateOcclusion(left_cnr)) {
-		return false;
-	}
-	if (!UpdateOcclusion(right_cnr)) {
-		return false;
-	}
-
-	if (!OcclusionValid(left_cnr) || !OcclusionValid(right_cnr)) {
-		//DLOG << "culling due to invalid occlusion";
+	if (!UpdateOcclusion(left_cnr) ||
+			!UpdateOcclusion(right_cnr) ||
+			!OcclusionValid(left_cnr) ||
+			!OcclusionValid(right_cnr)) {
 		return false;
 	}
 
@@ -739,8 +719,8 @@ void ManhattanEvaluator::PredictOrientations(const ManhattanBuilding& bld,
 	orients.Fill(vert_axis);
 	Polygon<4> wall;
 	DiagonalMatrix<3> Mscale(makeVector(1.0*orients.Cols()/pc->image_size().x,
-			1.0*orients.Rows()/pc->image_size().y,
-			1.0));
+																			1.0*orients.Rows()/pc->image_size().y,
+																			1.0));
 	for (ManhattanBuilding::ConstCnrIt left_cnr = bld.cnrs.begin();
 			successor(left_cnr) != bld.cnrs.end();
 			left_cnr++) {
@@ -860,6 +840,123 @@ void ManhattanEvaluator::OutputAllViz(const ImageRGB<byte>& image,
 	OutputBuildingViz(image, bld, basename+"bld.png");
 	OutputPredictionViz(bld, basename+"prediction.png");
 	WriteBuilding(bld, basename+"info.txt");
+}
+
+
+
+
+
+
+
+void ManhattanBnbReconstructor::Compute(const PosedImage& image) {
+	input = &image;
+	CHECK(image.loaded()) << "Frame must have its image loaded";
+
+	// Detect lines
+	TIMED("Detect lines")
+		line_detector.Compute(image);
+
+	// Compute line sweeps
+	TIMED("Compute orientations")
+		line_sweeper.Compute(image, line_detector.detections);
+
+	// Copy the lines into structure recovery format
+	vector<ManhattanEdge> edges[3];
+	int next_id = 0;
+	for (int i = 0; i < 3; i++) {
+		COUNTED_FOREACH(int j, const LineDetection& det, line_detector.detections[i]) {
+			Vec3 a = image.pc().ImToRet(det.seg.start);
+			Vec3 b = image.pc().ImToRet(det.seg.end);
+			edges[i].push_back(ManhattanEdge(a, b, i, next_id++));
+		}
+	}
+	DLOG << format("Line counts by axis: %d, %d, %d")
+						% edges[0].size() % edges[1].size() % edges[2].size();
+
+	// Enumerate building hypotheses
+	VW::Timer recovery_timer;
+	success = bnb.Compute(image.pc(), edges, line_sweeper.orient_map);
+	bnb_time_ms = recovery_timer.GetAsMilliseconds();
+}
+
+double ManhattanBnbReconstructor::GetAccuracy(const MatI& gt_orients) {
+	return ComputeAgreementPct(bnb.soln_orients, gt_orients);
+}
+
+double ManhattanBnbReconstructor::GetAccuracy(const ManhattanGroundTruth& gt) {
+	return GetAccuracy(gt.orientations());
+}
+
+
+void ManhattanBnbReconstructor::GetDepthErrors(const ManhattanGroundTruth& gt, MatF& errors) {
+	const MatD& gt_depth = gt.depthmap();
+	const MatD& soln_depth = bnb.ComputeDepthMap(gt.zfloor(), gt.zceil());
+	ComputeDepthErrors(soln_depth, gt_depth, errors);
+}
+
+double ManhattanBnbReconstructor::GetMeanDepthError(const ManhattanGroundTruth& gt) {
+	MatF errors;	// TODO: move to a class variable (or external?)
+	GetDepthErrors(gt, errors);
+	return ComputeMeanDepthError(errors);
+}
+
+double ManhattanBnbReconstructor::ReportDepthError(const ManhattanGroundTruth& gt) {
+	double acc = GetMeanDepthError(gt);
+	DLOG << format("Mean depth error: %|40t|%.1f%%") % (acc*100);
+	return acc;
+}
+
+
+void ManhattanBnbReconstructor::OutputOrigViz(const string& path) {
+	WriteImage(path, input->rgb);
+}
+
+void ManhattanBnbReconstructor::OutputOrientViz(const string& path) {
+	ImageRGB<byte> orient_canvas;
+	ImageCopy(input->rgb, orient_canvas);
+	line_sweeper.DrawOrientViz(orient_canvas);
+	line_detector.DrawSegments(orient_canvas);
+	WriteImage(path, orient_canvas);
+}
+
+void ManhattanBnbReconstructor::OutputLineViz(const string& path) {
+	FileCanvas line_canvas(path, input->size());
+	line_canvas.DrawImage(input->rgb);
+	line_canvas.SetLineWidth(3.0);
+	for (int i = 0; i < 3; i++) {
+		BOOST_FOREACH(const LineDetection& det, line_detector.detections[i]) {
+			line_canvas.StrokeLine(det.seg, Colors::primary(i));
+		}
+	}
+}
+
+void ManhattanBnbReconstructor::OutputSolutionOrients(const string& path) {
+	ImageRGB<byte> soln_canvas;
+	ImageCopy(input->rgb, soln_canvas);
+	DrawOrientations(bnb.soln_orients, soln_canvas, 0.35);
+	WriteImage(path, soln_canvas);
+}
+
+void ManhattanBnbReconstructor::GetAuxOrients(const PosedCamera& aux,
+                                              double zfloor,
+                                              MatI& aux_orients) {
+	aux_orients.Resize(aux.image_size().y, aux.image_size().x);
+	bnb.TransferBuilding(aux.pose(), zfloor, aux_orients);
+}
+
+void ManhattanBnbReconstructor::OutputSolutionInView(const string& path,
+                                                     const PosedImage& aux,
+                                                     double zfloor) {
+	// Generate the orientation map
+	MatI aux_orients;
+	GetAuxOrients(aux.pc(), zfloor, aux_orients);
+	CHECK(aux.loaded()) << "Auxiliary view not loaded";
+
+	// Draw the image
+	ImageRGB<byte> aux_canvas;
+	ImageCopy(aux.rgb, aux_canvas);
+	DrawOrientations(aux_orients, aux_canvas, 0.35);
+	WriteImage(path, aux_canvas);
 }
 
 }

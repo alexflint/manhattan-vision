@@ -155,6 +155,10 @@ public:
 	// Disable logging. Log messages will be ignored.
 	static void Disable() { enabled = false; }
 
+	// Send a special end-line-now token, which produces a newline only
+	// if the last token recieved was not a newline.
+	static void EndCurrentLine();
+
 	// A ScopedIndenter increases the global indent level in its
 	// constructor and decreases it by the same amount in its
 	// destructor. To have the log output of a code block indented, use

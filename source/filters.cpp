@@ -191,11 +191,7 @@ DiffFilter* GaborFunction::MakeSeperatedFilter() const {
 }
 
 // *** FilterBank ***
-FilterBank::FilterBank(int ns)
-: nscales(ns),
-  nworkers(0) {
-	GaussFunction g(1.0);
-	lowpass.reset(g.MakeSeperatedFilter());
+FilterBank::FilterBank() : nworkers(0) {
 }
 
 FilterBank::~FilterBank() {
@@ -213,50 +209,23 @@ void FilterBank::RunOneFilter(int filter,
 
 void FilterBank::RunSequential(const MatF& input,
 															 vector<shared_ptr<MatF> >* output) const {
-	scoped_ptr<MatF> level;
-	const MatF* cur = &input;
-	for (int i = 0; i < nscales; i++) {
-		for (int j = 0; j < filters.size(); j++) {
-			output->push_back(make_shared_ptr(new MatF));
-			RunOneFilter(j, *cur, *output->back());
-		}
-		MatF lowpassed(cur->Rows(), cur->Cols());
-		lowpass->RunSequential(*cur, lowpassed);
-		level.reset(new MatF(cur->Rows()/2, cur->Cols()/2));
-		Downsample(lowpassed, 2, *level);
-		cur = level.get();
+	for (int j = 0; j < filters.size(); j++) {
+		output->push_back(make_shared_ptr(new MatF));
+		RunOneFilter(j, input, *output->back());
 	}
 }
 
 void FilterBank::RunOnHardware(const MatF& input,
-                               vector<shared_ptr<MatF> >* outputs) const {
-	// Initialize the hardware convolvers for each scale
-	if (convs.size() != nscales) {
-		convs.clear();
-		int w = input.Cols();
-		int h = input.Rows();
-		for (int i = 0; i < nscales; i++) {
-			convs.push_back(make_shared_ptr(new HwConvolver(w, h)));
-			w /= 2;
-			h /= 2;
-		}
-	}
+															 vector<shared_ptr<MatF> >* outputs) const {
+	// Initialize the hardware convolver
+	hw.reset(new HwConvolver(input.Cols(), input.Rows()));
+	hw->LoadImage(input);
 
 	// Run the convolutions
-	scoped_ptr<MatF> level;
-	const MatF* cur = &input;
-	for (int i = 0; i < nscales; i++) {
-		convs[i]->LoadImage(*cur);
-		for (int j = 0; j < filters.size(); j++) {
-			MatF* output = new MatF(cur->Rows(), cur->Cols());
-			outputs->push_back(make_shared_ptr(output));
-			filters[j]->RunOnHardware(*convs[i], *output);
-		}
-		MatF lowpassed(cur->Rows(), cur->Cols());
-		lowpass->RunOnHardware(*convs[i], lowpassed);
-		level.reset(new MatF(cur->Rows()/2, cur->Cols()/2));
-		Downsample(lowpassed, 2, *level);
-		cur = level.get();
+	for (int j = 0; j < filters.size(); j++) {
+		MatF* output = new MatF(input.Rows(), input.Cols());
+		outputs->push_back(make_shared_ptr(output));
+		filters[j]->RunOnHardware(*hw, *output);
 	}
 }
 
@@ -270,28 +239,86 @@ void FilterBank::RunParallel(const MatF& input,
 		nworkers = filters.size();
 	}
 
-	vector<shared_ptr<MatF> > pyramid;
-	const MatF* cur = &input;
-	for (int i = 0; i < nscales; i++) {
-		for (int j = 0; j < filters.size(); j++) {
-			// Allocate the memory in the new thread for efficiency but do
-			// not allow multithreaded access to the vector (because STL is
-			// not threadsafe).
-			output->push_back(make_shared_ptr(new MatF));
-			workers[j].Add(bind(&FilterBank::RunOneFilter,
-													ref(*this), j, ref(*cur), ref(*output->back())));
-		}
-		MatF lowpassed(cur->Cols(), cur->Rows());
-		lowpass->RunSequential(*cur, lowpassed);
-		pyramid.push_back(make_shared_ptr(new MatF(cur->Rows()/2, cur->Cols()/2)));
-		Downsample(lowpassed, 2, *pyramid.back());
-		cur = pyramid.back().get();
+	// Do the filtering
+	for (int j = 0; j < filters.size(); j++) {
+		output->push_back(make_shared_ptr(new MatF));
+		workers[j].Add(bind(&FilterBank::RunOneFilter,
+												this, j, ref(input), ref(*output->back())));
 	}
 
+	// Wait for the jobs to finish
 	for (int i = 0; i < nworkers; i++) {
 		workers[i].Wait();
 	}
 }
+
+
+// *** FilterPyramid ***
+FilterPyramid::FilterPyramid() : num_scales(0) {
+}
+
+FilterPyramid::FilterPyramid(int nscales) {
+	Configure(nscales);
+}
+
+void FilterPyramid::Configure(int nscales) {
+	num_scales = nscales;
+	GaussFunction g(1.0);
+	lowpass.reset(g.MakeSeperatedFilter());
+}
+
+MatF* FilterPyramid::NextLevel(const MatF& cur) const {
+	MatF smoothed(cur.Rows(), cur.Cols());
+	lowpass->RunSequential(cur, smoothed);
+	MatF* next_level = new MatF(cur.Rows()/2, cur.Cols()/2);
+	Downsample(smoothed, 2, *next_level);
+	return next_level;
+}
+
+void FilterPyramid::RunSequential(const MatF& input,
+																	vector<shared_ptr<MatF> >* outputs) const {
+	CHECK_GT(num_scales, 0);
+	scoped_ptr<MatF> level;
+	const MatF* cur = &input;
+	for (int i = 0; i < num_scales; i++) {
+		filter_bank.RunSequential(*cur, outputs);
+		level.reset(NextLevel(*cur));
+		cur = level.get();
+	}
+}
+
+void FilterPyramid::RunOnHardware(const MatF& input,
+																	vector<shared_ptr<MatF> >* outputs) const {
+	CHECK_GT(num_scales, 0);
+	scoped_ptr<MatF> level;
+	const MatF* cur = &input;
+	for (int i = 0; i < num_scales; i++) {
+		filter_bank.RunOnHardware(*cur, outputs);
+		level.reset(NextLevel(*cur));
+		cur = level.get();
+	}
+}
+
+void FilterPyramid::RunParallel(const MatF& input,
+																vector<shared_ptr<MatF> >* outputs) const {
+	CHECK_GT(num_scales, 0);
+	vector<shared_ptr<MatF> > pyramid;
+	const MatF* cur = &input;
+	for (int i = 0; i < num_scales; i++) {
+		filter_bank.RunParallel(*cur, outputs);
+		pyramid.push_back(make_shared_ptr(NextLevel(*cur)));
+		cur = pyramid.back().get();
+	}
+}
+
+
+
+
+
+
+
+
+
 
 GaborFilters::GaborFilters() {
 }
@@ -303,39 +330,46 @@ GaborFilters::GaborFilters(int ns, int no) {
 void GaborFilters::Configure(int ns, int no) {
 	num_scales = ns;
 	num_orients = no;
-	filterbank.reset(new FilterBank(ns));
-	MakeGaborFilters(no, &filterbank->filters);
+	pyramid.Configure(num_scales);
+	MakeGaborFilters(num_orients, &pyramid.filter_bank.filters);
 }
 
 void GaborFilters::Run(const MatF& input) {
-	if (*gvDefaultParallelism == "CPU-Sequential") {
+	Run(input, *gvDefaultParallelism);
+}
+
+void GaborFilters::Run(const MatF& input, const string& strategy) {
+	if (strategy == "CPU-Sequential") {
 		RunSequential(input);
-	} else if (*gvDefaultParallelism == "CPU-Parallel") {
+	} else if (strategy == "CPU-Parallel") {
 		RunParallel(input);
-	} else if (*gvDefaultParallelism == "GPU") {
+	} else if (strategy == "GPU") {
 		RunParallel(input);
 	} else {
-		CHECK(false) << "Unknown parallelism: " << *gvDefaultParallelism;
+		CHECK(false) << "Unknown parallelism strategy: " << strategy;
 	}
 }
 
 void GaborFilters::RunSequential(const MatF& input) {
 	// TODO: stop deleting and re-allocating all this memory
 	responses.clear();
-	filterbank->RunSequential(input, &responses);
+	pyramid.RunSequential(input, &responses);
 }
 
 void GaborFilters::RunParallel(const MatF& input) {
 	// TODO: stop deleting and re-allocating all this memory
 	responses.clear();
-	filterbank->RunParallel(input, &responses);
+	pyramid.RunParallel(input, &responses);
 }
 
 void GaborFilters::RunOnHardware(const MatF& input) {
 	// TODO: stop deleting and re-allocating all this memory
 	responses.clear();
-	filterbank->RunOnHardware(input, &responses);
+	pyramid.RunOnHardware(input, &responses);
 }
+
+
+
 
 void SmoothGaussian(const float sigma,
                     const MatF& input,
@@ -353,7 +387,6 @@ void MakeGaborFilters(int norients, vector<shared_ptr<DiffFilter> >* filters) {
 	}
 }
 
-
 void MakeFullGaborFilters(int norients,
                           vector<shared_ptr<LinearFilter> >* filters) {
 	for (int i = 0; i < norients; i++) {
@@ -362,4 +395,5 @@ void MakeFullGaborFilters(int norients,
 		filters->push_back(make_shared_ptr(filter));
 	}
 }
+
 }

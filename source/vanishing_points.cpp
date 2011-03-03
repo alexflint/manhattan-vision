@@ -189,6 +189,38 @@ void ManhattanFrameEstimator::Bootstrap(const vector<LineDetection>& segments) {
 	num_iters = 0;
 }
 
+double ManhattanFrameEstimator::GetLogPosterior(const SO3<>& hypothesis) {
+	// We make the following approximation here:
+
+	// X = the observations (lines)
+	// xi = i-th line
+	// H = the hypothesis (i.e. a rotation)
+	// vj = j-th vanishing point (0<=j<3)
+	// A = the axis for each observed line
+	// ai = the axis for line i
+	// P(H|X) = 1/n P(X|H) P(H)
+	//        = a P(X|H)   { assume uniform prior over H }
+	//        ~ sum_A P(X,A|H)   { marginalize over A }
+	//        ~ sum_A [ prod_i P(xi|v_ai) ]   { assume independence between observations }
+	// but since the only term in the sum above that is not close to
+	// zero is the one where each line is associated with its most
+	// likely vanishing point:
+	//        ~ prod_i P(xi, v_j*)    { where j* is the most likely axis for xi to belong to }
+
+	double approx_log_posterior = 0;
+	for (int i = 0; i < detections->size(); i++) {
+		double max_log_lik = *gvSpuriousLogLik;
+		for (int j = 0; j < 3; j++) {
+			double log_lik = GetLogLik(col(R,j), (*detections)[i].eqn);
+			if (log_lik > max_log_lik) {
+				max_log_lik = log_lik;
+			}
+		}
+		approx_log_posterior += max_log_lik;
+	}
+	return approx_log_posterior;
+}
+
 void ManhattanFrameEstimator::EStep() {
 	CHECK_EQ(resps.Rows(), detections->size());
 	CHECK_EQ(resps.Cols(), 4);
@@ -334,7 +366,6 @@ Vec3 ManhattanFrameEstimator::FitIsctRansac(const vector<LineDetection>& segment
 void VanishingPoints::Compute(const CalibratedImage& image, bool use_prev) {
 	input = &image;
 	line_detector.Compute(image);
-	DREPORT(line_detector.detections.size());
 	if (line_detector.detections.size() < 3) {
 		DLOG << "Error: too few lines detected to proceed with vanishing point estimation";
 	} else {
@@ -362,7 +393,7 @@ void VanishingPoints::Compute(const CalibratedImage& image, bool use_prev) {
 }
 
 void VanishingPoints::OutputLineViz(const string& filename) const {
-	ImageRGB<byte> viz(input->sz());
+	ImageRGB<byte> viz(asIR(input->size()));
 	ImageCopy(input->rgb, viz);
 	ResetAlpha(viz);
 	line_detector.Draw(viz);
@@ -447,7 +478,6 @@ void VanishingPoints::DrawVanPointViz(ImageRGB<byte>& canvas,
 	PixelRGB<byte> white(255, 255, 255);
 	for (int i = 0; i < 3; i++) {
 		const Vec3& vpt = image_vpts[i];
-		TITLED(i) DREPORT(vpt);
 		if (abs(vpt[2]) > 1e-8) {
 			const Vec2 drawpos = project(vpt) + offs;
 			DrawSpot(canvas, drawpos, white, 4);

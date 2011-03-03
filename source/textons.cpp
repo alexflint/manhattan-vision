@@ -148,21 +148,12 @@ namespace indoor_context {
 		}
 
 		// Configure the filter bank
-		if (filters.filterbank.get() == NULL) {
+		if (filters.pyramid.size() == 0) {
 			filters.Configure(*gvNumScales, *gvNumOrients);
 		}
 
 		// Run the filter bank
-		if (*gvFilterStrategy == "CPU") {
-			filters.Run(m);
-		} else if (*gvFilterStrategy == "CPUParallel") {
-			filters.RunParallel(m);
-		} else if (*gvFilterStrategy == "GPU") {
-			filters.RunOnHardware(m);
-		} else {
-			DLOG << "Unknown filter strategy: " << *gvFilterStrategy << endl;
-			exit(-1);
-		}
+		filters.Run(m, *gvFilterStrategy);
 
 		// Compute feature length for efficiency and thread safety
 		// (ProcessRows calls FeatureLen in parallel, which must not read

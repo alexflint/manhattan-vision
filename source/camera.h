@@ -192,7 +192,6 @@ public:
 	Vec3 GetRetinaHorizon() const;
 	// Get the horizon line in image coords (positive side is below horizon)
 	Vec3 GetImageHorizon() const;
-
 private:
 	// camera pose: (world->retina transformation, i.e. extrinsic camera parameters)
 	toon::SE3<> pose_;

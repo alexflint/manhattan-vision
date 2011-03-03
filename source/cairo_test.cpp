@@ -2,7 +2,6 @@
 #include "colors.h"
 #include "image_bundle.h"
 
-//#include "numeric_utils.tpp"
 #include "canvas.tpp"
 #include "vector_utils.tpp"
 

@@ -14,9 +14,7 @@
 #include "multiview_reconstructor.h"
 
 #include "io_utils.tpp"
-#include "integral_col_image.tpp"
 #include "vector_utils.tpp"
-//#include "numeric_utils.tpp"
 
 int main(int argc, char **argv) {
 	InitVars(argc, argv);

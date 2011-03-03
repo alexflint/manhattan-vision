@@ -12,7 +12,6 @@
 #include "bld_helpers.h"
 #include "canny.h"
 
-#include "integral_col_image.tpp"
 #include "io_utils.tpp"
 #include "image_utils.tpp"
 #include "vector_utils.tpp"

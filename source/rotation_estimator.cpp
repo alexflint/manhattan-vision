@@ -16,7 +16,10 @@ namespace indoor_context {
 		return TooN::makeVector(mat.num_rows(), mat.num_cols());
 	}
 
-	SO3<>& RotationEstimator::Compute(const vector<Vector<3> >& lines,
+	RotationEstimator::RotationEstimator() : max_steps(*gvMaxSteps) {
+	}
+
+	SO3<>& RotationEstimator::Compute(const vector<Vec3>& lines,
 																		const Matrix<>& responsibilities,
 																		const SO3<>& initial_guess) {
 		CHECK_EQ(lines.size(), responsibilities.num_rows());
@@ -29,7 +32,7 @@ namespace indoor_context {
 
 		// Descend until convergence
 		Reset(initial_guess);
-		while (!converged && num_steps < *gvMaxSteps) {
+		while (!converged && num_steps < max_steps) {
 			Step(data, responsibilities);
 		}
 		DLOG_N << "SO(3) "
@@ -61,17 +64,17 @@ namespace indoor_context {
 		double fprev = residual;
 		double f = 0;		
 		for (int i = 0; i < 3; i++) {
-			Matrix<3> JR_ei;
+			Mat3 JR_ei;
 			for (int j = 0; j < 3; j++) {
 				JR_ei.slice(0,j,3,1) = SO3<>::generator_field(j, GetAxis<3>(i)).as_col();
 			}
 
-			Vector<3> w_X_R0 = (wts.slice(0,i,n,1).T() * X * R)[0];
+			Vec3 w_X_R0 = (wts.slice(0,i,n,1).T() * X * R)[0];
 			double f_cur = w_X_R0[i];
 			if (!isfinite(f_cur)) {
 				INDENTED DREPORT(f_cur, i, R, w_X_R0);
 			}
-			Vector<3> J_cur = 2 * f_cur * w_X_R0 * JR_ei;
+			Vec3 J_cur = 2 * f_cur * w_X_R0 * JR_ei;
 			f += f_cur*f_cur;
 			Jf += J_cur;
 		}

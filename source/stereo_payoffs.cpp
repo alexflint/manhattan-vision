@@ -11,7 +11,6 @@
 #include "geom_utils.h"
 
 #include "vector_utils.tpp"
-#include "integral_col_image.tpp"
 
 namespace indoor_context {
 
@@ -109,8 +108,7 @@ namespace indoor_context {
 	}
 
 	void FastNCC::ComputeInternal(const MatF& a, const MatF& b, const MatI* mask) {
-		CHECK_EQ(a.Rows(), b.Rows());
-		CHECK_EQ(a.Cols(), b.Cols());
+		CHECK_SAME_SIZE(a, b);
 		asqr.Resize(a.Rows(), a.Cols(), 0.0);
 		bsqr.Resize(a.Rows(), a.Cols(), 0.0);
 		ab.Resize(a.Rows(), a.Cols(), 0.0);
@@ -139,16 +137,21 @@ namespace indoor_context {
 	}
 
 	void FastNCC::AddStats(int col, int row0, int row1, NCCStatistics& stats) {
+		CHECK_INTERVAL(col, 0, intg_a.nx()-1);
 		CHECK_GT(intg_a.ny(), 0) << "AddStats() must not be called before Compute()";
 		stats.sum_a += intg_a.Sum(col, row0, row1);
 		stats.sum_b += intg_b.Sum(col, row0, row1);
 		stats.sum_asqr += intg_asqr.Sum(col, row0, row1);
 		stats.sum_bsqr += intg_bsqr.Sum(col, row0, row1);
 		stats.sum_ab += intg_ab.Sum(col, row0, row1);
-		stats.sum_wts += intg_nsamples.Sum(col, row0, row1);	// This is _not_ necessarily equal to row1-row0 !
+
+		float delta_wts = intg_nsamples.Sum(col, row0, row1);
+		CHECK_GE(delta_wts, 0) << EXPR_STR(col) << EXPR_STR(row0) << EXPR_STR(row1);
+		stats.sum_wts += delta_wts;	// This is _not_ necessarily equal to row1-row0 !
 	}
 
 	double FastNCC::CalculateNCC(int col, int row0, int row1) {
+		CHECK_INTERVAL(col, 0, intg_a.nx()-1);
 		NCCStatistics stats;
 		AddStats(col, row0, row1, stats);
 		return stats.CalculateNCC();
@@ -170,6 +173,8 @@ namespace indoor_context {
 															const Mat3& left_xfer,
 															const Mat3& right_xfer,
 															const Vec2I& bounds) {
+		CHECK_EQ(left.GetSize(), right.GetSize());
+
 		int nx = left.GetWidth();
 		int ny = left.GetHeight();
 		left_xfered.Resize(ny, nx, 0);
@@ -213,15 +218,21 @@ namespace indoor_context {
 
 
 	void StereoPayoffGen::Compute(const PosedImage& l_image,
-															const PosedImage& r_image,
-															const DPGeometry& geom,  // for left image
-															double zfloor,
-															double zceil) {
+																const PosedImage& r_image,
+																const DPGeometry& geom,  // for left image
+																double zfloor,
+																double zceil) {
+		CHECK_SAME_SIZE(l_image, r_image);
+
 		l_input = &l_image;
 		r_input = &r_image;
 		geometry = &geom;
 		ImageRef l_sample, r_sample;
 		Vec2I l_bounds = asToon(l_image.pc().image_size());
+
+		// Ensure the mono images are available
+		l_image.BuildMono();
+		r_image.BuildMono();
 
 		// Compute manhattan homologies
 		Mat3 l_fToC = GetManhattanHomology(l_image.pc(), zfloor, zceil);
@@ -283,128 +294,104 @@ namespace indoor_context {
 		toon::Matrix<3,2> curry_x = Zeros;
 		curry_x[1][0] = curry_x[2][1] = 1.0;
 
-		// Specify some points to visualize
-		/*MatI viz_mask(geom.grid_size[1], geom.grid_size[0], 0);
-		//int viz_pts[] = {44,282,  99,214,  210,195,  260,234}; // kf 50
-		int viz_pts[] = {246,286,  380,277,  422,344,  481,328}; // kf 25
-		for (int i = 0; i < 8; i += 2) {
-		ImageRef p = asIR(project(geom.imageToGrid * makeVector(viz_pts[i], viz_pts[i+1], 1.0)));
-		viz_mask[p.y][p.x] = 1;
-		}*/
-
-		//FileCanvas l_samples("out/samples_l.png", l_image.rgb);
-		//FileCanvas r_samples("out/samples_r.png", r_image.rgb);
-
 		// Compute the NCC payoffs
-		payoffs[0].Resize(geom.grid_size[1], geom.grid_size[0]);
-		payoffs[1].Resize(geom.grid_size[1], geom.grid_size[0]);
-		TIMED("Compute payoffs") INDENTED
-			for (int y = 0; y < geom.grid_size[1]; y++) {
-				float* payoffs0_row = payoffs[0][y];
-				float* payoffs1_row = payoffs[1][y];
+		payoffs.Resize(geom.grid_size[1], geom.grid_size[0]);
+		for (int y = 0; y < geom.grid_size[1]; y++) {
+			float* payoffs_row = payoffs[y];
 
-				// Compute the vertical transfer function for this image row
-				const Vec4& surf_plane = (y < geom.horizon_row) ? ceil_plane : floor_plane;
-				Vec3 pt = makeVector(0,y,1.0);  // this can be any point along the current image row
-				Vec3 surf_pt = IntersectRay(geom.gridToImage*pt, l_cam, surf_plane);
-				const SO3<>& l_rot = l_pc.pose().get_rotation();
-				Vec3 line_nrm = l_rot.inverse() * l_intr.T() * geom.imageToGrid.T() * makeVector(0,-1.0,y);
-				Vec3 plane_nrm = unit(makeVector(line_nrm[0], line_nrm[1], 0));
-				Vec4 plane_eqn = concat(plane_nrm, -plane_nrm*surf_pt);
-				Mat3 ltr_wall = GetHomographyVia(l_image.pc(), r_image.pc(), plane_eqn);
+			// Compute the vertical transfer function for this image row
+			const Vec4& surf_plane = (y < geom.horizon_row) ? ceil_plane : floor_plane;
+			Vec3 pt = makeVector(0,y,1.0);  // this can be any point along the current image row
+			Vec3 surf_pt = IntersectRay(geom.gridToImage*pt, l_cam, surf_plane);
+			const SO3<>& l_rot = l_pc.pose().get_rotation();
+			Vec3 line_nrm = l_rot.inverse() * l_intr.T() * geom.imageToGrid.T() * makeVector(0,-1.0,y);
+			Vec3 plane_nrm = unit(makeVector(line_nrm[0], line_nrm[1], 0));
+			Vec4 plane_eqn = concat(plane_nrm, -plane_nrm*surf_pt);
+			Mat3 ltr_wall = GetHomographyVia(l_image.pc(), r_image.pc(), plane_eqn);
 
-				// These transform from grid coordinates to l_vrect and r_vrect
-				Mat3 grid_to_l = l_vrect * geom.gridToImage;
-				Mat3 grid_to_r = r_vrect * ltr_wall * geom.gridToImage;
+			// These transform from grid coordinates to l_vrect and r_vrect
+			Mat3 grid_to_l = l_vrect * geom.gridToImage;
+			Mat3 grid_to_r = r_vrect * ltr_wall * geom.gridToImage;
 
-				// Compute vrect coords
-				int grid_y0, grid_y1;
-				if (y < geom.horizon_row) {
-					grid_y0 = y;
-					grid_y1 = Clamp<int>((y-grid_fToC_ty)/grid_fToC_sy, 0, geom.grid_size[1]-1);
-				} else {
-					grid_y0 = Clamp<int>(grid_fToC_sy*y + grid_fToC_ty, 0, geom.grid_size[1]-1);
-					grid_y1 = y;
-				}
-				CHECK_LE(y0, y1);
+			// Compute vrect coords
+			int grid_y0, grid_y1;
+			if (y < geom.horizon_row) {
+				grid_y0 = y;
+				grid_y1 = Clamp<int>((y-grid_fToC_ty)/grid_fToC_sy, 0, geom.grid_size[1]-1);
+			} else {
+				grid_y0 = Clamp<int>(grid_fToC_sy*y + grid_fToC_ty, 0, geom.grid_size[1]-1);
+				grid_y1 = y;
+			}
+			CHECK_LE(y0, y1);
 
-				// Compute NCCs for each column
-				for (int x = 0; x < geom.grid_size[0]; x++) {
-					//bool special = viz_mask[y][x];
-					curry_x[0][1] = x;
+			// Compute NCCs for each column
+			for (int x = 0; x < geom.grid_size[0]; x++) {
+				//bool special = viz_mask[y][x];
+				curry_x[0][1] = x;
 
-					// Compute the remaining transform after x is given
-					toon::Matrix<3,2> grid_to_ly = grid_to_l * curry_x;
-					grid_to_ly /= grid_to_ly[2][1];
-					CHECK_LE(abs(grid_to_ly[0][0]), 1e-8);  // require output x-coord independent of input y
-					CHECK_LE(abs(grid_to_ly[2][0]), 1e-8);  // require output x-coord independent of input y
-					int lx = roundi(grid_to_ly[0][1]);
-					float l_m = grid_to_ly[1][0];
-					float l_c = grid_to_ly[1][1];
+				// Compute the remaining transform after x is given
+				toon::Matrix<3,2> grid_to_ly = grid_to_l * curry_x;
+				grid_to_ly /= grid_to_ly[2][1];
+				CHECK_LE(abs(grid_to_ly[0][0]), 1e-8);  // ensure that output X is independent of input Y
+				CHECK_LE(abs(grid_to_ly[2][0]), 1e-8); 
+				int lx = grid_to_ly[0][1];  // don't clamp LX here, it MUST be outside the image sometimes (see the IF below)
+				float l_m = grid_to_ly[1][0];
+				float l_c = grid_to_ly[1][1];
 
-					toon::Matrix<3,2> grid_to_ry = grid_to_r * curry_x;
-					grid_to_ry /= grid_to_ry[2][1];
-					CHECK_LE(abs(grid_to_ry[0][0]), 1e-8);  // require output x-coord independent of input y
-					CHECK_LE(abs(grid_to_ry[2][0]), 1e-8);  // require output x-coord independent of input y
-					int rx = roundi(grid_to_ry[0][1]);
-					float r_m = grid_to_ry[1][0];
-					float r_c = grid_to_ry[1][1];
+				toon::Matrix<3,2> grid_to_ry = grid_to_r * curry_x;
+				grid_to_ry /= grid_to_ry[2][1];
+				CHECK_LE(abs(grid_to_ry[0][0]), 1e-8);  // ensure that output X is independent of input Y
+				CHECK_LE(abs(grid_to_ry[2][0]), 1e-8);
+				int rx = grid_to_ry[0][1];  // don't clamp RX here, it MUST be outside the image sometimes (see the IF below)
+				float r_m = grid_to_ry[1][0];
+				float r_c = grid_to_ry[1][1];
 
-					// Compute contributions from the horizontal component
-					int vrect_x = lx;
-					int vrect_y0 = Clamp<int>(l_m*grid_y0 + l_c, 0, l_image.ny()-1);
-					int vrect_y1 = Clamp<int>(l_m*grid_y1 + l_c, 0, l_image.ny()-1);
-					NCCStatistics stats;
-					ceil_ncc.AddStats(vrect_x, 0, vrect_y0-1, stats);  // portion above the ceiling point
-					floor_ncc.AddStats(vrect_x, vrect_y1, l_image.ny()-1, stats);  // portion below the floor point
+				// Compute contributions from the horizontal component
+				int vrect_x = Clamp<int>(lx, 0, l_image.nx()-1);  // Clamp here (not above) since we test LX in the IF below
+				int vrect_y0 = Clamp<int>(l_m*grid_y0 + l_c, 0, l_image.ny()-1);
+				int vrect_y1 = Clamp<int>(l_m*grid_y1 + l_c, 0, l_image.ny()-1);
+				NCCStatistics stats;
+				ceil_ncc.AddStats(vrect_x, 0, vrect_y0-1, stats);  // portion above the ceiling point
+				floor_ncc.AddStats(vrect_x, vrect_y1, l_image.ny()-1, stats);  // portion below the floor point
 
-					// visualization...
-					/*if (special) {
-						Vec3 p0 = makeVector(vrect_x, vrect_y0, 1.0);
-						Vec3 p1 = makeVector(vrect_x, vrect_y1, 1.0);
-						l_samples.DrawDot(project(l_vrect_inv*p0), 3.0, Colors::blue());
-						l_samples.DrawDot(project(l_vrect_inv*p1), 3.0, Colors::blue());
-						r_samples.DrawDot(project(ltr_ceil*l_vrect_inv*p0), 3.0, Colors::blue());
-						r_samples.DrawDot(project(ltr_floor*l_vrect_inv*p1), 3.0, Colors::blue());
-						}*/
+				// Pull out the rows
+				// RY can be outside image bounds because the images may not entirely overlap
+				if (lx >= 0 && lx < l_vrect_im_tr.Rows() &&
+						rx >= 0 && rx < r_vrect_im_tr.Rows()) {
+					const float* l_row = l_vrect_im_tr[lx];  // in transposed image, rows are columns...
+					const float* r_row = r_vrect_im_tr[rx];  // in transposed image, rows are columns...  
+					int l_len = l_vrect_im_tr.Cols();
+					int r_len = r_vrect_im_tr.Cols();
 
-					// Pull out the rows
-					// RY can be outside image bounds because the images may not entirely overlap
-					if (lx >= 0 && lx < l_vrect_im_tr.Rows() && rx >= 0 && rx < r_vrect_im_tr.Rows()) {
-						const float* l_row = l_vrect_im_tr[lx];  // in transposed image, rows are columns...
-						const float* r_row = r_vrect_im_tr[rx];  // in transposed image, rows are columns...  
-						int l_len = l_vrect_im_tr.Cols();
-						int r_len = r_vrect_im_tr.Cols();
+					// Compute contributions from the vertical component
+					for (int yy = grid_y0; yy <= grid_y1; yy++) {  // use '<=' because grid_y1 always < geom.grid_size[1]
+						int ly = l_m*yy + l_c;
+						int ry = r_m*yy + r_c;
 
-						// Compute contributions from the vertical component
-						for (int yy = grid_y0; yy <= grid_y1; yy++) {  // use '<=' because grid_y1 always < geom.grid_size[1]
-							int ly = l_m*yy + l_c;
-							int ry = r_m*yy + r_c;
-
-							if (ly >= 0 && ly < l_len && l_row[ly] >= 0 &&
-									ry >= 0 && ry < r_len && r_row[ry] >= 0) {
-								// l_m measures the number of pixels in the vrect
-								// domain that each grid pixel corresponds
-								// to. Therefore we weight each grid measurement by
-								// l_m.
-								CHECK_GT(l_m, 0);
-								stats.Add(l_row[ly], r_row[ry], l_m);  // accessing row from transposed image where y=column
-							}
+						if (ly >= 0 && ly < l_len && l_row[ly] >= 0 &&
+								ry >= 0 && ry < r_len && r_row[ry] >= 0) {
+							// l_m measures the number of pixels in the vrect
+							// domain that each grid pixel corresponds
+							// to. Therefore we weight each grid measurement by
+							// l_m.
+							CHECK_GT(l_m, 0);
+							stats.Add(l_row[ly], r_row[ry], l_m);  // accessing row from transposed image where y=column
 						}
 					}
+				}
 
-					if (stats.sum_wts == 0) {
-						payoffs0_row[x] = payoffs1_row[x] = 0;
-					} else {
-						// NOTE: I think it makes sense to take the absolute NCC since
-						// a large negative NCC suggests an anti-correlation, which
-						// indicates a good match. But I'm not sure...
-						// I'm now adding 1, for convenience and since the DP objective function is additive
-						payoffs0_row[x] = payoffs1_row[x] = 1.0 + stats.CalculateNCC();
-						CHECK_PRED1(isfinite, payoffs0_row[x]) << "[x="<<x<<",y="<<y<<"], stats:"<<stats;
-					}
+				if (stats.sum_wts == 0) {
+					payoffs_row[x] = 0;
+				} else {
+					// NOTE: I think it makes sense to take the absolute NCC since
+					// a large negative NCC suggests an anti-correlation, which
+					// indicates a good match. But I'm not sure...
+					// I'm now adding 1, for convenience and since the DP objective function is additive
+					payoffs_row[x] = 1.0 + stats.CalculateNCC();
+					CHECK_PRED1(isfinite, payoffs_row[x]) << "[x="<<x<<",y="<<y<<"], stats:"<<stats;
 				}
 			}
+		}
 	}
 
 
@@ -422,7 +409,7 @@ namespace indoor_context {
 
 
 
-	void StereoPayoffGen::ComputeWin(const PosedImage& l_image,
+	/*void StereoPayoffGen::ComputeWin(const PosedImage& l_image,
 																 const PosedImage& r_image,
 																 const DPGeometry& geom,  // for left image
 																 double zfloor,
@@ -493,25 +480,13 @@ namespace indoor_context {
 		toon::Matrix<3,2> curry_x = Zeros;
 		curry_x[1][0] = curry_x[2][1] = 1.0;
 
-		// Specify some points to visualize
-		/*MatI viz_mask(geom.grid_size[1], geom.grid_size[0], 0);
-		//int viz_pts[] = {44,282,  99,214,  210,195,  260,234}; // kf 50
-		int viz_pts[] = {246,286,  380,277,  422,344,  481,328}; // kf 25
-		for (int i = 0; i < 8; i += 2) {
-		ImageRef p = asIR(project(geom.imageToGrid * makeVector(viz_pts[i], viz_pts[i+1], 1.0)));
-		viz_mask[p.y][p.x] = 1;
-		}*/
-
 		//FileCanvas l_samples("out/samples_l.png", l_image.rgb);
 		//FileCanvas r_samples("out/samples_r.png", r_image.rgb);
 
 		// Compute the NCC payoffs
-		payoffs[0].Resize(geom.grid_size[1], geom.grid_size[0]);
-		payoffs[1].Resize(geom.grid_size[1], geom.grid_size[0]);
-		TIMED("Compute payoffs") INDENTED
+		payoffs.Resize(geom.grid_size[1], geom.grid_size[0]);
 			for (int y = 0; y < geom.grid_size[1]; y++) {
-				float* payoffs0_row = payoffs[0][y];
-				float* payoffs1_row = payoffs[1][y];
+				float* payoffs_row = payoffs[y];
 
 				// Compute the vertical transfer function for this image row
 				const Vec4& surf_plane = (y < geom.horizon_row) ? ceil_plane : floor_plane;
@@ -568,16 +543,6 @@ namespace indoor_context {
 					ceil_ncc.AddStats(vrect_x, 0, vrect_y0-1, stats);  // portion above the ceiling point
 					floor_ncc.AddStats(vrect_x, vrect_y1, l_image.ny()-1, stats);  // portion below the floor point
 
-					// visualization...
-					/*if (special) {
-						Vec3 p0 = makeVector(vrect_x, vrect_y0, 1.0);
-						Vec3 p1 = makeVector(vrect_x, vrect_y1, 1.0);
-						l_samples.DrawDot(project(l_vrect_inv*p0), 3.0, Colors::blue());
-						l_samples.DrawDot(project(l_vrect_inv*p1), 3.0, Colors::blue());
-						r_samples.DrawDot(project(ltr_ceil*l_vrect_inv*p0), 3.0, Colors::blue());
-						r_samples.DrawDot(project(ltr_floor*l_vrect_inv*p1), 3.0, Colors::blue());
-						}*/
-
 					// Pull out the rows
 					// RY can be outside image bounds because the images may not entirely overlap
 					if (lx >= 0 && lx < l_vrect_im_tr.Rows() && rx >= 0 && rx < r_vrect_im_tr.Rows()) {
@@ -603,18 +568,18 @@ namespace indoor_context {
 					}
 
 					if (stats.sum_wts == 0) {
-						payoffs0_row[x] = payoffs1_row[x] = 0;
+						payoffs_row[x] = 0;
 					} else {
 						// NOTE: I think it makes sense to take the absolute NCC since
 						// a large negative NCC suggests an anti-correlation, which
 						// indicates a good match. But I'm not sure...
 						// I'm now adding 1, for convenience and since the DP objective function is additive
-						payoffs0_row[x] = payoffs1_row[x] = 1.0 + stats.CalculateNCC();
-						CHECK_PRED1(isfinite, payoffs0_row[x]) << "[x="<<x<<",y="<<y<<"], stats:"<<stats;
+						payoffs_row[x] = 1.0 + stats.CalculateNCC();
+						CHECK_PRED1(isfinite, payoffs_row[x]) << "[x="<<x<<",y="<<y<<"], stats:"<<stats;
 					}
 				}
 			}
-	}
+	}*/
 
 
 
@@ -709,7 +674,6 @@ namespace indoor_context {
 		// Compute the NCC payoffs
 		payoffs[0].Resize(geom.grid_size[1], geom.grid_size[0]);
 		payoffs[1].Resize(geom.grid_size[1], geom.grid_size[0]);
-		TIMED("Compute payoffs") INDENTED
 			for (int y = 0; y < geom.grid_size[1]; y++) {
 				float* payoffs0_row = payoffs[0][y];
 				float* payoffs1_row = payoffs[1][y];
@@ -822,7 +786,7 @@ namespace indoor_context {
 		for (int y = 0; y < l_input->ny(); y += 5) {
 			for (int x = 0; x < l_input->nx(); x += 5) {
 				Vec2 vrect_p = project(geometry->imageToGrid * makeVector(x,y,1.0));
-				double payoff = payoffs[0][ roundi(vrect_p[1]) ][ roundi(vrect_p[0]) ];
+				double payoff = payoffs[ roundi(vrect_p[1]) ][ roundi(vrect_p[0]) ];
 				if (payoff >= 0) {
 					PixelRGB<byte> color(0,payoff*255,0);  // payoffs are in [0,1]
 					payoffs_canvas.DrawDot(makeVector(x,y), color);
@@ -832,6 +796,6 @@ namespace indoor_context {
 	}
 
 	void StereoPayoffGen::OutputRawPayoffs(const string& file) {
-		WriteMatrixImageRescaled(file, payoffs[0]);
+		WriteMatrixImageRescaled(file, payoffs);
 	}
 }  // namespace indoor_contex
