@@ -2,8 +2,6 @@
 #include "common_types.h"
 #include "cuda_conv.h"
 
-#include <VW/Utils/timer.h>
-
 namespace indoor_context {
 
 HwConvolver::HwConvolver(int w, int h) {

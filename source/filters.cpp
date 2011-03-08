@@ -1,4 +1,3 @@
-#include <VW/Utils/timer.h>
 #include <VNL/vector.tpp>
 
 #include "filters.h"

@@ -4,6 +4,8 @@
 
 #include "common_types.h"
 #include "filters.h"
+#include "image_bundle.h"
+#include "vw_image-fwd.h"
 
 namespace indoor_context {
 	// Represents a set of texton words (i.e. cluster centres)

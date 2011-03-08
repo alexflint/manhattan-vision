@@ -263,7 +263,7 @@ namespace indoor_context {
 
 	template <typename Range>
 	iowrapper<Range> iowrap(const Range& range, const string& sep) {
-		return iowrap<Range>(range, sep);
+		return iowrapper<Range>(range, sep);
 	}
 
 	template <typename T>

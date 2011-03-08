@@ -14,7 +14,10 @@
 #include "camera.h"
 #include "geom_utils.h"
 #include "canvas.h"
+#include "vw_image_io.h"
 
+#include "vw_image.tpp"
+#include "image_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {

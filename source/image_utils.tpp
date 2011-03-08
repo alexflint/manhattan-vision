@@ -8,18 +8,20 @@
 #include <boost/bind.hpp>
 #include <cvd/image.h>
 #include <cvd/rgba.h>
-#include <VW/Image/imagecopy.h>
 
 #include "common_types.h"
+#include "vw_image_io.h"
+#include "image_bundle.h"
 
 #include "matrix_traits.tpp"
 #include "polygon.tpp"
+#include "vw_image.tpp"
 
 namespace indoor_context {
 
 // Get the maximum absolute value of a pixel in an image
 template<typename T>
-T GetMaxAbsPixel(const VW::ImageMono<T>& image) {
+T GetMaxAbsPixel(const ImageMono<T>& image) {
 	T maxabs = 0.0;
 	for (int r = 0; r < image.GetHeight(); r++) {
 		for (int c = 0; c < image.GetWidth(); c++) {
@@ -34,9 +36,9 @@ T GetMaxAbsPixel(const VW::ImageMono<T>& image) {
 
 // Apply a function to an image
 template<typename T, typename Function>
-void ImApply(VW::ImageMono<T>& image, Function f) {
+void ImApply(ImageMono<T>& image, Function f) {
 	for (int r = 0; r < image.GetHeight(); r++) {
-		VW::PixelMono<T>* row = image[r];
+		PixelMono<T>* row = image[r];
 		for (int c = 0; c < image.GetWidth(); c++) {
 			row[c].y = f(row[c].y);
 		}
@@ -46,7 +48,7 @@ void ImApply(VW::ImageMono<T>& image, Function f) {
 // Apply a linear transform to all pixels so that 0 becomes mid-grey
 // and the highest/lowest pixel is white/black respectively.
 template<typename T, typename S>
-void Recentre(VW::ImageMono<T>& image, const S& max) {
+void Recentre(ImageMono<T>& image, const S& max) {
 	T offset = max / 2.0;
 	T scale = offset / GetMaxAbsPixel(image);
 	for (int r = 0; r < image.GetHeight(); r++) {
@@ -59,7 +61,7 @@ void Recentre(VW::ImageMono<T>& image, const S& max) {
 // Transform pixels so that 0 remains at 0 and the brighest pixel is
 // white.
 template<typename T, typename S>
-void Rescale(VW::ImageMono<T>& image, const S& max) {
+void Rescale(ImageMono<T>& image, const S& max) {
 	T scale = max / GetMaxAbsPixel(image);
 	ImApply(image, bind(multiplies<T>(), scale, _1));
 }
@@ -67,9 +69,9 @@ void Rescale(VW::ImageMono<T>& image, const S& max) {
 // Transform pixels so that 0 remains at 0 and the brighest pixel is
 // white.
 template<typename T, typename S>
-void RescaleAbs(VW::ImageMono<T>& image, const S& max) {
+void RescaleAbs(ImageMono<T>& image, const S& max) {
 	for (int y = 0; y < image.GetWidth(); y++) {
-		VW::PixelMono<T>* row = image[y];
+		PixelMono<T>* row = image[y];
 		for (int x = 0; x < image.GetHeight(); x++) {
 			row[x].y = abs(row[x].y);
 		}
@@ -82,25 +84,16 @@ void RescaleAbs(VW::ImageMono<T>& image, const S& max) {
 inline void Recentre(ImageF& image) {
 	Recentre(image, (1 << 16) - 1);
 }
-inline void Recentre(ImageD& image) {
-	Recentre(image, (1 << 8) - 1);
-}
 
 // Transform pixels so that 0 remains at 0 and the brighest pixel is
 // white.
 inline void Rescale(ImageF& image) {
 	Rescale(image, (1 << 16) - 1);
 }
-inline void Rescale(ImageD& image) {
-	Rescale(image, (1 << 8) - 1);
-}
 
 // Take absolute and then apply Rescale()
 inline void RescaleAbs(ImageF& image) {
 	RescaleAbs(image, (1 << 16) - 1);
-}
-inline void RescaleAbs(ImageD& image) {
-	RescaleAbs(image, (1 << 8) - 1);
 }
 
 // Copy one image into another with translation and scale changes
@@ -233,55 +226,55 @@ void DrawMatrixRecentred(const VNL::Matrix<T>& mat, ImageRGB<S>& image) {
 	}
 }
 
-template<typename T, typename String>
-void WriteMatrixImage(String filename, const VNL::Matrix<T>& mat) {
+template<typename T>
+void WriteMatrixImage(const string& filename, const VNL::Matrix<T>& mat) {
 	ImageF image;
 	MatrixToImage(mat, image);
 	WriteImage(filename, image);
 }
 
-template<typename T, typename String>
-void WriteMatrixImageRescaled(String filename, const VNL::Matrix<T>& mat) {
-	ImageF image;
-	MatrixToImage(mat, image);
-	WriteImageRescaledInPlace(filename, image);
-}
-
-template<typename T, typename String>
-void WriteMatrixImageRecentred(String filename, const VNL::Matrix<T>& mat) {
-	ImageF image;
-	MatrixToImage(mat, image);
-	WriteImageRecentredInPlace(filename, image);
-}
-
-template<typename T, typename String>
-void WriteImageRescaledInPlace(String filename, ImageMono<T>& image) {
+template<typename T>
+void WriteImageRescaledInPlace(const string& filename, ImageMono<T>& image) {
 	Rescale(image);
 	WriteImage(filename, image);
 }
 
-template<typename T, typename String>
-void WriteImageRescaled(String filename, const ImageMono<T>& image) {
+template<typename T>
+void WriteImageRescaled(const string& filename, const ImageMono<T>& image) {
 	ImageMono<T> clone;
 	ImageCopy(image, clone);
 	WriteImageRescaledInPlace(filename, clone);
 }
 
-template<typename T, typename String>
-void WriteImageRecentredInPlace(String filename, ImageMono<T>& image) {
+template<typename T>
+void WriteImageRecentredInPlace(const string& filename, ImageMono<T>& image) {
 	Recentre(image);
 	WriteImage(filename, image);
 }
 
-template<typename T, typename String>
-void WriteImageRecentred(String filename, const ImageMono<T>& image) {
+template<typename T>
+void WriteImageRecentred(const string& filename, const ImageMono<T>& image) {
 	ImageMono<T> clone;
 	ImageCopy(image, clone);
 	WriteImageRecentredInPlace(filename, clone);
 }
 
-template<typename T, typename String>
-void WriteImageOfNonFinites(String filename,
+template<typename T>
+void WriteMatrixImageRescaled(const string& filename, const VNL::Matrix<T>& mat) {
+	ImageF image;
+	MatrixToImage(mat, image);
+	WriteImageRescaledInPlace(filename, image);
+}
+
+template<typename T>
+void WriteMatrixImageRecentred(const string& filename, const VNL::Matrix<T>& mat) {
+	ImageF image;
+	MatrixToImage(mat, image);
+	WriteImageRecentredInPlace(filename, image);
+}
+
+template<typename T>
+void WriteImageOfNonFinites(const string& filename,
 														const VNL::Matrix<T>& mat) {
 	MatI m(mat.Rows(), mat.Cols());
 	for (int y = 0; y < mat.Rows(); y++) {
@@ -324,11 +317,12 @@ void DrawPolygonClipped(ImageRGB<byte>& canvas,
 }
 
 // Add two HSV pixels
-template<typename T, typename S>
+/*template<typename T, typename S>
 PixelHSV<T> operator+(const PixelHSV<T>& a, const PixelHSV<S>& b) {
 	return PixelHSV<T> (a.h + b.h, a.s + b.s, a.v + b.v);
-}
+	}*/
 
+/*
 // Add two HSV pixels
 template<typename T, typename S>
 PixelHSV<T>& operator+=(PixelHSV<T>& a, const PixelHSV<S>& b) {
@@ -352,6 +346,7 @@ PixelHSV<T>& operator/=(PixelHSV<T>& a, const S& k) {
 	a.v /= k;
 	return a;
 }
+*/
 
 // Re-allocate an image if it is not already the right size. Return
 // true if an allocation was performed

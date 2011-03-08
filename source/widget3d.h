@@ -8,6 +8,7 @@
 #include "common_types.h"
 #include "line_segment.h"
 
+#include "vw_image.tpp"
 #include "event.tpp"
 
 namespace indoor_context {

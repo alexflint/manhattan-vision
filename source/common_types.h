@@ -16,11 +16,6 @@
 #include <VNL/matrix.h>
 #include <VNL/matrixfixed.h>
 
-#include <VW/Image/imagergb.h>
-#include <VW/Image/imagehsv.h>
-#include <VW/Image/imagemono.h>
-#include <VW/Image/imageio.h>
-
 #include <TooN/TooN.h>
 
 #include <gvars3/instances.h>
@@ -35,14 +30,6 @@ namespace indoor_context {
 	using boost::scoped_array;
 	namespace fs=boost::filesystem;
 	namespace toon=TooN;
-
-	using VW::ImageRGB;
-	using VW::ImageHSV;
-	using VW::ImageMono;
-	using VW::ImageRef;
-	using VW::PixelRGB;
-	using VW::PixelHSV;
-	using VW::PixelMono;
 
 	typedef unsigned char byte;
 
@@ -70,16 +57,10 @@ namespace indoor_context {
 	typedef VNL::Vector<float> VecF;
 	typedef VNL::Vector<double> VecD;
 
-	typedef VW::ImageMono<float> ImageF;
-	typedef VW::ImageMono<double> ImageD;
-	typedef VW::PixelMono<float> PixelF;
-	typedef VW::PixelMono<double> PixelD;
-
 } // indoor_context
 
 // These rely on the above typedefs...
 #include "log.tpp"
 #include "check.tpp"
 #include "lazyvar.h"
-#include "image_bundle.h"
 #include "initialized_ptr.tpp"

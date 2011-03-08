@@ -8,7 +8,7 @@
 
 #include "range_utils.tpp"
 #include "numeric_utils.tpp"
-#include "image_utils.tpp"
+//#include "image_utils.tpp"
 
 namespace indoor_context {
 
@@ -113,21 +113,6 @@ private:
 	Measurement& lo_, hi_;
 	toon::Vector<N,double>& a_, b_;  // w is precomputed coefficients for efficiency
 	toon::Vector<N,int>& N_;
-};
-
-// Bin layout for RGB colorspace
-class RgbLayout : public IBinLayout<PixelRGB<byte> > {
-public:
-	RgbLayout();
-	RgbLayout(int na);
-	RgbLayout(int nr, int ng, int nb);
-	void Configure(int na);
-	void Configure(int nr, int ng, int nb);
-	int GetBinCount() const;
-	int GetBinIndex(const PixelRGB<byte>& p) const;
-	PixelRGB<byte> GetBinExemplar(int bin) const;
-private:
-	int n_, nr_, ng_, nb_;
 };
 
 // Represents a general histogram with an arbitrary measurement->bin mapping
@@ -253,14 +238,14 @@ public:
 	}
 
 	// Output
-	void Draw(ImageRGB<byte>& canvas) const {
+	/*void Draw(ImageRGB<byte>& canvas) const {
 		DrawHistogram(canvas, bins_, 1.0);
 	}
 	void OutputViz(const string& filename) const {
 		ImageRGB<byte> canvas;
 		Draw(canvas);
 		WriteImage(filename, canvas);
-	}
+		}*/
 	void RenderText() const {
 		int max_count = max(*max_element(bins_),1);
 		for (int i = 0; i < n_; i++) {

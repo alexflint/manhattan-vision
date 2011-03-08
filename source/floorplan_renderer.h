@@ -9,7 +9,10 @@
 
 #include "common_types.h"
 #include "map.pb.h"
+#include "model.pb.h"
 #include "simple_renderer.h"
+#include "vw_image-fwd.h"
+
 #include "polygon.tpp"
 
 namespace indoor_context {
@@ -26,12 +29,17 @@ public:
 	SimpleRenderer& renderer() { return renderer_; }
 	const SimpleRenderer& renderer() const { return renderer_; }
 
+	// Configure the camera
+	void Configure(const PosedCamera& camera);
+	void Configure(const toon::Matrix<3,4>& camera, const Vec2I& viewport);
+
+	// Reset with just the infinite floor and ceiling planes
+	void Reset(double zfloor, double zceil);
+
 	// Render orientations
-	void Render(const proto::FloorPlan& floorplan,
-							const toon::Matrix<3,4>& camera,
-							const Vec2I& viewport);
-	void Render(const proto::FloorPlan& floorplan,
-							const PosedCamera& camera);
+	void Render(const proto::FloorPlan& floorplan);
+	void Render(const proto::Model& model);
+	void RenderWall(const Vec2& u, const Vec2& v, double zfloor, double zceil);
 
 	// Retrieve pixel-wise orientations
 	MatI& orientations() { return renderer_.framebuffer(); }

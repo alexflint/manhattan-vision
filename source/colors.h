@@ -2,6 +2,8 @@
 
 #include "common_types.h"
 
+#include "vw_image.tpp"  // eek
+
 namespace indoor_context {
 	// Utility class of colours
 	class Colors {
@@ -58,6 +60,10 @@ namespace indoor_context {
 		static inline PixelRGB<byte> alpha(double a, const PixelRGB<byte>& in) {
 			return PixelRGB<byte>(in.r, in.g, in.b, (1-a)*255);
 		}
+
+		// RGB/HSV conversions
+		static void RGB2HSV(byte r, byte g, byte b, byte& h, byte& s, byte& v);
+		static void HSV2RGB(byte h, byte s, byte v, byte& r, byte& g, byte& b);
 	};
 
 	// Iterate through colors with full Saturation and Value --

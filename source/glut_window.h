@@ -4,11 +4,10 @@
 
 #include <GL/glut.h>
 
-#include <VW/Utils/timer.h>
-
 #include "common_types.h"
 #include "invokation_serializer.h"
 
+#include "vw_image.tpp"
 #include "event.tpp"
 
 namespace indoor_context {
@@ -220,7 +219,7 @@ namespace indoor_context {
 		// Current position of the mouse
 		toon::Vector<2> mousePt_;
 		// Time of the last click, used for detecting double-clicks
-		VW::Timer mouseTimer_;
+		//VW::Timer mouseTimer_;
 
 		// Map from keys to handlers
 		map<int, Event<> > keyMap_;

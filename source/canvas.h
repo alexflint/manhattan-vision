@@ -6,14 +6,12 @@
 #include <cairomm/context.h>
 #include <cairomm/surface.h>
 
-#include <VW/Image/imagergb.h>
-
 #include "common_types.h"
 #include "line_segment.h"
 #include "polygon-fwd.h"
+#include "vw_image-fwd.h"
 
 namespace indoor_context {
-using namespace toon;
 
 // Represents a canvas. Wraps Cairo::Context to provide vector-based methods
 class Canvas {
@@ -105,7 +103,7 @@ public:
 	               const Mat2& m,
 	               const Vec2& t,
 	               double alpha=1.0);
-	// Draw a greyscale image, rescaled so that the maximum value is white
+	// Draw a greyscale image, rescaled so that the mesaximum value is white
 	void DrawImageRescaled(const MatF& image, double alpha=1.0);
 protected:
 	// Protected so that this class cannot be instantiated directly

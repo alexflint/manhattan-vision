@@ -149,7 +149,7 @@ namespace indoor_context {
 	public:
 		const PosedImage* l_input;
 		const PosedImage* r_input;
-		const DPGeometry* geometry;
+		const DPGeometryWithScale* geometry;
 
 		// The left vertical-rectification homography
 		Mat3 l_vrect;
@@ -169,24 +169,20 @@ namespace indoor_context {
 		// element of the payoff matrix.
 		void Compute(const PosedImage& left_image,
 								 const PosedImage& right_image,
-								 const DPGeometry& geom,
-								 double zfloor,
-								 double zceil);
+								 const DPGeometryWithScale& geom);
 
 		// Same as Compute() but uses square windows rather than individual pixels
 		void ComputeWin(const PosedImage& l_image,
 										const PosedImage& r_image,
-										const DPGeometry& geom,  // for left image
-										double zfloor,
-										double zceil);
+										const DPGeometryWithScale& geom  // for left image
+										);
 
 		// Compute payoffs by calculating NCC scores for patches around each
 		// corresponding pixel pair, for each element of the payoff matrix.
 		void ComputeFull(const PosedImage& l_image,
 										 const PosedImage& r_image,
-										 const DPGeometry& geom,  // for left image
-										 double zfloor,
-										 double zceil);
+										 const DPGeometryWithScale& geom  // for left image
+										 );
 
 		// Visualization
 		void OutputRectifiedLeft(const string& file);

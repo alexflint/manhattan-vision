@@ -11,9 +11,7 @@ namespace indoor_context {
 		const vector<Vec3>* input_points;
 		const PosedCamera* input_camera;
 
-		DPGeometry geometry;
-		double zfloor;
-		double zceil;
+		DPGeometryWithScale geometry;
 
 		MatF agreement_payoffs;
 		MatF occlusion_payoffs;
@@ -22,22 +20,16 @@ namespace indoor_context {
 		// Slow old implementation for comparison with Compute() only
 		void Compute(const vector<Vec3>& points,
 								 const PosedCamera& camera,
-								 const DPGeometry& geom,
-								 double zfloor,
-								 double zceil);
+								 const DPGeometryWithScale& geom);
 		// Compute payoff matrices for consistency with observed landmarks
 		// Slow old implementation (only for comparison with new Compute())
 		void ComputeSlow(const vector<Vec3>& points,
 										 const PosedCamera& camera,
-										 const DPGeometry& geom,
-										 double zfloor,
-										 double zceil);
+										 const DPGeometryWithScale& geom);
 		// Compute payoff matrices for consistency with observed landmarks
 		// Slow old implementation for comparison with Compute() only
 		void ComputeSlow(const KeyFrame& frame,
-								 const DPGeometry& geom,
-								 double zfloor,
-								 double zceil);
+								 const DPGeometryWithScale& geom);
 
 		// Output points and the projections to floor/ceiling
 		void OutputProjectionViz(const ImageBundle& image,

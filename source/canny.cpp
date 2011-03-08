@@ -4,15 +4,14 @@
 
 #include <boost/foreach.hpp>
 
-#include <VW/Improc/smooth.h>
-#include <VW/Image/imagecopy.tpp>
-
 #include "common_types.h"
 #include "fast_sobel.h"
 #include "canny.h"
 #include "filters.h"
+
 #include "numeric_utils.tpp"
 #include "image_utils.tpp"
+#include "vw_image.tpp"
 
 namespace indoor_context {
 const lazyvar<float> gvSmoothingSigma("Gradients.SmoothingSigma");
@@ -99,19 +98,20 @@ void Gradients::ComputeOrients() {
 }
 
 
-void Gradients::ComputeSobel(const ImageF& rawinput) {
+void Gradients::ComputeSobel(const ImageF& input) {
 	// Smooth the image
-	scoped_ptr<ImageF> smoothed;
+	//scoped_ptr<ImageF> smoothed;
 	if (*gvSmoothingSigma > 0.0) {
-		smoothed.reset(new ImageF);
+		DLOG << "Warning, SmoothUniform not implemented but Gradients.SmoothingSigma was greater than 0";
+		/*smoothed.reset(new ImageF);
 		ImageCopy(rawinput, *smoothed);
-		VW::SmoothUniform(*smoothed, ceili(*gvSmoothingSigma)*2+1);
+		VW::SmoothUniform(*smoothed, ceili(*gvSmoothingSigma)*2+1);*/
 	}
-	const ImageF& input = *gvSmoothingSigma > 0 ? *smoothed : rawinput;
+	//const ImageF& input = *gvSmoothingSigma > 0 ? *smoothed : rawinput;
 
 	// Run sobel filters
-	ResizeImage(diffx, rawinput.GetSize());
-	ResizeImage(diffy, rawinput.GetSize());
+	ResizeImage(diffx, input.GetSize());
+	ResizeImage(diffy, input.GetSize());
 	FastSobel::ConvolveX(input, diffx);
 	FastSobel::ConvolveY(input, diffy);
 }

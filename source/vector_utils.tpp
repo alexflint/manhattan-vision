@@ -14,6 +14,7 @@
 
 #include "numeric_utils.tpp"
 #include "range_utils.tpp"
+#include "vw_image.tpp"
 
 namespace indoor_context {
 

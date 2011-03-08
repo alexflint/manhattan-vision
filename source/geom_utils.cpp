@@ -7,6 +7,7 @@
 
 #include "matrix_traits.tpp"
 #include "vector_utils.tpp"
+#include "vw_image.tpp"
 
 namespace indoor_context {
 using namespace toon;
@@ -120,6 +121,10 @@ Vec3 IntersectRay(const Vec3& p, const Matrix<3,4>& camera, const Vec4& plane) {
 	M.slice<3, 0, 1, 4> () = plane.as_row();
 	SVD<4> decomp(M);
 	return project(decomp.backsub(makeVector(p[0], p[1], p[2], 0.0)));
+}
+
+Vec3 IntersectRay(const Vec3& pixel, const PosedCamera& camera, const Vec4& plane) {
+	return IntersectRay(pixel, camera.Linearize(), plane);
 }
 
 Vec3 PlaneToDepthEqn(const Matrix<3,4>& camera, const Vec4& plane) {
@@ -243,7 +248,7 @@ Mat3 GetVerticalRectifier(const PosedCamera& pc,
 	// Compose the transforms and do a sanity check
 	Mat3 H = H_fit * H_rect;
 	for (int i = 0; i < 4; i++) {
-		CHECK_POS(project(H*outline.verts[i]), pc.image_size()) << "i="<<i<<", outline[i]="<<outline.verts[i];
+		CHECK_POS(project(H*outline.verts[i]), pc) << "i="<<i<<", outline[i]="<<outline.verts[i];
 	}
 
 	// Return the final transform

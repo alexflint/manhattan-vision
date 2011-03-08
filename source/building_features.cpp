@@ -1,10 +1,12 @@
+#include "building_features.h"
+
 #include <set>
 #include <algorithm>
 
 #include <boost/format.hpp>
 
-#include "building_features.h"
 #include "common_types.h"
+#include "colors.h"
 
 #include "io_utils.tpp"
 #include "image_utils.tpp"
@@ -212,7 +214,7 @@ namespace indoor_context {
 				float* vrow = hsv_features[2][y];
 				const PixelRGB<byte>* imrow = image.rgb[y];
 				for (int x = 0; x < image.nx(); x++) {
-					VW::ImageConversions::RGB2HSV(imrow[x].r, imrow[x].g, imrow[x].b, h, s, v);
+					Colors::RGB2HSV(imrow[x].r, imrow[x].g, imrow[x].b, h, s, v);
 					hrow[x] = h;
 					srow[x] = s;
 					vrow[x] = v;

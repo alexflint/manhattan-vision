@@ -12,6 +12,7 @@
 #include "canvas.tpp"
 #include "polygon.tpp"
 #include "vector_utils.tpp"
+#include "vw_image.tpp"
 
 namespace indoor_context {
 using namespace toon;

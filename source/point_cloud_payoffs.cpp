@@ -3,6 +3,7 @@
 #include "common_types.h"
 #include "map.h"
 #include "manhattan_dp.h"
+#include "colors.h"
 
 #include "canvas.tpp"
 
@@ -16,15 +17,11 @@ namespace indoor_context {
 	static const int kWin = 13;  // should be 2 * kCutoff + 1
 
 	void PointCloudPayoffs::Compute(const vector<Vec3>& points,
-																const PosedCamera& camera,
-																const DPGeometry& geom,
-																double zf,
-																double zc) {
+																	const PosedCamera& camera,
+																	const DPGeometryWithScale& geom) {
 		input_points = &points;
 		input_camera = &camera;
 		geometry = geom;
-		zfloor = zf;
-		zceil = zc;
 
 		CHECK_GE(kCutoff, *gvAgreeSigma*2)
 			<< "After changing PointCloudPayoffs.AgreeSigma, you must also change constants at top of landmark_payoffs.cpp";
@@ -42,8 +39,8 @@ namespace indoor_context {
 		// Count the number of points that project to each point in the grid
 		MatI proj_counts(geom.grid_size[1], geom.grid_size[0], 0);
 		BOOST_FOREACH(const Vec3& v, points) {
-			Vec3 f = makeVector(v[0], v[1], zfloor);
-			Vec3 c = makeVector(v[0], v[1], zceil);
+			Vec3 f = makeVector(v[0], v[1], geometry.zfloor);
+			Vec3 c = makeVector(v[0], v[1], geometry.zceil);
 			Vec2 grid_f = geom.ImageToGrid(camera.WorldToIm(f));
 			Vec2 grid_c = geom.ImageToGrid(camera.WorldToIm(c));
 			CHECK_LE(grid_c[1], grid_f[1]) << "Ceiling points should project above floor in grid";
@@ -88,9 +85,7 @@ namespace indoor_context {
 	}
 
 	void PointCloudPayoffs::ComputeSlow(const KeyFrame& frame,
-																const DPGeometry& geom,
-																double zfloor,
-																double zceil) {
+																			const DPGeometryWithScale& geom) {
 		CHECK_NOT_NULL(frame.map);
 
 		// Extract all the points visible in this image
@@ -100,20 +95,15 @@ namespace indoor_context {
 		}
 
 		// Compute payoffs
-		ComputeSlow(points, frame.image.pc(), 
-						geom, zfloor, zceil);
+		ComputeSlow(points, frame.image.pc(), geom);
 	}
 
 	void PointCloudPayoffs::ComputeSlow(const vector<Vec3>& points,
-																		const PosedCamera& camera,
-																		const DPGeometry& geom,
-																		double zf,
-																		double zc) {
+																			const PosedCamera& camera,
+																			const DPGeometryWithScale& geom) {
 		input_points = &points;
 		input_camera = &camera;
 		geometry = geom;
-		zfloor = zf;
-		zceil = zc;
 
 		agreement_payoffs.Resize(geom.grid_size[1], geom.grid_size[0], 0);
 		occlusion_payoffs.Resize(geom.grid_size[1], geom.grid_size[0], 0);
@@ -124,8 +114,8 @@ namespace indoor_context {
 
 		// Accumulate weights for each point
 		BOOST_FOREACH(const Vec3& v, points) {
-			Vec3 f = makeVector(v[0], v[1], zfloor);
-			Vec3 c = makeVector(v[0], v[1], zceil);
+			Vec3 f = makeVector(v[0], v[1], geometry.zfloor);
+			Vec3 c = makeVector(v[0], v[1], geometry.zceil);
 			Vec2 grid_f = geom.ImageToGrid(camera.WorldToIm(f));
 			Vec2 grid_c = geom.ImageToGrid(camera.WorldToIm(c));
 			CHECK_LE(grid_c[1], grid_f[1]);
@@ -173,17 +163,14 @@ namespace indoor_context {
 	}
 
 	void PointCloudPayoffs::OutputProjectionViz(const ImageBundle& image,
-																						const string& path) {
+																							const string& path) {
 		FileCanvas canvas(path, image.rgb);
 		
 		for (int i = 0; i < 200; i++) {
 			int ii = rand() % input_points->size();
 			Vec3 v = (*input_points)[ii];
-			Vec3 f = makeVector(v[0], v[1], zfloor);
-			Vec3 c = makeVector(v[0], v[1], zceil);
-			/*Vec2 grid_v = geometry.ImageToGrid(input_camera->WorldToIm(v));
-			Vec2 grid_f = geometry.ImageToGrid(input_camera->WorldToIm(f));
-			Vec2 grid_c = geometry.ImageToGrid(input_camera->WorldToIm(c));*/
+			Vec3 f = makeVector(v[0], v[1], geometry.zfloor);
+			Vec3 c = makeVector(v[0], v[1], geometry.zceil);
 			Vec2 grid_v = project(input_camera->WorldToIm(v));
 			Vec2 grid_f = project(input_camera->WorldToIm(f));
 			Vec2 grid_c = project(input_camera->WorldToIm(c));

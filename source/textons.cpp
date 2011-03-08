@@ -12,15 +12,13 @@
 #include <boost/ref.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
 
-#include <VW/Image/pixelconversions.h>
-
 #include "common_types.h"
+#include "colors.h"
 #include "textons.h"
 #include "filters.h"
 #include "kmeans.h"
 #include "progress_reporter.h"
-
-#include <VW/Image/imagecopy.tpp>
+#include "image_bundle.h"
 
 #include "io_utils.tpp"
 #include "image_utils.tpp"
@@ -201,9 +199,9 @@ namespace indoor_context {
 			break;
 		}
 		case kHSV: {
-			float h, s, v;
+			byte h, s, v;
 			const PixelRGB<byte>& q = input->rgb[y][x];
-			VW::ImageConversions::RGB2HSV(q.r, q.g, q.b, h, s, v);
+			Colors::RGB2HSV(q.r, q.g, q.b, h, s, v);
 			ftr[n] = h_weight * h / 127.5;
 			ftr[n+1] = s_weight * s / 127.5;
 			ftr[n+2] = v_weight * v / 127.5;

@@ -19,6 +19,62 @@ using namespace toon;
 
 const int kNumColorBins = 10;
 
+// Bin layout for RGB colorspace
+class RgbLayout : public IBinLayout<PixelRGB<byte> > {
+public:
+	RgbLayout();
+	RgbLayout(int na);
+	RgbLayout(int nr, int ng, int nb);
+	void Configure(int na);
+	void Configure(int nr, int ng, int nb);
+	int GetBinCount() const;
+	int GetBinIndex(const PixelRGB<byte>& p) const;
+	PixelRGB<byte> GetBinExemplar(int bin) const;
+private:
+	int n_, nr_, ng_, nb_;
+};
+
+RgbLayout::RgbLayout() { }
+
+RgbLayout::RgbLayout(int na) {
+	Configure(na);
+}
+
+RgbLayout::RgbLayout(int nr, int ng, int nb) {
+	Configure(nr, ng, nb);
+}
+
+void RgbLayout::Configure(int na) {
+	Configure(na, na, na);
+}
+
+void RgbLayout::Configure(int nr, int ng, int nb) {
+	nr_ = nr;
+	ng_ = ng;
+	nb_ = nb;
+	n_ = nr*ng*nb;
+}
+
+int RgbLayout::GetBinCount() const {
+	return n_;
+}
+
+int RgbLayout::GetBinIndex(const PixelRGB<byte>& p) const {
+	return (int)(p.r*nr_)/256 + (int)(p.g*ng_/256)*nr_ + (int)(p.b*nb_/256)*nr_*ng_;
+}
+
+PixelRGB<byte> RgbLayout::GetBinExemplar(int bin) const {
+	PixelRGB<byte> p;
+	p.r = (0.5+(bin%nr_)) * 256/nr_;
+	bin /= nr_;
+	p.g = (0.5+(bin%ng_)) * 256/ng_;
+	bin /= ng_;
+	p.b = (0.5+(bin%nb_)) * 256/nb_;
+	p.alpha = 0;
+	return p;
+}
+
+
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
 	if (argc != 2) {

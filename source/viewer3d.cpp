@@ -14,7 +14,6 @@
 
 namespace indoor_context {
 using namespace TooN;
-using namespace VW;
 
 double kRotateSpeed = 0.4;
 double kPanSpeed = 0.1;

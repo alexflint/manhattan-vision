@@ -2,8 +2,6 @@
 
 #include <limits>
 
-#include <VW/Image/imagecopy.tpp>
-
 #include <TooN/SVD.h>
 
 #include "common_types.h"
@@ -14,6 +12,7 @@
 #include "timer.h"
 #include "line_sweeper.h"
 #include "manhattan_ground_truth.h"
+#include "vw_image_io.h"
 
 #include "canvas.tpp"
 #include "counted_foreach.tpp"
@@ -874,9 +873,7 @@ void ManhattanBnbReconstructor::Compute(const PosedImage& image) {
 						% edges[0].size() % edges[1].size() % edges[2].size();
 
 	// Enumerate building hypotheses
-	VW::Timer recovery_timer;
 	success = bnb.Compute(image.pc(), edges, line_sweeper.orient_map);
-	bnb_time_ms = recovery_timer.GetAsMilliseconds();
 }
 
 double ManhattanBnbReconstructor::GetAccuracy(const MatI& gt_orients) {

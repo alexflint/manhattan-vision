@@ -38,9 +38,6 @@ public:
 	// Transform image -> retina in homogeneous coordinates
 	virtual Vec3 ImToRet(const Vec3& v) const = 0;
 
-	// Approximate this camera by a linear transform
-	Mat3 Linearize() const;
-
 	// Get the dimensions of a pixel in the retina (assumes
 	// rectangular pixels). Calls the pure virtual RetToIm and ImToRet.
 	Vec2 GetRetinaPixelSize() const;
@@ -49,6 +46,10 @@ public:
 	// the retina at the origin. Calls the pure virtual RetToIm and
 	// ImToRet.
 	double GetRetinaPixelDiameter() const;
+
+	// Approximate this camera by a linear transform. If this is a
+	// linear camera then this simply returns the intrinsics matrix.
+	virtual const Mat3& Linearize() const = 0;
 
 	// Project each pixel through two different cameras and return the
 	// maximum deviation (euclidean distance). Can be used to compare
@@ -69,7 +70,7 @@ public:
 	ATANCamera();
 	// Construct a camera for images of a specified size
 	ATANCamera(const ImageRef& image_size);
-	ATANCamera(const ImageRef& image_size, const string& cam_name);
+	ATANCamera(const ImageRef& image_size, const string& gvar_name);
 
 	// Transform retina -> image
 	Vec2 RetToIm(const Vec2& v) const;
@@ -80,9 +81,14 @@ public:
 	// Transform image -> retina in homogeneous coordinates
 	Vec3 ImToRet(const Vec3& v) const;
 
+	// Approximate this camera by a linear transform.
+	virtual const Mat3& Linearize() const;
+
 	// Get the underlying PTAM camera
 	inline PTAMM::ATANCamera& atan_camera() const { return *atan_; }
 private:
+  // lazily constructed on call to Linearize()
+	mutable Mat3 linearized_intrinsics_;
 	// ATANCamera is mutable because its Project() and UnProject()
 	// methods are non-const (but act as if they are const)
 	mutable shared_ptr<PTAMM::ATANCamera> atan_;
@@ -104,6 +110,9 @@ public:
 	// Set the camera matrix
 	void SetIntrinsics(const Mat3& m);
 
+	// Same as intrinsics()
+	virtual const Mat3& Linearize() const;
+
 	// Transform retina -> image
 	Vec2 RetToIm(const Vec2& v) const;
 	// Transform retina -> image in homogeneous coordinates
@@ -112,10 +121,6 @@ public:
 	Vec2 ImToRet(const Vec2& v) const;
 	// Transform image -> retina in homogeneous coordinates
 	Vec3 ImToRet(const Vec3& v) const;
-
-	// Construct a linear camera as an approximation to some other camera.
-	static Mat3 Linearize(const CameraBase& cam);
-	static void Linearize(const CameraBase& cam, Mat3& m);
 private:
 	Mat3 m;  // the intrinsics matrix (i.e. the transform from retina to image coordinates)
 	Mat3 m_inv;  // the transform from image to retina coordinates

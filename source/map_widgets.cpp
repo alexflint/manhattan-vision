@@ -39,7 +39,7 @@ KeyFrameWidget::KeyFrameWidget(const KeyFrame& k, double ret_z)
 	Add(guided_line_bloc);
 }
 
-bool KeyFrameWidget::HitTest(const Vector<2>& mouse) const {
+bool KeyFrameWidget::HitTest(const Vec2& mouse) const {
 	return PointInQuad(pa,pb,pc,pd,mouse);
 }
 
@@ -57,13 +57,13 @@ void KeyFrameWidget::OnRender() {
 
 		// Bind this keyframe into the current GL texture. On the first
 		// invokation, this will load the texture into graphics memory.
-		kf.unwarped.image.BindGLTexture();
+		kf.image.BindGLTexture();
 
 		// Project the quad boundary to the screen
-		const Vector<2>& tl = kf.unwarped.TLinRetina();
-		const Vector<2>& tr = kf.unwarped.TRinRetina();
-		const Vector<2>& bl = kf.unwarped.BLinRetina();
-		const Vector<2>& br = kf.unwarped.BRinRetina();
+		const Vec2& tl = kf.image.pc().retina_bounds().tl();
+		const Vec2& tr = kf.image.pc().retina_bounds().tr();
+		const Vec2& bl = kf.image.pc().retina_bounds().bl();
+		const Vec2& br = kf.image.pc().retina_bounds().br();
 		pa = viewer().ProjectToScreen(unproject(tl)*retina_z);
 		pb = viewer().ProjectToScreen(unproject(tr)*retina_z);
 		pc = viewer().ProjectToScreen(unproject(br)*retina_z);
@@ -128,19 +128,18 @@ void KeyFrameWidget::OnRender() {
 	}
 }
 
-Vector<3> KeyFrameWidget::ImagePtToWorld(const Vector<2>& p) {
+Vec3 KeyFrameWidget::ImagePtToWorld(const Vec2& p) {
 	// Pixel Coordinates -> Homogeneous Pixel Coords -> Retina Plane (Z=1) Coordates
 	//  -> (Z = retina_z) Plane Coordinates -> World Coordaintes -> whew!
-	const Matrix<3>& im_to_ret = kf.unwarped.image_to_retina;
-	return kf.image.pc().pose_inverse() * (retina_z * atretina(im_to_ret * unproject(p)));
+	return kf.image.pc().pose_inverse() * (retina_z * atretina(kf.image.pc().ImToRet(unproject(p))));
 }
 
-Vector<3> KeyFrameWidget::WorldToRetina(const Vector<3>& p) {
+Vec3 KeyFrameWidget::WorldToRetina(const Vec3& p) {
 	return kf.image.pc().pose_inverse() * (retina_z * atretina(kf.image.pc().pose() * p));
 }
 
-LineWidget& KeyFrameWidget::AddLineInRetina(const Vector<3>& ret_a,
-                                            const Vector<3>& ret_b,
+LineWidget& KeyFrameWidget::AddLineInRetina(const Vec3& ret_a,
+                                            const Vec3& ret_b,
                                             const float width,
                                             const PixelRGB<byte>& color) {
 	LineWidget* w = new LineWidget(
@@ -156,6 +155,7 @@ void KeyFrameWidget::Line_Click(int index, const string& label) {
 	DLOG << label;
 }
 
+	/*
 void KeyFrameWidget::ConfigureLineWidget(LineWidget& w,
                                          const LineDetection& det,
                                          int index,
@@ -173,7 +173,6 @@ void KeyFrameWidget::ConfigureLineWidget(LineWidget& w,
 	}
 }
 
-// private
 void KeyFrameWidget::ConfigureLineWidgets() {
 	// Configure widgets for canny lines
 	bool persist = (line_widgets.size() == kf.line_detector.detections.size());
@@ -211,12 +210,13 @@ void KeyFrameWidget::ConfigureLineWidgets() {
 		}
 	}
 }
+*/
 
-void KeyFrameWidget::OnClick(int button, const Vector<2>& mouse) {
+void KeyFrameWidget::OnClick(int button, const Vec2& mouse) {
 	DLOG << "Keyframe " << kf.id << " clicked.\n  Filename:" << kf.image_file;
 }
 
-void KeyFrameWidget::OnDoubleClick(int button, const Vector<2>& mouse) {
+void KeyFrameWidget::OnDoubleClick(int button, const Vec2& mouse) {
 	viewer().viewCentre = -kf.image.pc().pose_inverse().get_translation();
 }
 
@@ -237,7 +237,7 @@ void PointCloudWidget::OnRender() {
 	glPointSize(2.0);
 	glColor3f(0,1,0);
 	GL_PRIMITIVE(GL_POINTS) {
-		COUNTED_FOREACH(int i, const Vector<3>& v, points) {
+		COUNTED_FOREACH(int i, const Vec3& v, points) {
 			if (i != selected_point) {
 				glVertexV(v);
 			}
@@ -256,17 +256,17 @@ void PointCloudWidget::OnRender() {
 	// Record the screen projections
 	if (selectable()) {
 		screen_pts.resize(points.size());
-		COUNTED_FOREACH(int i, const Vector<3>& v, points) {
+		COUNTED_FOREACH(int i, const Vec3& v, points) {
 			screen_pts[i] = viewer().ProjectToScreen(v);
 		}
 	}
 }
 
-int PointCloudWidget::GetPointAt(const Vector<2>& mouse) const {
+int PointCloudWidget::GetPointAt(const Vec2& mouse) const {
 	static const double kHitMargin = 4.0;
 	int best_i = -1;
 	double best_dsq = kHitMargin*kHitMargin;
-	COUNTED_FOREACH(int i, const Vector<2>& v, screen_pts) {
+	COUNTED_FOREACH(int i, const Vec2& v, screen_pts) {
 		double dsq = norm_sq(mouse-v);
 		if (dsq < best_dsq) {
 			best_i = i;
@@ -276,11 +276,11 @@ int PointCloudWidget::GetPointAt(const Vector<2>& mouse) const {
 	return best_i;
 }
 
-bool PointCloudWidget::HitTest(const Vector<2>& mouse) const {
+bool PointCloudWidget::HitTest(const Vec2& mouse) const {
 	return GetPointAt(mouse) != -1;
 }
 
-void PointCloudWidget::OnClick(int button, const Vector<2>& mouse) {
+void PointCloudWidget::OnClick(int button, const Vec2& mouse) {
 	selected_point = GetPointAt(mouse);
 	SelectedPointChanged.fire();
 }
@@ -325,15 +325,15 @@ void MapWidget::BindKeys() {
 	viewer().window().KeyStroke('p').add(bind(&PointCloudWidget::ToggleVisible, ref(pts_widget)));
 	viewer().window().KeyStroke(',').add(bind(&MapWidget::ChangeRetinaPos, this, -1));
 	viewer().window().KeyStroke('.').add(bind(&MapWidget::ChangeRetinaPos, this, 1));
-	viewer().window().KeyStroke('l').add(bind(&MapWidget::ToggleLines, this));
+	//viewer().window().KeyStroke('l').add(bind(&MapWidget::ToggleLines, this));
 }
 
 void MapWidget::SetRetinaPos(double z) {
 	BOOST_FOREACH(KeyFrameWidget* kfwidget, kf_widgets) {
 		kfwidget->retina_z = z;
-		if (kfwidget->line_state != 0) {
+		/*if (kfwidget->line_state != 0) {
 			kfwidget->ConfigureLineWidgets();
-		}
+			}*/
 	}
 	Invalidate();
 }
@@ -342,6 +342,7 @@ void MapWidget::ChangeRetinaPos(int delta) {
 	SetRetinaPos(kf_widgets[0]->retina_z * pow(*gvRetinaPosDelta, delta));
 }
 
+	/*
 void MapWidget::ToggleLines() {
 	// It could be that some keyframes have lines visible while others
 	// are not, but the most sensible thing to do here is to force
@@ -352,5 +353,6 @@ void MapWidget::ToggleLines() {
 		kfwidget->ConfigureLineWidgets();
 	}
 }
+	*/
 
 }

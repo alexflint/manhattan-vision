@@ -2,11 +2,6 @@
 #include <iomanip>
 #include <queue>
 
-#include <VW/Image/imagecopy.tpp>
-#include <VW/Utils/timer.h>
-#include <VW/Graphics/drawimage.h>
-#include <VW/GeomObjects/lineseg2d.h>
-
 #include <so3.h>
 #include <determinant.h>
 #include <SVD.h>

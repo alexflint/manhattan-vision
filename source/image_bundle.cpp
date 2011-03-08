@@ -3,12 +3,11 @@
 
 #include <boost/filesystem.hpp>
 
-#include <VW/Image/imagecopy.tpp>
-
 #include "image_bundle.h"
 #include "common_types.h"
 #include "gl_utils.tpp"
 #include "glut_window.h"
+#include "vw_image_io.h"
 
 namespace indoor_context {
 	ImageBundle::ImageBundle() : monodirty(true), texdirty(true) {
@@ -23,8 +22,7 @@ namespace indoor_context {
 	}
 
 	void ImageBundle::Load(const string& filename) {
-		CHECK(ReadImage(filename, rgb))
-			<< "Failed to read image from file: " << filename;
+		ReadImage(filename, rgb);
 		Invalidate();
 	}
 
@@ -40,7 +38,7 @@ namespace indoor_context {
 	void ImageBundle::BuildMono() const {
 		if (monodirty) {
 			CHECK(loaded());
-			ImageCopy(rgb, mono);
+			ImageConvert(rgb, mono);
 			monodirty = false;
 		}
 	}
@@ -72,7 +70,7 @@ namespace indoor_context {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexImage2D(GL_TEXTURE_2D, 0, 4, nx(), ny(), 
 								 0, GL_BGRA, GL_UNSIGNED_BYTE,
-								 rgb.GetRawBuffer());
+								 rgb.GetImageBuffer());
 		glError();
 		return gl_texture_id;
 	}

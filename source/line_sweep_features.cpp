@@ -7,6 +7,7 @@
 #include "image_utils.h"
 
 #include "vector_utils.tpp"
+#include "vw_image_io.h"
 
 namespace indoor_context {
 	namespace {
@@ -39,10 +40,14 @@ namespace indoor_context {
 		input_image = &image;
 
 		// Detect lines and sweep
-		//TIMED("Detect lines")
-		line_detector.Compute(image);
-		//TIMED("Estimate orientations")
-		line_sweeper.Compute(image, line_detector.detections);
+		TIMED("Detect lines")
+			line_detector.Compute(image);
+		DLOG << "Line detections by axis: "
+				 << line_detector.detections[0].size() << " "
+				 << line_detector.detections[1].size() << " "
+				 << line_detector.detections[2].size();
+		TIMED("Estimate orientations")
+			line_sweeper.Compute(image, line_detector.detections);
 
 		// Convert the line sweeper labels to a score matrix
 		objective.Resize(image.size());

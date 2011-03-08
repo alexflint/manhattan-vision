@@ -4,6 +4,7 @@
 
 #include "common_types.h"
 #include "polygon-fwd.h"
+#include "vw_image-fwd.h"
 
 #include "numeric_utils.tpp"
 
@@ -65,9 +66,9 @@ void ClipToPositive(const Vec3& line,
                     Vec3& start,
                     Vec3& end);
 
-void GetImageBounds(const VW::ImageRef& size, vector<Vec3>& bounds);
+void GetImageBounds(const ImageRef& size, vector<Vec3>& bounds);
 
-void GetROIBounds(const VW::ROI& roi, vector<Vec3>& bounds);
+	//void GetROIBounds(const VW::ROI& roi, vector<Vec3>& bounds);
 
 // Take care here, poly must be a vector of line equations
 // representing the sides of the poly, NOT the coordinates of the
@@ -78,22 +79,22 @@ void ClipLineToPoly(const Vec3& line,
                     Vec3& out_b);
 
 void ClipLineToImage(const Vec3& line,
-                     const VW::ImageRef& size,
+                     const ImageRef& size,
                      Vec3& out_a,
                      Vec3& out_b);
 
 void ClipLineToImage(const Vec3& line,
-                     const VW::ImageRef& size,
+                     const ImageRef& size,
                      Vec2& out_a,
                      Vec2& out_b);
 
-void ClipLineToROI(const Vec3& line,
-                   const VW::ROI& roi,
+	/*void ClipLineToROI(const Vec3& line,
+                   const ROI& roi,
                    Vec3& out_a,
                    Vec3& out_b);
-
+									 
 void ClipLineToROI(const Vec3& line,
-                   const VW::ROI& roi,
+                   const ROI& roi,
                    Vec2& out_a,
-                   Vec2& out_b);
+                   Vec2& out_b);*/
 }

@@ -1,14 +1,10 @@
 #pragma once
 
 #include <boost/shared_ptr.hpp>
+#include <boost/ptr_container/ptr_vector.hpp>
 
 #include "common_types.h"
-#include "image_bundle.h"
-#include "unwarped_image.h"
-#include "vanishing_points.h"
-#include "textons.h"
-#include "line_detector.h"
-#include "guided_line_detector.h"
+#include "camera.h"
 #include "map.pb.h"
 
 namespace indoor_context {
@@ -38,13 +34,10 @@ public:
 
 	// The raw image from the camera together with its pose
 	PosedImage image;
-
 	// Path to the image file for this frame (if any)
 	string image_file;
 	// The MD5 hash from the map XML
 	string image_hash;
-	// The unwarped image
-	UnwarpedImage unwarped;
 
 	// True iff the camera was lost (or initializing) at this frame
 	bool lost;
@@ -58,10 +51,9 @@ public:
 	               const string& image_file,
 	               const toon::SE3<>& pose);
 	// Load the image
-	void LoadImage(bool undistort=false);
+	void LoadImage();
+	// Unload the image
 	void UnloadImage();
-	// Undistort the current image using the camera model
-	void UndistortImage();
 };
 
 // Represents a frame that was selected as a key frame by PTAM
@@ -69,19 +61,6 @@ class KeyFrame : public Frame {
 public:
 	// The SLAM landmarks that were observed in this frame
 	vector<Measurement> measurements;
-
-	// The canny line detector
-	CannyLineDetector line_detector;
-	// The guided line detector (for after canonical frame is established)
-	GuidedLineDetector guided_line_detector;
-
-	// Vanishing points in the retina plane
-	Vec3 retina_vpts[3];
-	// Vanishing points in the image plane
-	Vec3 image_vpts[3];
-
-	// Run the guided line detector: this->pc must be initialized
-	void RunGuidedLineDetector();
 	// Output a vector of all points measured in this frame
 	void GetMeasuredPoints(vector<Vec3>& out) const;
 };
@@ -107,14 +86,6 @@ public:
 	shared_ptr<ATANCamera> orig_camera;
 	shared_ptr<CameraBase> camera;
 
-	// The undistort map, cached for performance
-	UndistortMap undistorter;
-
-	// Line segments on the plane-at-infinity
-	vector<LineDetection> segments;
-	// Global vanishing point detector
-	ManhattanFrameEstimator manhattan_est;
-
 	// Rotation from SLAM coordinates to canonical scene coordinates
 	toon::SO3<> scene_from_slam;
 
@@ -128,13 +99,16 @@ public:
 	void LoadXml(const string& path);
 
 	// Load images for each keyframe
-	void LoadImages(bool undistort=false);
+	void LoadImages();
 
 	// Apply a rigid transformation to the map. Modifies the keyframe
 	// poses and map points.
 	void Transform(const toon::SE3<>& M);
 	// As above but for pure rotations.
 	void Rotate(const toon::SO3<>& R);
+	// Rotate to scene frame with a pre-computed rotation. Just calls
+	// Rotate() and saves the transform as this->scene_from_slam
+	void RotateToSceneFrame(const toon::SO3<>& scene_from_slam);
 
 	// Get a key frame by its index in the original map. Return NULL
 	// if this keyframe is not loaded or does not exist.
@@ -146,29 +120,5 @@ public:
 
 	// Get a frame by ID, and load its image
 	PosedImage& ImageByIdOrDie(int id);
-
-	// Initialize the undistort map. If no image size is specified
-	// then the size of the first keyframe will be used. If no
-	// keyframes are loaded then an error will be raised.
-	void InitializeUndistorter(const Vec2I& size=toon::Zeros);
-	// Detect lines in each keyframe and project to plane at infinity
-	void DetectLines();
-	// Compute vanishing points globally and project back into frames
-	void RunManhattanEstimator();
-	// Detect vanishing points and compute the rotation between SLAM
-	// coordinates and (axis-aligned) scene coordinates.
-	void EstimateSceneRotation();
-	// Compute bounds of the map, discarding outliers for robustness
-	//void ComputeRobustBounds();
-	// Run the guided line detector (Manhattan frame must be established)
-	void RunGuidedLineDetectors();
-
-	// Do all of the above. Compute vanishing points, estimate the
-	// scene rotation, and transform the map so that 3D surfaces and
-	// edges are axis-aligned.
-	void RotateToSceneFrame();
-	// Rotate to scene frame with a pre-computed rotation. Does
-	// Rotate() and ComputeRobustBounds(), etc.
-	void RotateToSceneFrame(const toon::SO3<>& scene_from_slam);
 };
 }

@@ -1,10 +1,13 @@
 #include <GL/gl.h>
 #include <GL/glut.h>
 
-#include "glut_window.h"
-#include "image_utils.tpp"
-
 #include <map>
+
+#include "glut_window.h"
+#include "vw_image_io.h"
+
+#include "image_utils.tpp"
+#include "image_transforms.tpp"
 
 namespace indoor_context {
 using namespace toon;
@@ -224,7 +227,7 @@ void GlutWindow::CaptureFrameBuffer(ImageRGB<byte>& out) const {
 	ResizeImage(out, size_);
 	glReadPixels(0,0, size_.x, size_.y, GL_BGRA, GL_UNSIGNED_BYTE, out.GetImageBuffer());
 	ResetAlpha(out);  // the GL convention for alpha is different to ours
-	out.FlipVertical();  // the GL convention for top and bottom is different to ours
+	FlipVertical(out);  // the GL convention for top and bottom is different to ours
 }
 
 void GlutWindow::OutputFrameBuffer(const string& filename) const {
@@ -281,12 +284,13 @@ void GlutWindow::NotifyMouse(int button, int state, int x, int y) {
 	} else if (state == GLUT_UP) {
 		MouseUp.fire(button, mousePt_);
 		if (!mouseDragFlag_) {
-			if (mouseTimer_.GetAsSeconds() < *gvDoubleClickTime) {
-				DoubleClick.fire(button, mousePt_);
+			// temporarily commented, need to re-implement VW::Timer
+			/*if (mouseTimer_.GetAsSeconds() < *gvDoubleClickTime) {
+				  DoubleClick.fire(button, mousePt_);
 			} else {
-				mouseTimer_.Start();
+			  mouseTimer_.Start();*/
 				Click.fire(button, mousePt_);
-			}
+				//}
 		}
 	}
 }

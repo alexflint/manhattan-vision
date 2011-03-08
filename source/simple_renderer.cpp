@@ -109,10 +109,10 @@ bool SimpleRenderer::OldRenderInfinitePlane(double z0, int label) {
 	Vec3 ne = makeVector(kExtent, -kExtent, z0);
 	Vec3 se = makeVector(kExtent, kExtent, z0);
 	Vec3 sw = makeVector(-kExtent, kExtent, z0);
-	DREPORT(project(camera_*unproject(nw)),
+	/*DREPORT(project(camera_*unproject(nw)),
 					project(camera_*unproject(ne)),
 					project(camera_*unproject(se)),
-					project(camera_*unproject(sw)));
+					project(camera_*unproject(sw)));*/
 	Render(nw, ne, se, label);
 	Render(nw, sw, se, label);
 }

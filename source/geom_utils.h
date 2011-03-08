@@ -65,8 +65,9 @@ double EvaluateDepthEqn(const Vec3& depth_eqn, const Vec2& p);
 // Get the depth of a plane at a particular pixel
 double GetPlaneDepth(const Vec3& pixel, const toon::Matrix<3,4>& camera, const Vec4& plane);
 
-// Intersect a ray with a plan
+// Intersect a ray with a plane
 Vec3 IntersectRay(const Vec3& pixel, const toon::Matrix<3,4>& camera, const Vec4& plane);
+Vec3 IntersectRay(const Vec3& pixel, const PosedCamera& camera, const Vec4& plane);
 
 // Compute the cross ratio for four points in homgeneous coordinates
 // See Hartley&Zisserman

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common_types.h"
+#include "vw_image-fwd.h"
 
 namespace indoor_context {
 	class ManhattanReconstruction;

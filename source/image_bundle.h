@@ -2,6 +2,8 @@
 
 #include "common_types.h"
 
+#include "vw_image.tpp"  // eek
+
 namespace indoor_context {
 
 // Represents an image transformed into various color spaces. The

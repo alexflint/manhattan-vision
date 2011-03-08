@@ -6,6 +6,9 @@
 
 #include "common_types.h"
 #include "glut_window.h"
+#include "image_bundle.h"
+
+#include "vw_image.tpp"
 
 namespace indoor_context {
 	// Forward declarations

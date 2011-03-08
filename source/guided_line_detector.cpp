@@ -1,15 +1,16 @@
 #include "guided_line_detector.h"
 
-#include <VW/Image/imagecopy.h>
-
 #include "common_types.h"
 #include "image_utils.h"
 #include "clipping.h"
+#include "vw_image_io.h"
+#include "timer.h"
 
 #include "io_utils.tpp"
 #include "numeric_utils.tpp"
 #include "counted_foreach.tpp"
 #include "vector_utils.tpp"
+#include "vw_image.tpp"
 
 namespace indoor_context {
 using namespace toon;
@@ -107,6 +108,10 @@ void GuidedLineDetector::ComputeAssocs() {
 				-2*v[1]*v[2],
 				v[2]*v[2]);
 	}
+
+	CHECK_SAME_SIZE(*input, gradients.diffx);
+	CHECK_SAME_SIZE(*input, gradients.diffy);
+	CHECK_SAME_SIZE(*input, gradients.magnitude_sqr);
 
 	for (int y = 0; y < input->ny(); y++) {
 		// Determine vpt associations: this must be done in the

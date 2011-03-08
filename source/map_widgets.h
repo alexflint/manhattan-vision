@@ -55,14 +55,14 @@ public:
 	void GLTransformToCameraCoords() const;
 
 	// Configure a line widget to match a line detection
-	void ConfigureLineWidget(LineWidget& w,
+	/*void ConfigureLineWidget(LineWidget& w,
 	                         const LineDetection& det,
 	                         int index,
 	                         bool visible,
 	                         bool add_events,
-	                         const string& label);
+	                         const string& label);*/
 	// Recreate the widgets for the line segments in this keyframe
-	void ConfigureLineWidgets();
+	//void ConfigureLineWidgets();
 	// Configure the widgets that comprise the border
 	void ConfigureBorder();
 
@@ -134,6 +134,6 @@ public:
 	// Increment/decrement the retina plane z pos
 	void ChangeRetinaPos(int delta);
 	// Show/hide detected lines in keyframes
-	void ToggleLines();
+	//void ToggleLines();
 };
 }

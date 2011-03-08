@@ -54,12 +54,8 @@ double CameraBase::GetMaxDeviation(const CameraBase& cam1, const CameraBase& cam
 	return maxerr;
 }
 
-Mat3 CameraBase::Linearize() const {
-	return LinearCamera::Linearize(*this);
-}
 
-
-///// Camera
+///// ATANCamera
 
 ATANCamera::ATANCamera() : atan_(new PTAMM::ATANCamera(*gvDefaultCamera)) {
 	SetImageSize(asIR(*gvImageSize));
@@ -91,7 +87,16 @@ Vec3 ATANCamera::ImToRet(const Vec3& v) const {
 	return unproject(ImToRet(project(v)));
 }
 
-
+//virtual
+const Mat3& ATANCamera::Linearize() const {
+	// there may be an error in this function since the linearizations seem
+	// to vary from one frame to the next!
+	Vec3 c = RetToIm(makeVector(0.0, 0, 1));
+	linearized_intrinsics_.T()[0] = RetToIm(makeVector(1.0, 0, 1)) - c;
+	linearized_intrinsics_.T()[1] = RetToIm(makeVector(0.0, 1, 1)) - c;
+	linearized_intrinsics_.T()[2] = c;
+	return linearized_intrinsics_;
+}
 
 ///// LinearCamera
 
@@ -126,22 +131,9 @@ Vec3 LinearCamera::ImToRet(const Vec3& v) const {
 	return m_inv * v;
 }
 
-//static
-Mat3 LinearCamera::Linearize(const CameraBase& cam) {
-	Mat3 m;
-	Linearize(cam, m);
-	return m;
-}
-
-//static
-void LinearCamera::Linearize(const CameraBase& cam, Mat3& m) {
-	Vec3 c = cam.RetToIm(makeVector(0.0, 0, 1));
-	m.T()[0] = cam.RetToIm(makeVector(1.0, 0, 1)) - c;
-	m.T()[1] = cam.RetToIm(makeVector(0.0, 1, 1)) - c;
-	m.T()[2] = c;
-
-	// there may be an error in this function since the linearizations seem
-	// to vary from one frame to the next!
+// virtual
+const Mat3& LinearCamera::Linearize() const {
+	return intrinsics();
 }
 
 ///// PosedCamera

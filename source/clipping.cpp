@@ -5,7 +5,6 @@
 
 namespace indoor_context {
 using namespace toon;
-using VW::ROI;
 
 bool ClipAgainstLine(Vec3& start,
                      Vec3& end,
@@ -57,13 +56,14 @@ void GetImageBounds(const ImageRef& size,
 	bounds.push_back(makeVector(0.0, -1.0, size.y-1)); // bottom
 }
 
-void GetROIBounds(const ROI& roi,
+	/*void GetROIBounds(const ROI& roi,
                   vector<Vec3 >& bounds) {
 	bounds.push_back(makeVector(1.0, 0.0, -roi.Left())); // left
 	bounds.push_back(makeVector(0.0, 1.0, -roi.Top())); // top
 	bounds.push_back(makeVector(-1.0, 0.0, roi.Right()-1)); // right
 	bounds.push_back(makeVector(0.0, -1.0, roi.Bottom()-1)); // bottom
 }
+	*/
 
 void ClipLineToPoly(const Vec3& line,
                     const vector<Vec3 >& poly,
@@ -103,7 +103,7 @@ void ClipLineToImage(const Vec3& line,
 	b = project(bh);
 }
 
-void ClipLineToROI(const Vec3& line,
+	/*void ClipLineToROI(const Vec3& line,
                    const ROI& roi,
                    Vec3& a,
                    Vec3& b) {
@@ -121,4 +121,6 @@ void ClipLineToROI(const Vec3& line,
 	a = project(ah);
 	b = project(bh);
 }
+	*/
+
 }

@@ -18,7 +18,7 @@ namespace indoor_context {
 	extern "C" lazyvar<float> gvLineJumpThreshold;
 	extern "C" lazyvar<float> gvDefaultWallPenalty;
 	extern "C" lazyvar<float> gvDefaultOcclusionPenalty;
-
+	
 	////////////////////////////////////////////////////////////////////////////////
 	// Represents a node in the DP graph.
 	// Be very careful about adding things to this class since
@@ -77,6 +77,7 @@ namespace indoor_context {
 	// Unlike DPSubSolution, this is mostly used externally to examine the
 	// solution produced by ManhattanDP.
 	class DPPayoffs;
+	class DPGeometryWithScale;
 	class DPSolution {
 	public:
 		// The vector of Y values for each column. Size equals width of the payoff matrix
@@ -89,6 +90,16 @@ namespace indoor_context {
 		int num_occlusions;
 		// The score computed by ManhattanDP
 		double score;
+		// Orientation of each pixel predicted by this solution, in image coordinates
+		MatI pixel_orients;
+
+		// Line segments representing either the top or the bottom of walls, in image coords
+		vector<LineSeg> wall_segments;
+		// Orientations of the above wall segments
+		vector<int> wall_orients;
+
+		// Used in ComputeDepthMap
+		SimpleRenderer renderer;
 
 		// The node in the DP cache that corresponds to this solution
 		DPSubSolution node;
@@ -101,6 +112,9 @@ namespace indoor_context {
 		// Sum over the path represented by this solution through the
 		// payoff matrix. Ignores axes -- see above for that.
 		double GetPathSum(const MatF& payoffs) const;
+		// Compute depth map for the solution given floor and ceiling heights
+		// This returns a reference to an internal buffer.
+		const MatD& GetDepthMap(const DPGeometryWithScale& geometry);
 	};
 
 	////////////////////////////////////////////////////////////////////////////////
@@ -119,8 +133,6 @@ namespace indoor_context {
 		DPGeometry();
 		// Initialize and configure
 		DPGeometry(const PosedCamera& camera, const Mat3& floorToCeil);
-		// Initialize and configure
-		DPGeometry(const PosedCamera& camera, double zfloor, double zceil);
 
 		// Accessors
 		int nx() const { return grid_size[0]; }
@@ -128,8 +140,6 @@ namespace indoor_context {
 
 		// Configure the various homographies and useful vanishing point info
 		void Configure(const PosedCamera& camera, const Mat3& floorToCeil);
-		// Configurethe various homographies and useful vanishing point info
-		void Configure(const PosedCamera& camera, double zfloor, double zceil);
 
 		// Convert between image and grid coordinates
 		Vec3 GridToImage(const Vec2& x) const;
@@ -154,8 +164,25 @@ namespace indoor_context {
 	};
 
 	////////////////////////////////////////////////////////////////////////////////
+	// Represents an "upgraded" type of geometry with 3D scale information
+	class DPGeometryWithScale : public DPGeometry {
+	public:
+		double zfloor, zceil;
+		// Initializes grid_size to the gvar value. Can be modified before Configure()
+		DPGeometryWithScale();
+		// Initialize and configure
+		DPGeometryWithScale(const PosedCamera& camera, double zfloor, double zceil);
+		// Initialize and configure
+		DPGeometryWithScale(const DPGeometry& geom, double zfloor, double zceil);
+		// Configure the various homographies and useful vanishing point info
+		void Configure(const PosedCamera& camera, double zfloor, double zceil);
+		// Configure the various homographies and useful vanishing point info
+		void Configure(const DPGeometry& geom, double zfloor, double zceil);
+		// Back-project an image point onto the floor or ceiling plane
+		Vec3 BackProject(const Vec3& image_point) const;
+	};
 
-
+	////////////////////////////////////////////////////////////////////////////////
 	// Represents a cost function that ManhattanDP optimizes, in terms of
 	// the cost of assigning label A to pixel [Y,X] (stored in
 	// pixel_scores[A][Y][X]). An object of this form is converted to the
@@ -244,13 +271,6 @@ namespace indoor_context {
 		// The solution and derived quantities
 		vector<const DPState*> full_backtrack;  // series of nodes to the solution
 		vector<const DPState*> abbrev_backtrack;  // as above but omitting UP, DOWN, and some OUT nodes
-		vector<LineSeg> soln_segments;  // line segments represent either the top or the bottom of walls
-		vector<int> soln_seg_orients;  // orientations of the above line segments
-		MatI soln_orients;  // orientation map as predicted by the optimal model, in image coordinates
-		//int soln_num_walls;  // number of walls in the solution (both normal and occluding)
-		//int soln_num_occlusions;  // number of occlusions in the solution
-
-		SimpleRenderer renderer;  // used in ComputeSolutionDepth
 
 		// Performance statistics
 		double solve_time;
@@ -269,19 +289,6 @@ namespace indoor_context {
 		// Backtrack through the evaluation graph from the solution
 		void PopulateSolution(const DPSubSolution& soln_node);
 
-		// Get a mask as above, but represented a mapping from columns to
-		// the (unique) row at which the path crosses that colum, together
-		// with the orientation for each image column.
-		void GetSolutionPath(VecI& path_ys, VecI& path_axes) const; // USE solution.path_ys and solution.path_axes instead!
-
-		// Get a mask in the grid domain representing the path taken through
-		// the payoff matrix, with values of 0 or 1 indicating the base of
-		// walls, and all other cells set to -1.
-		//void ComputeSolutionPath(MatI& m) const;
-		// Compute depth map for the solution given floor and ceiling heights
-		// This returns a reference to an internal buffer.
-		const MatD& ComputeDepthMap(double zfloor, double zceil);
-
 		// Get the exact pixel-wise orientations for the current solution,
 		// in grid coordinates. Uses GetSolutionPath etc.
 		void ComputeGridOrients(MatI& grid_orients);
@@ -295,9 +302,6 @@ namespace indoor_context {
 		const DPSubSolution& Solve(const DPState& state);
 		// The DP implementation
 		DPSubSolution Solve_Impl(const DPState& state);
-
-		// Get the marginal cost of building a wall across an additional column
-		//double MarginalWallScore(int row, int col, int axis);
 		// Determines whether an occlusion is physically realisable
 		// occl_side should be -1 for left or 1 for right
 		bool OcclusionValid(int col, int left_axis, int right_axis, int occl_side);

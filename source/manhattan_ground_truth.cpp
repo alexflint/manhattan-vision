@@ -72,7 +72,8 @@ namespace indoor_context {
 
 		CountWalls(gt_floorplan, cam);
 
-		renderer.Render(gt_floorplan, cam);
+		renderer.Configure(cam);
+		renderer.Render(gt_floorplan);
 		// See comments in SimpleRenderer::SmoothInfiniteDepths() for why this is necessary
 		int n = renderer.renderer().SmoothInfiniteDepths();
 		if (n > 0) {

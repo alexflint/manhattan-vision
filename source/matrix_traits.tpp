@@ -8,14 +8,16 @@
 
 #pragma once
 
+#include <VW/Image/imagergb.h>
+#include <VW/Image/imagemono.h>
+#include <VW/Image/imagecopy.tpp>
+
 #include "common_types.h"
+
+#include "vw_image.tpp"
 
 namespace indoor_context {
 	// matrix_width
-	template<typename T, typename U>
-	int matrix_width(const VW::ImageBase<T,U>& A) {
-		return A.GetWidth();
-	}
 	template<typename T>
 	int matrix_width(const toon::Matrix<toon::Dynamic, toon::Dynamic, T>& A) {
 		return A.num_cols();
@@ -32,9 +34,6 @@ namespace indoor_context {
 	int matrix_width(const VNL::Matrix<T>& A) {
 		return A.Cols();
 	}
-	inline int matrix_width(const ImageRef& p) {  // ugly hack for CHECK_POS
-		return p.x;
-	}
 	template<typename T>
 	int matrix_width(const T& A) {
 		return A.nx();
@@ -42,10 +41,6 @@ namespace indoor_context {
 
 
 	// matrix_height
-	template<typename T, typename U>
-	int matrix_height(const VW::ImageBase<T,U>& A) {
-		return A.GetHeight();
-	}
 	template<typename T>
 	int matrix_height(const toon::Matrix<toon::Dynamic, toon::Dynamic, T>& A) {
 		return A.num_rows();
@@ -62,20 +57,66 @@ namespace indoor_context {
 	int matrix_height(const VNL::Matrix<T>& A) {
 		return A.Rows();
 	}
-	inline int matrix_height(const ImageRef& p) {  // ugly hack for CHECK_POS
-		return p.y;
-	}
 	template<typename T>
 	int matrix_height(const T& A) {
 		return A.ny();
 	}
 	
+
+
+
+
+	// matrix_traits implementation for images
+	template<typename T, typename S>
+	inline int matrix_width(const VW::ImageBase<T,S>& image) {
+		return image.GetWidth();
+	}
+	template<typename T, typename S>
+	inline int matrix_height(const VW::ImageBase<T,S>& image) {
+		return image.GetHeight();
+	}
+	template<typename T>
+	inline int matrix_width(const VW::ImageMono<T>& image) {
+		return image.GetWidth();
+	}
+	template<typename T>
+	inline int matrix_height(const VW::ImageMono<T>& image) {
+		return image.GetHeight();
+	}
+	template<typename T>
+	inline int matrix_width(const VW::ImageRGB<T>& image) {
+		return image.GetWidth();
+	}
+	template<typename T>
+	inline int matrix_height(const VW::ImageRGB<T>& image) {
+		return image.GetHeight();
+	}
+
+	// Hack because the above weren't being picked up for some bizarre reason...
+	template<>
+	inline int matrix_width(const VW::ImageMono<float>& image) {
+		return image.GetWidth();
+	}
+	template<>
+	inline int matrix_height(const VW::ImageMono<float>& image) {
+		return image.GetHeight();
+	}
+	template<>
+	inline int matrix_width(const VW::ImageRGB<byte>& image) {
+		return image.GetWidth();
+	}
+	template<>
+	inline int matrix_height(const VW::ImageRGB<byte>& image) {
+		return image.GetHeight();
+	}
+
+
+
 	// matrix_size
 	template <typename T>
 	Vec2I matrix_size(const T& A) {
 		return toon::makeVector(matrix_width(A), matrix_height(A));
 	}
-
 
 
 	template <typename T>

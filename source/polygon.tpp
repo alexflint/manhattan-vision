@@ -3,9 +3,10 @@
 #include <iostream>
 
 #include "common_types.h"
-//#include "geom_utils.h"
 #include "line_segment.h"
 #include "polygon-fwd.h"
+
+#include "vw_image.tpp"
 
 namespace indoor_context {
 

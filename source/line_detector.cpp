@@ -4,8 +4,6 @@
 
 #include <boost/foreach.hpp>
 
-#include <VW/Image/imagecopy.tpp>
-
 #include <LU.h>
 
 #include "common_types.h"

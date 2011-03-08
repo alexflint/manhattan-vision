@@ -4,6 +4,7 @@
 #include "colors.h"
 
 #include "line_segment.h"
+#include "vw_image-fwd.h"
 
 namespace indoor_context {
 

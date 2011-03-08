@@ -8,6 +8,8 @@
 #include <fstream>
 #include "read_ply.h"
 
+#include "vw_image.tpp"
+
 namespace indoor_context {
 
 void ReadPly(const string& file,

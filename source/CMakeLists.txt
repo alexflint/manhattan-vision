@@ -23,7 +23,7 @@ FIND_PACKAGE( PythonLibs REQUIRED ) # Required by Boost.Python
 FIND_PACKAGE( ZLIB REQUIRED ) # Required by Python
 
 # Find VW
-SET( VW_USE_LIBS VW VNL )
+SET( VW_USE_LIBS VNL VW )
 FIND_PACKAGE( VW REQUIRED )
 
 # Find Matlab
@@ -144,8 +144,16 @@ IF(CMAKE_COMPILER_IS_GNUCC)
   SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -include ${CMAKE_SOURCE_DIR}/prefix.h")
 ENDIF(CMAKE_COMPILER_IS_GNUCC)
 
-# Generate protos
-PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS map.proto)
+###############################################################################
+# GENERATE PROTOCOL BUFFERS
+###############################################################################
+SET( PROTOS
+	vector.proto
+	map.proto
+	model.proto
+)
+
+PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${PROTOS})
 
 ###############################################################################
 # BUILD CORE LIBRARY
@@ -162,6 +170,7 @@ ADD_LIBRARY( core SHARED
 
 	log.cpp
 	check.cpp
+	timer.cpp
 
 	canny.cpp
 	fast_sobel.cpp
@@ -178,7 +187,6 @@ ADD_LIBRARY( core SHARED
 	textons.cpp
 	clipping.cpp
 	line_sweeper.cpp
-	unwarped_image.cpp
 	rotation_estimator.cpp
 	map.cpp
 	vars.cpp
@@ -218,6 +226,9 @@ ADD_LIBRARY( core SHARED
 
 	kinect_device.cpp
 	kinect_transform.cpp
+
+	vw_image.cpp
+	vw_image_io.cpp
 )
 
 
@@ -233,6 +244,7 @@ ADD_LIBRARY( manhattan SHARED
 	monocular_payoffs.cpp
 	stereo_payoffs.cpp
 	point_cloud_payoffs.cpp
+	joint_payoffs.cpp
 
 	manhattan_bnb.cpp
 
@@ -297,6 +309,9 @@ SET( EXECUTABLES
 	stereo_dp
 	point_dp
 	joint_dp
+	kinect_dp
+	estimate_floorplan
+	generate_video
 
 	inspect_geometry
 	test_gt_walls
@@ -307,12 +322,14 @@ SET( EXECUTABLES
 	joint_vpt_calib
 
 	kinect_viewer
-	kinect_dp
 
 	generate_svm_problem
 	bootstrap_train_dp
 	oneshot_train_dp
 
+	temp
+	gil_test
+	image_test
 	brostow
 )
 

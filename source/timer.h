@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common_types.h"
+#include <time.h>
 
-#include <VW/Utils/timer.h>
+#include "common_types.h"
 
 // This macro is used like this:
 //
@@ -32,15 +32,11 @@ namespace indoor_context {
 	// Starts a timer on construction and reports its value on destruction
 	struct scoped_timer {
 		const string str;
-		VW::Timer timer;
-		inline scoped_timer() { }
-		inline scoped_timer(const char* s) : str(s) { }
-		inline scoped_timer(const string& s) : str(s) { }
-		inline ~scoped_timer() {
-			DLOG << str << ": " << timer << endl;
-		}
-		inline operator bool() {
-			return true;
-		}
+		struct timeval start;
+		scoped_timer();
+		scoped_timer(const char* s);
+		scoped_timer(const string& s);
+		~scoped_timer();
+		inline operator bool() { return true; }
 	};
 }

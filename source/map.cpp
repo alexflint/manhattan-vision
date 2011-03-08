@@ -5,16 +5,16 @@
 #include <LU.h>
 #include <determinant.h>
 
-#include <VW/Image/imagecopy.tpp>
-
 #include "map.h"
 #include "safe_stream.h"
 #include "common_types.h"
 #include "tinyxml.h"
 #include "lazyvar.h"
 #include "image_utils.h"
-#include "io_utils.tpp"
+#include "vw_image_io.h"
 
+#include "vw_image.tpp"
+#include "io_utils.tpp"
 #include "counted_foreach.tpp"
 #include "vector_utils.tpp"
 
@@ -33,12 +33,12 @@ void Frame::Configure(Map* m, int i, const string& im_file, const SE3<>& pose) {
 	image.pc().SetCamera(map->camera.get());
 }
 
-void Frame::LoadImage(bool undistort) {
+void Frame::LoadImage() {
 	if (!image.loaded()) {
 		image.Load(image_file);
-		if (undistort) {
+		/*if (undistort) {
 			UndistortImage();
-		}
+			}*/
 	}
 }
 
@@ -48,6 +48,7 @@ void Frame::UnloadImage() {
 	}
 }
 
+	/*
 void Frame::UndistortImage() {
 	if (map->undistorter.input_size != image.sz()) {
 		map->undistorter.Compute(image.sz());
@@ -58,6 +59,7 @@ void Frame::UndistortImage() {
 void KeyFrame::RunGuidedLineDetector() {
 	guided_line_detector.Compute(image);
 }
+	*/
 
 void KeyFrame::GetMeasuredPoints(vector<Vec3>& out) const {
 	CHECK(map != NULL);
@@ -180,7 +182,8 @@ void Map::Load(const string& path) {
 		kfs_by_id[id] = kf;
 	}
 
-	DLOG << "Loaded " << pts.size() << " points and " << kfs.size() << " frames";
+	DLOG << "Loaded " << pts.size() << " points and "
+			 << frames.size() << " frames (" << kfs.size() << " key frames)";
 }
 
 void Map::LoadWithGroundTruth(const string& path, proto::TruthedMap& gt_map) {
@@ -202,12 +205,9 @@ void Map::LoadXml(const string& xml_file) {
 	Load(xml_file);
 }
 
-void Map::LoadImages(bool undistort) {
+void Map::LoadImages() {
 	BOOST_FOREACH(KeyFrame& kf, kfs) {
 		kf.LoadImage();
-		if (undistort) {
-			kf.UndistortImage();
-		}
 	}
 }
 
@@ -271,7 +271,7 @@ void Map::Rotate(const SO3<>& R) {
 	Transform(SE3<>(R,t));
 }
 
-void Map::DetectLines() {
+	/*void Map::DetectLines() {
 	// Detect lines in each keyframe
 	segments.clear();
 	COUNTED_FOREACH(int i, KeyFrame& kf, kfs) {
@@ -299,7 +299,7 @@ void Map::InitializeUndistorter(const Vec2I& imsize) {
 		sz = kfs[0].image.size();
 	}
 	undistorter.Compute(asIR(sz));
-}
+	}
 
 void Map::RunManhattanEstimator() {
 	// Compute scene rotation
@@ -379,10 +379,11 @@ void Map::RunGuidedLineDetectors() {
 void Map::RotateToSceneFrame() {
 	EstimateSceneRotation();
 	RotateToSceneFrame(scene_from_slam);
-}
+	}*/
 
 void Map::RotateToSceneFrame(const SO3<>& R) {
 	scene_from_slam = R;
 	Rotate(R);
 }
+
 }

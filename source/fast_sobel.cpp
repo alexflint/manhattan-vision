@@ -6,6 +6,7 @@
 #include "worker.h"
 
 #include "functional_types.tpp"
+#include "vw_image.tpp"
 
 namespace indoor_context {
 
@@ -49,8 +50,8 @@ void FastSobel::ConvolveRowRange(const ImageF& input,
 	//void(*rowfunc)(int,const PixelF*,const PixelF*,const PixelF*,PixelF*);
 	//rowfunc = (direction == kSobelX) ? &ConvolveRowX : &ConvolveRowY;
 	for (int r = r0; r <= r1; r++) {
-		PixelF* rprev = r == 0 ? input[r] : input[r-1];
-		PixelF* rnext = r == input.GetHeight()-1 ? input[r] : input[r+1];
+		const PixelF* rprev = r == 0 ? input[r] : input[r-1];
+		const PixelF* rnext = r == input.GetHeight()-1 ? input[r] : input[r+1];
 		if (direction == kSobelX) {
 			ConvolveRowX(input.GetWidth(), rprev, input[r], rnext, output[r]);
 		} else {

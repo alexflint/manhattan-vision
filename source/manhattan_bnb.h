@@ -248,7 +248,6 @@ public:
 	IsctGeomLabeller line_sweeper;
 	MonocularManhattanBnb bnb;
 	bool success;
-	double bnb_time_ms;
 
 	// Run the reconstruction algorithm for the given frame
 	void Compute(const PosedImage& input);

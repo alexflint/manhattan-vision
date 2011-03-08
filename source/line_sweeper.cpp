@@ -1,11 +1,10 @@
 #include <boost/ptr_container/ptr_vector.hpp>
 
-#include <VW/Image/imagecopy.tpp>
-
 #include "line_sweeper.h"
 #include "common_types.h"
 #include "guided_line_detector.h"
 
+#include "vw_image.tpp"
 #include "image_utils.tpp"
 #include "io_utils.tpp"
 #include "fill_polygon.tpp"
