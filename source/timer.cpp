@@ -1,6 +1,7 @@
 #include <sys/time.h>
 #include <boost/format.hpp>
 #include "timer.h"
+#include "common_types.h"
 
 namespace indoor_context {
 	static const long US_PER_MS = 1000;

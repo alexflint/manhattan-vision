@@ -11,12 +11,12 @@
 #include "manhattan_ground_truth.h"
 #include "safe_stream.h"
 #include "timer.h"
+#include "image_utils.h"
+#include "model.pb.h"
 
 #include "counted_foreach.tpp"
 #include "format_utils.tpp"
 #include "io_utils.tpp"
-
-#include "model.pb.h"
 
 lazyvar<string> gvStereoOffsets("JointDP.Stereo.AuxOffsets");
 lazyvar<int> gvDrawPayoffs("JointDP.Output.DrawPayoffs");

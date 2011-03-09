@@ -331,6 +331,7 @@ SET( EXECUTABLES
 	gil_test
 	image_test
 	brostow
+	time_test
 )
 
 FOREACH( EXECUTABLE ${EXECUTABLES} )

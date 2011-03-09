@@ -1,8 +1,7 @@
 #pragma once
 
 #include <time.h>
-
-#include "common_types.h"
+#include <string>
 
 // This macro is used like this:
 //
@@ -31,11 +30,11 @@
 namespace indoor_context {
 	// Starts a timer on construction and reports its value on destruction
 	struct scoped_timer {
-		const string str;
+		const std::string str;
 		struct timeval start;
 		scoped_timer();
 		scoped_timer(const char* s);
-		scoped_timer(const string& s);
+		scoped_timer(const std::string& s);
 		~scoped_timer();
 		inline operator bool() { return true; }
 	};

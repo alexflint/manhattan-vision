@@ -110,6 +110,8 @@ int main(int argc, char **argv) {
 	double sum_err = 0;
 	int num_frames = 0;
 
+	vector<Vec3> point_cloud;  // must be outside scope as PointCloudPayoffs keeps a pointer
+
 	// Process each frame
 	BOOST_FOREACH(int frame_id, frame_ids) {
 		TITLE("Frame "<<frame_id);
@@ -125,7 +127,7 @@ int main(int argc, char **argv) {
 		DPGeometryWithScale geom(frame.image.pc(), zfloor, zceil);
 
 		// Get point cloud
-		vector<Vec3> point_cloud;
+		point_cloud.clear();
 		frame.GetMeasuredPoints(point_cloud);
 
 		// Get auxiliary frames
