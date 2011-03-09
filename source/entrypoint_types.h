@@ -10,13 +10,14 @@
 
 #include <boost/foreach.hpp>
 #include <boost/format.hpp>
+#include <boost/program_options.hpp>
 
 #include "common_types.h"
 #include "vars.h"
 
-//#include "numeric_utils.tpp"
 #include "vector_utils.tpp"
 
 using namespace indoor_context;
 using namespace toon;
 
+namespace po=boost::program_options;

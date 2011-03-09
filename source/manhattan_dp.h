@@ -360,7 +360,7 @@ namespace indoor_context {
 		void GetDepthErrors(const ManhattanGroundTruth& gt,
 												MatF& out_errors);
 		// Compute mean relative-depth-error
-		double GetMeanDepthError(const ManhattanGroundTruth& gt);
+		double GetDepthError(const ManhattanGroundTruth& gt);
 		// Report and return mean relative-depth-error
 		double ReportDepthError(const ManhattanGroundTruth& gt);
 

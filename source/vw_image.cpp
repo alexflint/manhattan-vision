@@ -1,9 +1,9 @@
 #include "vw_image.tpp"
 
 namespace indoor_context {
-	/*ostream& operator<<(ostream& o, const ImageRef& p) {
+	ostream& operator<<(ostream& o, const ImageRef& p) {
 		return o << "["<<p.x<<","<<p.y<<"]";
-		}*/
+	}
 
 	void ImageConvert(const ImageRGB<byte>& in, ImageMono<float>& out) {
 		if (out.IsAlloced()) {

@@ -9,11 +9,6 @@
 
 namespace indoor_context {
 
-	extern "C" lazyvar<double> gvMonoWeight;
-	extern "C" lazyvar<double> gvOcclusionWeight;
-	extern "C" lazyvar<double> gvAgreementWeight;
-	extern "C" lazyvar<double> gvStereoWeight;
-
 	class JointPayoffGen {
 	public:
 		// These are initialized at construction from various gvars. You can

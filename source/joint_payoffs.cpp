@@ -4,13 +4,11 @@
 #include "timer.h"
 
 namespace indoor_context {
-
-	extern "C" {
-		lazyvar<double> gvMonoWeight("JointDP.Mono.Weight");
-		lazyvar<double> gvOcclusionWeight("JointDP.3D.OcclusionWeight");
-		lazyvar<double> gvAgreementWeight("JointDP.3D.AgreementWeight");
-		lazyvar<double> gvStereoWeight("JointDP.Stereo.Weight");
-	}
+	// Call these "coef" to avoid confusion with Texton.Features.MonoWeight etc
+	lazyvar<double> gvMonoCoef("JointPayoffs.Mono.Weight");
+	lazyvar<double> gvOcclusionCoef("JointPayoffs.3D.OcclusionWeight");
+	lazyvar<double> gvAgreementCoef("JointPayoffs.3D.AgreementWeight");
+	lazyvar<double> gvStereoCoef("JointPayoffs.Stereo.Weight");
 
 	JointPayoffGen::JointPayoffGen() {
 		RevertWeights();
@@ -25,10 +23,10 @@ namespace indoor_context {
 	}
 
 	void JointPayoffGen::RevertWeights() {
-		mono_weight = *gvMonoWeight;
-		occlusion_weight = *gvOcclusionWeight;
-		agreement_weight = *gvAgreementWeight;
-		stereo_weight = *gvStereoWeight;
+		mono_weight = *gvMonoCoef;
+		occlusion_weight = *gvOcclusionCoef;
+		agreement_weight = *gvAgreementCoef;
+		stereo_weight = *gvStereoCoef;
 	}
 
 	void JointPayoffGen::Compute(const PosedImage& image,
@@ -58,17 +56,15 @@ namespace indoor_context {
 		}
 
 		// Combine payoffs
-		TIMED("Add up payoffs") {
-			payoffs.Resize(geom.grid_size);  // always forces a Clear(0)
-			payoffs.Add(mono_gen.payoffs, mono_weight);
-			payoffs.Add(point_cloud_gen.agreement_payoffs, agreement_weight);
-			payoffs.Add(point_cloud_gen.occlusion_payoffs, occlusion_weight);
-			if (!aux_images.empty()) {
-				double stereo_weight_per_aux = stereo_weight / aux_images.size();
-				BOOST_FOREACH(const StereoPayoffGen& stereo_gen, stereo_gens) {
-					// TODO: pass gradient images to stereo (See stereo_dp.cpp)
-					payoffs.Add(stereo_gen.payoffs, stereo_weight_per_aux);
-				}
+		payoffs.Resize(geom.grid_size);  // always forces a Clear(0)
+		payoffs.Add(mono_gen.payoffs, mono_weight);
+		payoffs.Add(point_cloud_gen.agreement_payoffs, agreement_weight);
+		payoffs.Add(point_cloud_gen.occlusion_payoffs, occlusion_weight);
+		if (!aux_images.empty()) {
+			double stereo_weight_per_aux = stereo_weight / aux_images.size();
+			BOOST_FOREACH(const StereoPayoffGen& stereo_gen, stereo_gens) {
+				// TODO: pass gradient images to stereo (See stereo_dp.cpp)
+				payoffs.Add(stereo_gen.payoffs, stereo_weight_per_aux);
 			}
 		}
 	}

@@ -820,7 +820,7 @@ double ManhattanDPReconstructor::GetAccuracy(const ManhattanGroundTruth& gt) {
 
 double ManhattanDPReconstructor::ReportAccuracy(const ManhattanGroundTruth& gt) {
 	double acc = GetAccuracy(gt);
-	DLOG << format("Labelling accuracy: %|40t|%.0f%%") % (acc*100);
+	DLOG << format("Labelling accuracy: %|40t|%.1f%%") % (acc*100);
 	return acc;
 }
 
@@ -831,14 +831,14 @@ void ManhattanDPReconstructor::GetDepthErrors(const ManhattanGroundTruth& gt, Ma
 	ComputeDepthErrors(gt_depth, soln_depth, errors);
 }
 
-double ManhattanDPReconstructor::GetMeanDepthError(const ManhattanGroundTruth& gt) {
+double ManhattanDPReconstructor::GetDepthError(const ManhattanGroundTruth& gt) {
 	MatF errors;	// TODO: move to a class variable (or external?)
 	GetDepthErrors(gt, errors);
-	return ComputeMeanDepthError(errors);
+	return MeanError(errors);
 }
 
 double ManhattanDPReconstructor::ReportDepthError(const ManhattanGroundTruth& gt) {
-	double acc = GetMeanDepthError(gt);
+	double acc = GetDepthError(gt);
 	DLOG << format("Mean depth error: %|40t|%.1f%%") % (acc*100);
 	return acc;
 }

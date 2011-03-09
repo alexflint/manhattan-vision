@@ -35,12 +35,9 @@ void FloorPlanRenderer::Reset(double zfloor, double zceil) {
 	// Clear vectors
 	walls_.clear();
 	wall_labels_.clear();
+	renderer_.Clear(-1);  // Need to reset depth
 
-	// Configure the renderer
-	renderer_.Clear(-1);  // no pixels should still be at -1 after rendering
-
-	// Render the floor and ceiling planes. Do _not_ do this by using
-	// Clear() because then the depth map will be incomplete.
+	// Render the floor and ceiling planes.
 	renderer_.RenderInfinitePlane(zfloor, kVerticalAxis);
 	renderer_.RenderInfinitePlane(zceil, kVerticalAxis);
 }																

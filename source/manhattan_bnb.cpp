@@ -894,7 +894,7 @@ void ManhattanBnbReconstructor::GetDepthErrors(const ManhattanGroundTruth& gt, M
 double ManhattanBnbReconstructor::GetMeanDepthError(const ManhattanGroundTruth& gt) {
 	MatF errors;	// TODO: move to a class variable (or external?)
 	GetDepthErrors(gt, errors);
-	return ComputeMeanDepthError(errors);
+	return MeanError(errors);
 }
 
 double ManhattanBnbReconstructor::ReportDepthError(const ManhattanGroundTruth& gt) {

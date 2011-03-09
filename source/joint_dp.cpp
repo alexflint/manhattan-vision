@@ -63,7 +63,16 @@ int main(int argc, char **argv) {
 
 	ofstream stats_out;
 	format stats_fmt("\"%s\",\"%s\",%d,%f,%f\n");
-	format filepat;
+
+	// Create vizualization dir
+	fs::path viz_dir = results_dir / "out";
+	if (!quiet && !fs::create_directory(viz_dir)) {
+		DLOG << "Created output directory: " << viz_dir;
+	}
+	format filepat("%s/%s_frame%03d_%s.%s");
+	// Pattern for output filenames
+	filepat.bind_arg(1, viz_dir.string());
+	filepat.bind_arg(2, sequence);
 
 	if (!quiet) {
 		// Open the CSV file
@@ -73,44 +82,24 @@ int main(int argc, char **argv) {
 		// Write the parameters
 		fs::path params_file = results_dir / fmt("parameters_%s.csv", results_dir.filename());
 		ofstream params_out(params_file.string().c_str());
-		params_out << "\"3D.OcclusionWeight\"," << *gvOcclusionWeight << endl;
-		params_out << "\"3D.AgreementWeight\"," << *gvAgreementWeight << endl;
-		params_out << "\"Mono.Weight\"," << *gvMonoWeight << endl;
-		params_out << "\"Stereo.Weight\"," << *gvStereoWeight << endl;
-		params_out << "\"Stereo.AuxOffsets\",\"" << *gvStereoOffsets << "\"" << endl;
-		params_out << "\"ManhattanDP.DefaultWallPenalty\"," << *gvDefaultWallPenalty << endl;
-		params_out << "\"ManhattanDP.DefaultOcclusionPenalty\"," << *gvDefaultOcclusionPenalty << endl;
-		params_out << "\"ManhattanDP.GridSize\",\"" << *gvGridSize << "\"" << endl;
+		GV3::print_var_list(params_out);
 		params_out.close();
-
-		// Create vizualization dir
-		fs::path viz_dir = results_dir / "out";
-		if (!fs::create_directory(viz_dir)) {
-			DLOG << "Created output directory: " << viz_dir;
-		}
-
-		// Pattern for output filenames
-		filepat = format("%s/%s_frame%03d_%s.%s");
-		filepat.bind_arg(1, viz_dir.string());
-		filepat.bind_arg(2, sequence);
 	}
 
 	// Load the map
 	Map map;
 	proto::TruthedMap gt_map;
 	map.LoadWithGroundTruth(GetMapPath(sequence), gt_map);
-	double zfloor = gt_map.floorplan().zfloor();
-	double zceil = gt_map.floorplan().zceil();
 
 	// Initialize the payoff generator
 	JointPayoffGen joint;
 	vector<int> stereo_offsets = ParseMultiRange<int>(*gvStereoOffsets);
+	vector<Vec3> point_cloud;  // must be outside scope as PointCloudPayoffs keeps a pointer
 
+	// Initialize statistics
 	double sum_acc = 0;
 	double sum_err = 0;
 	int num_frames = 0;
-
-	vector<Vec3> point_cloud;  // must be outside scope as PointCloudPayoffs keeps a pointer
 
 	// Process each frame
 	BOOST_FOREACH(int frame_id, frame_ids) {
@@ -123,8 +112,10 @@ int main(int argc, char **argv) {
 		frame.LoadImage();
 		num_frames++;  // for computing average performance, in case one or more of the frames weren't found
 
-		// Compute geometry
-		DPGeometryWithScale geom(frame.image.pc(), zfloor, zceil);
+		// Setup geometry
+		DPGeometryWithScale geom(frame.image.pc(),
+														 gt_map.floorplan().zfloor(),
+														 gt_map.floorplan().zceil());
 
 		// Get point cloud
 		point_cloud.clear();
@@ -173,16 +164,6 @@ int main(int argc, char **argv) {
 		sum_err += mean_err;
 
 		if (!quiet) {
-			ImageRGB<byte> canvas2(geom.grid_size[0], geom.grid_size[1]);
-			recon.dp.DrawWireframeGridSolution(canvas2);
-			WriteImage("out/grid_wires.png", canvas2);
-
-			ImageRGB<byte> canvas(frame.image.sz());
-			recon.dp.DrawWireframeSolution(canvas);
-			WriteImage("out/image_wires.png", canvas);
-
-			recon.OutputSolution("out/orients.png");
-
 			// Visualize
 			filepat.bind_arg(3, frame_id);
 			filepat.bind_arg(5, "png");
@@ -193,6 +174,7 @@ int main(int argc, char **argv) {
 				fs::copy_file(frame.image_file, dest);
 			}
 
+			// Draw the solution
 			recon.OutputSolution(str(filepat % "dp"));
 
 			// Draw payoffs
@@ -246,13 +228,13 @@ int main(int argc, char **argv) {
 
 	// Note that if one or more frames weren't found then num_frames
 	// will not equal frame_ids.size()
-	double av_acc = sum_acc / num_frames;  // these are already multipled by 100
 	double av_err = sum_err / num_frames;  // these are already multipled by 100
+	double av_labelling_err = 100. - sum_acc / num_frames;  // these are already multipled by 100
 	if (quiet) {
-		DLOG << av_acc;
+		DLOG << av_err;
 	} else {
-		DLOG << format("AVERAGE LABEL ACCURACY: %|40t|%.1f%%") % av_acc;
 		DLOG << format("AVERAGE DEPTH ERROR: %|40t|%.1f%%") % av_err;
+		DLOG << format("AVERAGE LABELLING ERROR: %|40t|%.1f%%") % av_labelling_err;
 	}
 	
 	return 0;

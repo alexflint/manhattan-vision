@@ -8,10 +8,9 @@
 #include "matrix_traits.tpp"
 
 namespace indoor_context {
-/*
 	using boost::scoped_array;
 
-	// Minimal mock of VW::Image*
+	// Minimal mock of VW::ImageRGB, VW::ImageMono, etc
 	class ImageRef {
 	public:
 		int x, y;
@@ -66,11 +65,17 @@ namespace indoor_context {
 				delete[] rows_;
 			}
 		}
+		// Get image dimensions
 		inline int GetWidth() const { return size_.x; }
 		inline int GetHeight() const { return size_.y; }
 		inline const ImageRef& GetSize() const { return size_; }
+		// Get image data
 		inline T* GetData() { return data_; }
 		inline const T* GetData() const { return data_; }
+		// Get image data -- identical to above but matches VW::ImageBase
+		inline T* GetImageBuffer() { return data_; }
+		inline const T* GetImageBuffer() const { return data_; }
+		// Allocate image data
 		inline bool IsAlloced() const { return data_ != NULL; }
 		int AllocImageData(int width, int height) {
 			size_.x = width;
@@ -92,6 +97,7 @@ namespace indoor_context {
 			delete[] rows_;
 			rows_ = NULL;
 		}
+		// Fill image with a specified value
 		void Clear(const T& v) {
 			for (int i = 0, n = size_.x*size_.y; i < n; i++) {
 				data_[i] = v;
@@ -127,6 +133,7 @@ namespace indoor_context {
 			: ImageBase<PixelRGB<T> >(width, height) { }
 	};
 
+	// Image copying
 	template <typename T>
 	void ImageCopy(const ImageBase<T>& in,
 								 ImageBase<T>& out) {
@@ -142,15 +149,15 @@ namespace indoor_context {
 				outrow[x] = inrow[x];
 			}
 		}
-		}
+	}
 
 	// matrix_traits implementation for images
-	template<typename T, typename S>
-	inline int matrix_width(const ImageBase<T,S>& image) {
+	template<typename T>
+	inline int matrix_width(const ImageBase<T>& image) {
 		return image.GetWidth();
 	}
-	template<typename T, typename S>
-	inline int matrix_height(const ImageBase<T,S>& image) {
+	template<typename T>
+	inline int matrix_height(const ImageBase<T>& image) {
 		return image.GetHeight();
 	}
 	template<typename T>
@@ -186,5 +193,15 @@ namespace indoor_context {
 	template<>
 	inline int matrix_height(const ImageRGB<byte>& image) {
 		return image.GetHeight();
-		}*/
+	}
+
+
+  // ugly hack for CHECK_SAME_SIZE
+	inline int matrix_width(const ImageRef& p) {
+		return p.x;
+	}
+	inline int matrix_height(const ImageRef& p) {
+		return p.y;
+	}
+
 }

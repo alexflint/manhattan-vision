@@ -40,14 +40,13 @@ namespace indoor_context {
 		input_image = &image;
 
 		// Detect lines and sweep
-		TIMED("Detect lines")
-			line_detector.Compute(image);
-		DLOG << "Line detections by axis: "
+		line_detector.Compute(image);
+		line_sweeper.Compute(image, line_detector.detections);
+
+		/*DLOG << "Line detections by axis: "
 				 << line_detector.detections[0].size() << " "
 				 << line_detector.detections[1].size() << " "
-				 << line_detector.detections[2].size();
-		TIMED("Estimate orientations")
-			line_sweeper.Compute(image, line_detector.detections);
+				 << line_detector.detections[2].size();*/
 
 		// Convert the line sweeper labels to a score matrix
 		objective.Resize(image.size());

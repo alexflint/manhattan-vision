@@ -13,8 +13,11 @@ namespace indoor_context {
 	lazyvar<double> gvAgreeSigma("LandmarkPayoffs.AgreeSigma");
 
 	// These cannot be gvars because they are used as template parameters
-	static const int kCutoff = 6;  // should be > gvAgreeSigma*3
-	static const int kWin = 13;  // should be 2 * kCutoff + 1
+	//static const int gaussian_cutoff = 6;  // should be > gvAgreeSigma*3
+	//static const int gaussian_window = 13;  // should be 2*cutoff+1
+
+	PointCloudPayoffs::PointCloudPayoffs() : agreement_sigma(*gvAgreeSigma) {
+	}
 
 	void PointCloudPayoffs::Compute(const vector<Vec3>& points,
 																	const PosedCamera& camera,
@@ -23,7 +26,10 @@ namespace indoor_context {
 		input_camera = &camera;
 		geometry = geom;
 
-		CHECK_GE(kCutoff, *gvAgreeSigma*2)
+		const int gaussian_cutoff = ceili(sqrt(agreement_sigma) * 3.);  // cutoff after 3 standard deviations
+		const int gaussian_window = gaussian_cutoff*2+1;
+
+		CHECK_GE(gaussian_cutoff, sqrt(agreement_sigma)*2)
 			<< "After changing PointCloudPayoffs.AgreeSigma, you must also change constants at top of landmark_payoffs.cpp";
 
 		// Resize matrices
@@ -31,9 +37,10 @@ namespace indoor_context {
 		occlusion_payoffs.Resize(geom.grid_size[1], geom.grid_size[0], 0);
 
 		// Cache gaussian for speed
-		Vector<kWin> gauss1d = Zeros;
+		Vector<> gauss1d(gaussian_window);
+		gauss1d = Zeros;
 		for (int i = 0; i < gauss1d.size(); i++) {
-			gauss1d[i] = Gauss1D(i-kCutoff, 0, *gvAgreeSigma);
+			gauss1d[i] = Gauss1D(i-gaussian_cutoff, 0, agreement_sigma);
 		}
 
 		// Count the number of points that project to each point in the grid
@@ -57,9 +64,10 @@ namespace indoor_context {
 
 		for (int x = 0; x < geom.grid_size[0]; x++) {
 			// Initialize counts
-			Vector<kWin> dist_counts = Zeros;
-			for (int i = kCutoff; i < kWin; i++) {
-				dist_counts[i] = abs(proj_counts[i-kCutoff][x]);
+			Vector<> dist_counts(gaussian_window);
+			dist_counts = Zeros;
+			for (int i = gaussian_cutoff; i < gaussian_window; i++) {
+				dist_counts[i] = abs(proj_counts[i-gaussian_cutoff][x]);
 			}
 
 			// Calculate agreement payoffs
@@ -68,10 +76,10 @@ namespace indoor_context {
 				agree_counts += proj_counts[y][x];  // sign will cause corresponding floor/ceiling projs to cancel
 
 				// Update the last window
-				if (y+kWin < geom.grid_size[1]) {
-					dist_counts[kWin-1] = abs(proj_counts[y+kCutoff][x]);
+				if (y+gaussian_window < geom.grid_size[1]) {
+					dist_counts[gaussian_window-1] = abs(proj_counts[y+gaussian_cutoff][x]);
 				} else {
-					dist_counts[kWin-1] = 0;
+					dist_counts[gaussian_window-1] = 0;
 				}
 
 				// Compute payoffs
@@ -79,7 +87,7 @@ namespace indoor_context {
 				occlusion_payoffs[y][x] = agree_counts;
 
 				// Shift left
-				dist_counts.slice<0,kWin-1>() = dist_counts.slice<1,kWin-1>();
+				dist_counts.slice(0,gaussian_window-1) = dist_counts.slice(1,gaussian_window-1);
 			}
 		}
 	}
@@ -105,12 +113,11 @@ namespace indoor_context {
 		input_camera = &camera;
 		geometry = geom;
 
+		const int gaussian_cutoff = agreement_sigma * 2;
+		const int gaussian_window = gaussian_cutoff*2+1;
+
 		agreement_payoffs.Resize(geom.grid_size[1], geom.grid_size[0], 0);
 		occlusion_payoffs.Resize(geom.grid_size[1], geom.grid_size[0], 0);
-
-		/*VecI col0_counts(geom.grid_size[1], 0);
-		Vector<> dist_from_09(kWin);
-		dist_from_09 = Zeros;*/
 
 		// Accumulate weights for each point
 		BOOST_FOREACH(const Vec3& v, points) {
@@ -121,45 +128,17 @@ namespace indoor_context {
 			CHECK_LE(grid_c[1], grid_f[1]);
 			CHECK_EQ_TOL(grid_f[0], grid_c[0], 1.0);
 
-			//canvas.DrawDot(grid_f, 2.0, Colors::alpha(0.1, Colors::red()));
-			//canvas.DrawDot(grid_c, 2.0, Colors::alpha(0.1, Colors::blue()));
 			int x = roundi(grid_f[0]);
 			if (x >= 0 && x < geom.nx()) {
-				/*Vec2I grid_p = makeVector(roundi(grid_f[0]), roundi(grid_f[1]));
-				if (grid_p[0] == 0 &&
-						grid_p[1] >= 0 && grid_p[1] < geom.grid_size[1]) {
-					if (grid_p == makeVector(0,1)) DREPORT(grid_p, grid_f);
-					col0_counts[ grid_p[1] ]++;
-				}
-
-				grid_p = makeVector(roundi(grid_c[0]), roundi(grid_c[1]));
-				if (grid_p[0] == 0 &&
-						grid_p[1] >= 0 && grid_p[1] < geom.grid_size[1]) {
-					if (grid_p == makeVector(0,1)) DREPORT(grid_p, grid_c);
-					col0_counts[ grid_p[1] ]++;
-					}*/
-
-				/*if (x==0 && grid_c[1] >= 0 && grid_c[1] < geom.ny()) {
-					col0_counts[floori(grid_c[1])]++;
-				}
-				if (x==0 && grid_f[1] >= 0 && grid_f[1] < geom.ny()) {
-					col0_counts[floori(grid_f[1])]++;
-					}*/
-
-				int ymin = max(grid_c[1]-kCutoff, 0);
-				int ymax = min(grid_f[1]+kCutoff, geom.ny()-1);
+				int ymin = max(grid_c[1]-gaussian_cutoff, 0);
+				int ymax = min(grid_f[1]+gaussian_cutoff, geom.ny()-1);
 				for (int y = ymin; y <= ymax; y++) {
 					occlusion_payoffs[y][x] += (y>grid_c[1] && y<grid_f[1]) ? 1.0 : 0.0;
 					int mu = roundi(y < 0.5*(grid_c[1]+grid_f[1]) ? grid_c[1] : grid_f[1]);
 					agreement_payoffs[y][x] += Gauss1D(y, mu, 2.0);
-					/*if (x == 0 && y == 9) {
-						dist_from_09[mu-y+kCutoff]++;
-						}*/
 				}
 			}
 		}
-
-		//DREPORT(col0_counts, dist_from_09);
 	}
 
 	void PointCloudPayoffs::OutputProjectionViz(const ImageBundle& image,

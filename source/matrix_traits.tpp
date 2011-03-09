@@ -8,13 +8,7 @@
 
 #pragma once
 
-#include <VW/Image/imagergb.h>
-#include <VW/Image/imagemono.h>
-#include <VW/Image/imagecopy.tpp>
-
 #include "common_types.h"
-
-#include "vw_image.tpp"
 
 namespace indoor_context {
 	// matrix_width
@@ -62,53 +56,6 @@ namespace indoor_context {
 		return A.ny();
 	}
 	
-
-
-
-
-	// matrix_traits implementation for images
-	template<typename T, typename S>
-	inline int matrix_width(const VW::ImageBase<T,S>& image) {
-		return image.GetWidth();
-	}
-	template<typename T, typename S>
-	inline int matrix_height(const VW::ImageBase<T,S>& image) {
-		return image.GetHeight();
-	}
-	template<typename T>
-	inline int matrix_width(const VW::ImageMono<T>& image) {
-		return image.GetWidth();
-	}
-	template<typename T>
-	inline int matrix_height(const VW::ImageMono<T>& image) {
-		return image.GetHeight();
-	}
-	template<typename T>
-	inline int matrix_width(const VW::ImageRGB<T>& image) {
-		return image.GetWidth();
-	}
-	template<typename T>
-	inline int matrix_height(const VW::ImageRGB<T>& image) {
-		return image.GetHeight();
-	}
-
-	// Hack because the above weren't being picked up for some bizarre reason...
-	template<>
-	inline int matrix_width(const VW::ImageMono<float>& image) {
-		return image.GetWidth();
-	}
-	template<>
-	inline int matrix_height(const VW::ImageMono<float>& image) {
-		return image.GetHeight();
-	}
-	template<>
-	inline int matrix_width(const VW::ImageRGB<byte>& image) {
-		return image.GetWidth();
-	}
-	template<>
-	inline int matrix_height(const VW::ImageRGB<byte>& image) {
-		return image.GetHeight();
-	}
 
 
 

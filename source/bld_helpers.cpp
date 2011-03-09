@@ -26,8 +26,6 @@ namespace indoor_context {
 	lazyvar<string> gvSequencesDir("Sequences.DataDir");
 	lazyvar<string> gvMapPath("Sequences.MapPath");
 
-
-
 	string GetMapPath(const string& sequence_name) {
 		fs::path file = fs::path(*gvSequencesDir) / sequence_name / *gvMapPath;
 		CHECK_PRED1(fs::exists, file)
@@ -206,7 +204,7 @@ namespace indoor_context {
 	}
 
 	// Compute per--pixel relative depth errors
-	double ComputeMeanDepthError(const MatF& errors) {
+	double MeanError(const MatF& errors) {
 		double max_error = errors.MaxValue();
 		double min_error = errors.MinValue();
 		CHECK_PRED1(isfinite, max_error);

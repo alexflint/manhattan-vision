@@ -39,7 +39,7 @@ ENDIF( NOT TOON_INCLUDE_DIR )
 # Find Boost
 SET( Boost_FIND_QUIETLY OFF )
 FIND_PACKAGE( Boost 1.44.0
-	COMPONENTS date_time filesystem iostreams thread python system
+	COMPONENTS date_time filesystem iostreams thread python system program_options
 	REQUIRED )
 
 # Find CUDA if it's enabled
@@ -130,6 +130,7 @@ SET( EXTERNAL_LIBRARIES
 	${Boost_filesystem_LIBRARY}
 	${Boost_iostreams_LIBRARY}
 	${Boost_thread_LIBRARY}
+	${Boost_program_options_LIBRARY}
 
 	# Only for stereotracks
 	${EIGEN2_LIBRARIES}
@@ -313,6 +314,8 @@ SET( EXECUTABLES
 	estimate_floorplan
 	generate_video
 
+	dp_optimization_wrapper
+
 	inspect_geometry
 	test_gt_walls
 	tata_video
@@ -331,7 +334,6 @@ SET( EXECUTABLES
 	gil_test
 	image_test
 	brostow
-	time_test
 )
 
 FOREACH( EXECUTABLE ${EXECUTABLES} )

@@ -52,6 +52,8 @@ namespace indoor_context {
 													const MatD& gt_depth,
 													MatF& depth_errors);
 
-	// Compute per--pixel relative depth errors
-	double ComputeMeanDepthError(const MatF& errors);
+	// Compute mean of a matrix of errors. Differs from generic mean
+	// calculation only in that it checks that all errors are finite and
+	// greater than zero.
+	double MeanError(const MatF& errors);
 }
