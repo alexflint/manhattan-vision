@@ -225,8 +225,10 @@ ADD_LIBRARY( core SHARED
 	simple_renderer.cpp
 	floorplan_renderer.cpp
 
-	kinect_device.cpp
-	kinect_transform.cpp
+# Temporarily commented to remove dependency on libfreenect
+
+#	kinect_device.cpp
+#	kinect_transform.cpp
 
 	vw_image.cpp
 	vw_image_io.cpp
