@@ -56,21 +56,21 @@ SET( GraphCuts_LIBRARIES -lgraphcuts )
 # Find Kinect driver
 # TODO: put these into FindFreenect.cmake
 # TODO: make these optional
-SET(libfreenect_LIBRARIES "freenect")
-SET(libfreenect_INCLUDE_DIR "/usr/local/include/libfreenect")
-SET(libfreenect_LIBRARY_DIRS "/usr/local/lib/libfreenect")
-INCLUDE_DIRECTORIES(${libfreenect_INCLUDE_DIR})
-LINK_DIRECTORIES(${libfreenect_LIBRARY_DIRS})
+#SET(libfreenect_LIBRARIES "freenect")
+#SET(libfreenect_INCLUDE_DIR "/usr/local/include/libfreenect")
+#SET(libfreenect_LIBRARY_DIRS "/usr/local/lib/libfreenect")
+#INCLUDE_DIRECTORIES(${libfreenect_INCLUDE_DIR})
+#LINK_DIRECTORIES(${libfreenect_LIBRARY_DIRS})
 
 # Eigen2 (only for kinect_transform)
-FIND_PACKAGE(Eigen2)
-INCLUDE_DIRECTORIES(${EIGEN2_INCLUDE_DIR})
-LINK_DIRECTORIES(${EIGEN2_LIBRARY_DIRS})
-LIST(APPEND LIBRARIES ${EIGEN2_LIBRARIES})
+#FIND_PACKAGE(Eigen2)
+#INCLUDE_DIRECTORIES(${EIGEN2_INCLUDE_DIR})
+#LINK_DIRECTORIES(${EIGEN2_LIBRARY_DIRS})
+#LIST(APPEND LIBRARIES ${EIGEN2_LIBRARIES})
 
 # Yaml (only for kinect_transform)
 #FIND_PACKAGE(yaml-cpp)
-SET(Yaml-cpp_LIBRARIES "/usr/local/lib/libyaml-cpp.so")
+#SET(Yaml-cpp_LIBRARIES "/usr/local/lib/libyaml-cpp.so")
 #INCLUDE_DIRECTORIES(${EIGEN2_INCLUDE_DIR})
 #LINK_DIRECTORIES(${EIGEN2_LIBRARY_DIRS})
 #LIST(APPEND LIBRARIES ${EIGEN2_LIBRARIES})
@@ -122,7 +122,7 @@ SET( EXTERNAL_LIBRARIES
 	${PROTOBUF_LIBRARY}
 	${GLUT_LIBRARIES}
 	${OPENGL_LIBRARIES}
-	${libfreenect_LIBRARIES}
+	#${libfreenect_LIBRARIES}
 
 	# Enumerate specific libs to avoid linking Boost.Python to the core code
 	${Boost_system_LIBRARY_RELEASE}
@@ -133,8 +133,8 @@ SET( EXTERNAL_LIBRARIES
 	${Boost_program_options_LIBRARY}
 
 	# Only for stereotracks
-	${EIGEN2_LIBRARIES}
-	${Yaml-cpp_LIBRARIES}
+	#${EIGEN2_LIBRARIES}
+	#${Yaml-cpp_LIBRARIES}
 
 	# Profiling libraries (empty unless USE_CPU_PROFILER / USE_TCMALLOC are true)
 	${CPU_PROFILER_LIBRARIES}
