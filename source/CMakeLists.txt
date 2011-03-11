@@ -323,6 +323,7 @@ SET( EXECUTABLES
 	tata_video
 
 	test_solution_path
+	test_atancamera
 
 	joint_vpt_calib
 

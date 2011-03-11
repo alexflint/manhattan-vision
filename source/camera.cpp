@@ -2,13 +2,14 @@
 
 #include "camera.h"
 #include "lazyvar.h"
+#include "ATANCamera.h"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
 using namespace toon;
 
-lazyvar<string> gvDefaultCamera("Map.DefaultCamera");
-lazyvar<Vec2 > gvImageSize("Camera.ImageSize");
+lazyvar<string> gvDefaultCamera("Map.DefaultCameraParams");
+lazyvar<Vec2> gvImageSize("Map.DefaultImageSize");
 
 ///// CameraBase
 
@@ -57,22 +58,18 @@ double CameraBase::GetMaxDeviation(const CameraBase& cam1, const CameraBase& cam
 
 ///// ATANCamera
 
-ATANCamera::ATANCamera() : atan_(new PTAMM::ATANCamera(*gvDefaultCamera)) {
-	SetImageSize(asIR(*gvImageSize));
+ATANCamera::ATANCamera(const Vec5& camera_params, const Vec2& image_size)
+	: impl_(new PTAMM::ATANCamera("Camera" /** XXX **/)) {
+	SetImageSize(asIR(image_size));
 }
 
-ATANCamera::ATANCamera(const ImageRef& image_size)
-: atan_(new PTAMM::ATANCamera(*gvDefaultCamera)) {
-	SetImageSize(image_size);
-}
-
-ATANCamera::ATANCamera(const ImageRef& image_size, const string& cam_name)
-: atan_(new PTAMM::ATANCamera(cam_name)) {
+ATANCamera::ATANCamera(const Vec5& camera_params, const ImageRef& image_size)
+	: impl_(new PTAMM::ATANCamera("Camera" /** XXX **/)) {
 	SetImageSize(image_size);
 }
 
 Vec2 ATANCamera::RetToIm(const Vec2& v) const {
-	return atan_->Project(v);
+	return impl_->Project(v);
 }
 
 Vec3 ATANCamera::RetToIm(const Vec3& v) const {
@@ -80,7 +77,7 @@ Vec3 ATANCamera::RetToIm(const Vec3& v) const {
 }
 
 Vec2 ATANCamera::ImToRet(const Vec2& v) const {
-	return atan_->UnProject(v);
+	return impl_->UnProject(v);
 }
 
 Vec3 ATANCamera::ImToRet(const Vec3& v) const {

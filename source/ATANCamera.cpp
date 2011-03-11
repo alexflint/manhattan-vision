@@ -29,7 +29,7 @@ ATANCamera::ATANCamera(string sName)
  * @param irSize image size
  * @param vParams The camera parameters
  */
-ATANCamera::ATANCamera(string sName, ImageRef irSize, Vector<NUMTRACKERCAMPARAMETERS> vParams)
+ATANCamera::ATANCamera(string sName, ImageRef irSize, CameraParameters vParams)
 {
   msName = sName;
   GV2.Register(mgvvCameraParams, sName+".Parameters", vParams, HIDDEN );
@@ -226,21 +226,21 @@ Matrix<2,2> ATANCamera::GetProjectionDerivs()
   return m2Derivs;
 }
 
-Matrix<2,NUMTRACKERCAMPARAMETERS> ATANCamera::GetCameraParameterDerivs()
+Matrix<2,kNumCameraParameters> ATANCamera::GetCameraParameterDerivs()
 {
   // Differentials wrt to the camera parameters
   // Use these to calibrate the camera
   // No need for this to be quick, so do them numerically
   
-  Matrix<2, NUMTRACKERCAMPARAMETERS> m2NNumDerivs;
-  Vector<NUMTRACKERCAMPARAMETERS> vNNormal = *mgvvCameraParams;
+  Matrix<2, kNumCameraParameters> m2NNumDerivs;
+  CameraParameters vNNormal = *mgvvCameraParams;
   Vector<2> v2Cam = mvLastCam;
   Vector<2> v2Out = Project(v2Cam);
-  for(int i=0; i<NUMTRACKERCAMPARAMETERS; i++)
+  for(int i=0; i<kNumCameraParameters; i++)
     {
-      if(i == NUMTRACKERCAMPARAMETERS-1 && mdW == 0.0)
+      if(i == kNumCameraParameters-1 && mdW == 0.0)
 	continue;
-      Vector<NUMTRACKERCAMPARAMETERS> vNUpdate;
+      CameraParameters vNUpdate;
       vNUpdate = Zeros;
       vNUpdate[i] += 0.001;
       UpdateParams(vNUpdate); 
@@ -250,7 +250,7 @@ Matrix<2,NUMTRACKERCAMPARAMETERS> ATANCamera::GetCameraParameterDerivs()
       RefreshParams();
     }
   if(mdW == 0.0)
-    m2NNumDerivs.T()[NUMTRACKERCAMPARAMETERS-1] = Zeros;
+    m2NNumDerivs.T()[kNumCameraParameters-1] = Zeros;
   return m2NNumDerivs;
 }
 
@@ -265,7 +265,7 @@ void ATANCamera::DisableRadialDistortion()
 {
   // Set the radial distortion parameter to zero
   // This disables radial distortion and also disables its differentials
-  (*mgvvCameraParams)[NUMTRACKERCAMPARAMETERS-1] = 0.0;
+  (*mgvvCameraParams)[kNumCameraParameters-1] = 0.0;
   RefreshParams();
 }
 
@@ -301,6 +301,6 @@ Vector<2> ATANCamera::UFBUnProject(const Vector<2>& v2Im)
   return mvLastCam;
 }
 
-const Vector<NUMTRACKERCAMPARAMETERS> ATANCamera::mvDefaultParams = makeVector(0.5, 0.75, 0.5, 0.5, 0.1);
+const CameraParameters ATANCamera::mvDefaultParams = makeVector(0.5, 0.75, 0.5, 0.5, 0.1);
 
 }

@@ -50,50 +50,53 @@
 
 namespace PTAMM {
   
-using namespace TooN;
+	using namespace TooN;
 
-#define NUMTRACKERCAMPARAMETERS 5
+	static const int kNumCameraParameters = 5;
+	typedef TooN::Vector<kNumCameraParameters> CameraParameters;
+	typedef Vector<2> Vec2;
+	typedef Matrix<2,2> Mat2;
 
-// The parameters are:
-// 0 - normalized x focal length
-// 1 - normalized y focal length
-// 2 - normalized x offset
-// 3 - normalized y offset
-// 4 - w (distortion parameter)
+	// The parameters are:
+	// 0 - normalized x focal length
+	// 1 - normalized y focal length
+	// 2 - normalized x offset
+	// 3 - normalized y offset
+	// 4 - w (distortion parameter)
 
-class ATANCamera
-{
+	class ATANCamera
+	{
   public:
     ATANCamera( std::string sName );
-    ATANCamera(std::string sName, CVD::ImageRef irSize, Vector<NUMTRACKERCAMPARAMETERS> vParams);
+    ATANCamera(std::string sName, CVD::ImageRef irSize, CameraParameters vParams);
     
     // Image size get/set: updates the internal projection params to that target image size.
-    void SetImageSize(Vector<2> v2ImageSize);
+    void SetImageSize(Vec2 v2ImageSize);
     inline void SetImageSize(CVD::ImageRef irImageSize) {SetImageSize(vec(irImageSize));};
-    inline Vector<2> GetImageSize() {return mvImageSize;};
-    inline Vector<NUMTRACKERCAMPARAMETERS> GetParams()  { return *mgvvCameraParams; }
+    inline Vec2 GetImageSize() {return mvImageSize;};
+    inline CameraParameters GetParams()  { return *mgvvCameraParams; }
     void RefreshParams();
     
     // Various projection functions
-    Vector<2> Project(const Vector<2>& camframe); // Projects from camera z=1 plane to pixel coordinates, with radial distortion
-    inline Vector<2> Project(CVD::ImageRef ir) { return Project(vec(ir)); }
-    Vector<2> UnProject(const Vector<2>& imframe); // Inverse operation
-    inline Vector<2> UnProject(CVD::ImageRef ir)  { return UnProject(vec(ir)); }
+    Vec2 Project(const Vec2& camframe); // Projects from camera z=1 plane to pixel coordinates, with radial distortion
+    inline Vec2 Project(CVD::ImageRef ir) { return Project(vec(ir)); }
+    Vec2 UnProject(const Vec2& imframe); // Inverse operation
+    inline Vec2 UnProject(CVD::ImageRef ir)  { return UnProject(vec(ir)); }
     
-    Vector<2> UFBProject(const Vector<2>& camframe);
-    Vector<2> UFBUnProject(const Vector<2>& camframe);
-    inline Vector<2> UFBLinearProject(const Vector<2>& camframe);
-    inline Vector<2> UFBLinearUnProject(const Vector<2>& fbframe);
+    Vec2 UFBProject(const Vec2& camframe);
+    Vec2 UFBUnProject(const Vec2& camframe);
+    inline Vec2 UFBLinearProject(const Vec2& camframe);
+    inline Vec2 UFBLinearUnProject(const Vec2& fbframe);
     
-	TooN::Matrix<2,2> GetProjectionDerivs(); // Projection jacobian
+		Mat2 GetProjectionDerivs(); // Projection jacobian
     
     inline bool Invalid() {  return mbInvalid;}
     inline double LargestRadiusInImage() {  return mdLargestRadius; }
     inline double OnePixelDist() { return mdOnePixelDist; }
     
     // The z=1 plane bounding box of what the camera can see
-    inline Vector<2> ImplaneTL(); 
-    inline Vector<2> ImplaneBR(); 
+    inline Vec2 ImplaneTL(); 
+    inline Vec2 ImplaneBR(); 
 
     // OpenGL helper function
     TooN::Matrix<4> MakeUFBLinearFrustumMatrix(double near, double far);
@@ -102,22 +105,22 @@ class ATANCamera
     double PixelAspectRatio() { return mvFocal[1] / mvFocal[0];}
     
     std::string Name() { return msName; }
-    Vector<2> ImageSize() { return mvImageSize; }
+    Vec2 ImageSize() { return mvImageSize; }
 
     // Useful for gvar-related reasons (in case some external func tries to read the camera params gvar, and needs some defaults.)
-    static const Vector<NUMTRACKERCAMPARAMETERS> mvDefaultParams;
+    static const CameraParameters mvDefaultParams;
 
   protected:
-  GVars3::gvar3<Vector<NUMTRACKERCAMPARAMETERS> > mgvvCameraParams; // The actual camera parameters
+		GVars3::gvar3<CameraParameters > mgvvCameraParams; // The actual camera parameters
   
-    TooN::Matrix<2, NUMTRACKERCAMPARAMETERS> GetCameraParameterDerivs();
-    void UpdateParams(Vector<NUMTRACKERCAMPARAMETERS> vUpdate);
-  void DisableRadialDistortion();
+    TooN::Matrix<2, kNumCameraParameters> GetCameraParameterDerivs();
+    void UpdateParams(CameraParameters vUpdate);
+		void DisableRadialDistortion();
     
     // Cached from the last project/unproject:
-    Vector<2> mvLastCam;      // Last z=1 coord
-    Vector<2> mvLastIm;       // Last image/UFB coord
-    Vector<2> mvLastDistCam;  // Last distorted z=1 coord
+    Vec2 mvLastCam;      // Last z=1 coord
+    Vec2 mvLastIm;       // Last image/UFB coord
+    Vec2 mvLastDistCam;  // Last distorted z=1 coord
     double mdLastR;           // Last z=1 radius
     double mdLastDistR;       // Last z=1 distorted radius
     double mdLastFactor;      // Last ratio of z=1 radii
@@ -131,54 +134,54 @@ class ATANCamera
     double mdOneOver2Tan;   // distortion model coeff
     double mdW;             // distortion model coeff
     double mdWinv;          // distortion model coeff
-  double mdDistortionEnabled; // One or zero depending on if distortion is on or off.
-    Vector<2> mvCenter;     // Pixel projection center
-    Vector<2> mvFocal;      // Pixel focal length
-    Vector<2> mvInvFocal;   // Inverse pixel focal length
-    Vector<2> mvImageSize;  
-    Vector<2> mvUFBLinearFocal;
-    Vector<2> mvUFBLinearInvFocal;
-    Vector<2> mvUFBLinearCenter;
-    Vector<2> mvImplaneTL;   
-    Vector<2> mvImplaneBR;
+		double mdDistortionEnabled; // One or zero depending on if distortion is on or off.
+    Vec2 mvCenter;     // Pixel projection center
+    Vec2 mvFocal;      // Pixel focal length
+    Vec2 mvInvFocal;   // Inverse pixel focal length
+    Vec2 mvImageSize;  
+    Vec2 mvUFBLinearFocal;
+    Vec2 mvUFBLinearInvFocal;
+    Vec2 mvUFBLinearCenter;
+    Vec2 mvImplaneTL;   
+    Vec2 mvImplaneBR;
 
-  // Radial distortion transformation factor: returns ration of distorted / undistorted radius.
-  inline double rtrans_factor(double r)
-  {
-    if(r < 0.001 || mdW == 0.0)
-      return 1.0;
-    else 
-      return (mdWinv* atan(r * md2Tan) / r);
-  };
+		// Radial distortion transformation factor: returns ration of distorted / undistorted radius.
+		inline double rtrans_factor(double r)
+		{
+			if(r < 0.001 || mdW == 0.0)
+				return 1.0;
+			else 
+				return (mdWinv* atan(r * md2Tan) / r);
+		};
 
-  // Inverse radial distortion: returns un-distorted radius from distorted.
-  inline double invrtrans(double r)
-  {
-    if(mdW == 0.0)
-      return r;
-    return(tan(r * mdW) * mdOneOver2Tan);
-  };
+		// Inverse radial distortion: returns un-distorted radius from distorted.
+		inline double invrtrans(double r)
+		{
+			if(mdW == 0.0)
+				return r;
+			return(tan(r * mdW) * mdOneOver2Tan);
+		};
   
     std::string msName;
 
-};
+	};
 
-// Some inline projection functions:
-inline Vector<2> ATANCamera::UFBLinearProject(const Vector<2>& camframe)
-{
-  Vector<2> v2Res;
-  v2Res[0] = camframe[0] * mvUFBLinearFocal[0] + mvUFBLinearCenter[0];
-  v2Res[1] = camframe[1] * mvUFBLinearFocal[1] + mvUFBLinearCenter[1];
-  return v2Res;
-}
+	// Some inline projection functions:
+	inline Vec2 ATANCamera::UFBLinearProject(const Vec2& camframe)
+	{
+		Vec2 v2Res;
+		v2Res[0] = camframe[0] * mvUFBLinearFocal[0] + mvUFBLinearCenter[0];
+		v2Res[1] = camframe[1] * mvUFBLinearFocal[1] + mvUFBLinearCenter[1];
+		return v2Res;
+	}
 
-inline Vector<2> ATANCamera::UFBLinearUnProject(const Vector<2>& fbframe)
-{
-  Vector<2> v2Res;
-  v2Res[0] = (fbframe[0] - mvUFBLinearCenter[0]) * mvUFBLinearInvFocal[0];
-  v2Res[1] = (fbframe[1] - mvUFBLinearCenter[1]) * mvUFBLinearInvFocal[1];
-  return v2Res;
-}
+	inline Vec2 ATANCamera::UFBLinearUnProject(const Vec2& fbframe)
+	{
+		Vec2 v2Res;
+		v2Res[0] = (fbframe[0] - mvUFBLinearCenter[0]) * mvUFBLinearInvFocal[0];
+		v2Res[1] = (fbframe[1] - mvUFBLinearCenter[1]) * mvUFBLinearInvFocal[1];
+		return v2Res;
+	}
 
 
 }

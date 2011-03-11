@@ -5,12 +5,15 @@
 #include <TooN/se3.h>
 
 #include "common_types.h"
-#include "ATANCamera.h"
 #include "image_bundle.h"
 
 #include "polygon.tpp"
 
+// Forward declaration
+namespace PTAMM { class ATANCamera; }
+
 namespace indoor_context {
+
 // The vertical axis by convention is fixed as 2
 static const int kVerticalAxis = 2;
 
@@ -62,15 +65,14 @@ private:
 	Bounds2D<> retina_bounds_;
 };
 
+
 // Represents a projection from retina to image coordinates. Simply
 // wraps PTAMM::ATANCamera in a standard interface.  Emphatically NOT thread-safe!
 class ATANCamera : public CameraBase {
 public:
-	// Construct a camera for 0 by 0 images
-	ATANCamera();
-	// Construct a camera for images of a specified size
-	ATANCamera(const ImageRef& image_size);
-	ATANCamera(const ImageRef& image_size, const string& gvar_name);
+	// Construct a camera for images of a specified size with the given intrinsic parameters.
+	ATANCamera(const Vec5& camera_params, const Vec2& image_size);
+	ATANCamera(const Vec5& camera_params, const ImageRef& image_size);
 
 	// Transform retina -> image
 	Vec2 RetToIm(const Vec2& v) const;
@@ -85,13 +87,13 @@ public:
 	virtual const Mat3& Linearize() const;
 
 	// Get the underlying PTAM camera
-	inline PTAMM::ATANCamera& atan_camera() const { return *atan_; }
+	inline PTAMM::ATANCamera& impl_camera() const { return *impl_; }
 private:
   // lazily constructed on call to Linearize()
 	mutable Mat3 linearized_intrinsics_;
 	// ATANCamera is mutable because its Project() and UnProject()
 	// methods are non-const (but act as if they are const)
-	mutable shared_ptr<PTAMM::ATANCamera> atan_;
+	mutable shared_ptr<PTAMM::ATANCamera> impl_;
 };
 
 // Represents a camera that consists of a matrix transform in

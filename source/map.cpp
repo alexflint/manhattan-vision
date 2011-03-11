@@ -21,9 +21,13 @@
 namespace indoor_context {
 using namespace toon;
 
-lazyvar<bool> gvLoadOriginalFrames("Map.LoadOriginalFrames");
+lazyvar<Vec5> gvDefaultCameraParams("Map.DefaultCameraParams");
+lazyvar<Vec2> gvDefaultImageSize("Map.DefaultImageSize");
 lazyvar<int> gvLinearizeCamera("Map.LinearizeCamera");
+
+lazyvar<bool> gvLoadOriginalFrames("Map.LoadOriginalFrames");
 lazyvar<string> gvOrigFramesDir("Map.OrigFramesDir");
+
 
 void Frame::Configure(Map* m, int i, const string& im_file, const SE3<>& pose) {
 	map = m;
@@ -73,7 +77,7 @@ void KeyFrame::GetMeasuredPoints(vector<Vec3>& out) const {
 
 
 Map::Map() {
-	orig_camera.reset(new ATANCamera);
+	orig_camera.reset(new ATANCamera(*gvDefaultCameraParams, *gvDefaultImageSize));
 	if (*gvLinearizeCamera) {
 		// Use a fast approximation to the camera
 		Mat3 cam = orig_camera->Linearize();
