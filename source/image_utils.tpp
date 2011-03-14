@@ -6,8 +6,6 @@
 #include <utility>
 
 #include <boost/bind.hpp>
-#include <cvd/image.h>
-#include <cvd/rgba.h>
 
 #include "common_types.h"
 #include "vw_image_io.h"
@@ -374,23 +372,12 @@ inline PixelRGB<byte> RandomColor() {
 	return PixelRGB<byte> (rand() % 255, rand() % 255, rand() % 255);
 }
 
-// Convert a pixel from CVD to VW
-template<typename T>
-PixelRGB<T> fromCVD(const CVD::Rgba<T>& p) {
-	return PixelRGB<T> (p.red, p.green, p.blue, p.alpha);
-}
-
-// Convert a pixel from VW to CVD
-template<typename T>
-CVD::Rgba<T> toToon(const PixelRGB<T>& p) {
-	return CVD::Rgba<T>(p.r, p.g, p.b, p.alpha);
-}
-
 // Output conversions for pixels
 template<typename T>
 ostream& operator<<(ostream& o, const PixelRGB<T>& p) {
-	o << "{" << static_cast<int> (p.r) << "," << static_cast<int> (p.g) << ","
-	        << static_cast<int> (p.b) << "}";
+	o << "{" << static_cast<int> (p.r)
+		<< "," << static_cast<int> (p.g)
+		<< "," << static_cast<int> (p.b) << "}";
 	return o;
 }
 

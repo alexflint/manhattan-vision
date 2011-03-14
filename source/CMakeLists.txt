@@ -11,23 +11,30 @@ SET( CMAKE_MODULE_PATH
 	${CMAKE_SOURCE_DIR}/../cmake_modules
 	${CMAKE_ROOT}/Modules )
 
+# Find Boost
+SET( Boost_FIND_QUIETLY OFF )
+FIND_PACKAGE( Boost 1.44.0
+	COMPONENTS date_time filesystem iostreams thread python system program_options
+	REQUIRED )
+
 # Find required dependencies
+FIND_PACKAGE( Protobuf REQUIRED )
+# GL-related
 FIND_PACKAGE( OpenGL REQUIRED )
 FIND_PACKAGE( GLUT REQUIRED )
-FIND_PACKAGE( Protobuf REQUIRED )
+# Cairo-related
 FIND_PACKAGE( Cairo REQUIRED )
 FIND_PACKAGE( Cairomm REQUIRED )
-FIND_PACKAGE( Freetype REQUIRED )	# Required by Cairo
-FIND_PACKAGE( SigC++ REQUIRED )	# Required by Cairo
+FIND_PACKAGE( Freetype REQUIRED )
+FIND_PACKAGE( SigC++ REQUIRED )
+# Python-related
 FIND_PACKAGE( PythonLibs REQUIRED ) # Required by Boost.Python
 FIND_PACKAGE( ZLIB REQUIRED ) # Required by Python
+FIND_PACKAGE( Matlab )	# for mex stuff
 
 # Find VW
-SET( VW_USE_LIBS VNL VW )
+SET( VW_USE_LIBS VNL )
 FIND_PACKAGE( VW REQUIRED )
-
-# Find Matlab
-FIND_PACKAGE( Matlab )	# for mex stuff
 
 # Find TooN
 FIND_PATH( TOON_INCLUDE_DIR TooN.h
@@ -35,12 +42,6 @@ FIND_PATH( TOON_INCLUDE_DIR TooN.h
 IF( NOT TOON_INCLUDE_DIR )
 	MESSAGE( FATAL_ERROR "Could not find TooN include directory." )
 ENDIF( NOT TOON_INCLUDE_DIR )
-
-# Find Boost
-SET( Boost_FIND_QUIETLY OFF )
-FIND_PACKAGE( Boost 1.44.0
-	COMPONENTS date_time filesystem iostreams thread python system program_options
-	REQUIRED )
 
 # Find CUDA if it's enabled
 IF( USE_CUDA )
@@ -50,8 +51,8 @@ IF( USE_CUDA )
 ENDIF( USE_CUDA )
 
 # Find graph cuts
-SET( GraphCuts_INCLUDE_DIR /usr/local/include/graphcuts )
-SET( GraphCuts_LIBRARIES -lgraphcuts )
+#SET( GraphCuts_INCLUDE_DIR /usr/local/include/graphcuts )
+#SET( GraphCuts_LIBRARIES -lgraphcuts )
 
 # Find Kinect driver
 # TODO: put these into FindFreenect.cmake
@@ -79,15 +80,12 @@ SET( GraphCuts_LIBRARIES -lgraphcuts )
 IF ( USE_CPU_PROFILER )
 	MESSAGE( STATUS "Linking CPU Profiler" )
   SET ( CPU_PROFILER_LIBRARIES -lprofiler )
-ELSE ( USE_TCMALLOC )
-	SET( TCMALLOC_LIBRARY "" )	
 ENDIF (USE_CPU_PROFILER)
 
+# Configure tc-malloc
 IF ( USE_TCMALLOC )
 	MESSAGE( STATUS "Linking tcmalloc" )
 	SET( TCMALLOC_LIBRARY -ltcmalloc )
-ELSE ( USE_TCMALLOC )
-	SET( TCMALLOC_LIBRARY "" )	
 ENDIF ( USE_TCMALLOC)
 
 # Include dirs
@@ -104,7 +102,7 @@ INCLUDE_DIRECTORIES(
 	/usr/lib/cairomm-1.0/include   # Cairomm seem to need this in addition to above!
 	${Freetype_INCLUDE_DIRS}
 	${SigC++_INCLUDE_DIRS}
-	${GraphCuts_INCLUDE_DIR}
+	#${GraphCuts_INCLUDE_DIR}
 	${PYTHON_INCLUDE_DIRS}
 	${ZLIB_INCLUDE_DIRS}
 )
@@ -112,17 +110,13 @@ INCLUDE_DIRECTORIES(
 # Setup linked libraries
 SET( EXTERNAL_LIBRARIES
 	-lGVars3
-	-lcvd
-	-lGKTools
 	-llapack
-	${VW_LIBRARIES}
-	${Cairomm_LIBRARIES}
-	${SigC++_LIBRARIES}
-	${GraphCuts_LIBRARIES}
 	${PROTOBUF_LIBRARY}
 	${GLUT_LIBRARIES}
 	${OPENGL_LIBRARIES}
-	#${libfreenect_LIBRARIES}
+	${VW_LIBRARIES}
+	${Cairomm_LIBRARIES}
+	${SigC++_LIBRARIES}  # needed by cairo
 
 	# Enumerate specific libs to avoid linking Boost.Python to the core code
 	${Boost_system_LIBRARY_RELEASE}
@@ -131,6 +125,14 @@ SET( EXTERNAL_LIBRARIES
 	${Boost_iostreams_LIBRARY}
 	${Boost_thread_LIBRARY}
 	${Boost_program_options_LIBRARY}
+
+	-ljpeg # for GIL
+	-lpng  # for GIL
+
+  #-lcvd
+  #-lGKTools
+  #${GraphCuts_LIBRARIES}
+	#${libfreenect_LIBRARIES}
 
 	# Only for stereotracks
 	#${EIGEN2_LIBRARIES}
@@ -141,8 +143,9 @@ SET( EXTERNAL_LIBRARIES
 	${TCMALLOC_LIBRARY}
 )
 
+# Include prefix.h, which is precompiled to speed up compilation
 IF(CMAKE_COMPILER_IS_GNUCC)
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -include ${CMAKE_SOURCE_DIR}/prefix.h")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -include ${CMAKE_SOURCE_DIR}/prefix.h")
 ENDIF(CMAKE_COMPILER_IS_GNUCC)
 
 ###############################################################################

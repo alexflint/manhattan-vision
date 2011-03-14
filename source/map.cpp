@@ -21,7 +21,7 @@
 namespace indoor_context {
 using namespace toon;
 
-lazyvar<Vec5> gvDefaultCameraParams("Map.DefaultCameraParams");
+lazyvar<Vec5> gvDefaultCameraParams("Map.DefaultCameraParameters");
 lazyvar<Vec2> gvDefaultImageSize("Map.DefaultImageSize");
 lazyvar<int> gvLinearizeCamera("Map.LinearizeCamera");
 

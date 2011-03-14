@@ -1,5 +1,3 @@
-#include "common_types.h"
-
 #include <boost/gil/typedefs.hpp>
 #include <boost/gil/extension/io/png_dynamic_io.hpp>
 #include <iostream>

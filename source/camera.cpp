@@ -59,12 +59,12 @@ double CameraBase::GetMaxDeviation(const CameraBase& cam1, const CameraBase& cam
 ///// ATANCamera
 
 ATANCamera::ATANCamera(const Vec5& camera_params, const Vec2& image_size)
-	: impl_(new PTAMM::ATANCamera("Camera" /** XXX **/)) {
+	: impl_(new PTAMM::ATANCamera(image_size, camera_params)) {
 	SetImageSize(asIR(image_size));
 }
 
 ATANCamera::ATANCamera(const Vec5& camera_params, const ImageRef& image_size)
-	: impl_(new PTAMM::ATANCamera("Camera" /** XXX **/)) {
+	: impl_(new PTAMM::ATANCamera(asToon(image_size), camera_params)) {
 	SetImageSize(image_size);
 }
 

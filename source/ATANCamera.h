@@ -45,8 +45,6 @@
 
 #include <TooN/TooN.h>
 #include <cmath>
-#include <cvd/vector_image_ref.h>
-#include <gvars3/gvars3.h>
 
 namespace PTAMM {
   
@@ -67,21 +65,18 @@ namespace PTAMM {
 	class ATANCamera
 	{
   public:
-    ATANCamera( std::string sName );
-    ATANCamera(std::string sName, CVD::ImageRef irSize, CameraParameters vParams);
+    //ATANCamera( std::string sName );
+    ATANCamera(Vec2 irSize, CameraParameters vParams);
     
     // Image size get/set: updates the internal projection params to that target image size.
     void SetImageSize(Vec2 v2ImageSize);
-    inline void SetImageSize(CVD::ImageRef irImageSize) {SetImageSize(vec(irImageSize));};
     inline Vec2 GetImageSize() {return mvImageSize;};
-    inline CameraParameters GetParams()  { return *mgvvCameraParams; }
+    inline CameraParameters GetParams()  { return mvCameraParams; }
     void RefreshParams();
     
     // Various projection functions
     Vec2 Project(const Vec2& camframe); // Projects from camera z=1 plane to pixel coordinates, with radial distortion
-    inline Vec2 Project(CVD::ImageRef ir) { return Project(vec(ir)); }
     Vec2 UnProject(const Vec2& imframe); // Inverse operation
-    inline Vec2 UnProject(CVD::ImageRef ir)  { return UnProject(vec(ir)); }
     
     Vec2 UFBProject(const Vec2& camframe);
     Vec2 UFBUnProject(const Vec2& camframe);
@@ -104,14 +99,14 @@ namespace PTAMM {
     // Feedback for Camera Calibrator
     double PixelAspectRatio() { return mvFocal[1] / mvFocal[0];}
     
-    std::string Name() { return msName; }
     Vec2 ImageSize() { return mvImageSize; }
 
     // Useful for gvar-related reasons (in case some external func tries to read the camera params gvar, and needs some defaults.)
     static const CameraParameters mvDefaultParams;
 
   protected:
-		GVars3::gvar3<CameraParameters > mgvvCameraParams; // The actual camera parameters
+		CameraParameters mvCameraParams;
+		//GVars3::gvar3<CameraParameters > mgvvCameraParams; // The actual camera parameters
   
     TooN::Matrix<2, kNumCameraParameters> GetCameraParameterDerivs();
     void UpdateParams(CameraParameters vUpdate);
@@ -161,9 +156,6 @@ namespace PTAMM {
 				return r;
 			return(tan(r * mdW) * mdOneOver2Tan);
 		};
-  
-    std::string msName;
-
 	};
 
 	// Some inline projection functions:
