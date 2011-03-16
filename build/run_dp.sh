@@ -19,4 +19,5 @@ time -f "%E elapsed (real)" \
 		--3d_agreement_weight=1000 \
 		--3d_occlusion_weight=40 \
 		--frame_stride=10 \
-		$SEQUENCE_ARGS
+		$SEQUENCE_ARGS \
+		$*
