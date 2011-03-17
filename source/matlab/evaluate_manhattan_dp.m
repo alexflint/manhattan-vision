@@ -1,8 +1,10 @@
-function [ y output ] = evaluate_manhattan_dp( x )
+function [ y output ] = evaluate_manhattan_dp( x, precompute )
 %EVALUATE_MANHATTAN_DP Summary of this function goes here
 %   Detailed explanation goes here
 
-if (length(x) ~= 7)
+default precompute = 0;
+
+if (length(x) ~= 5)
     error(['Expected 7 parameters, got ' num2str(length(x))]);
 end
 
@@ -28,26 +30,32 @@ sequences = {...
 
 frame_stride = 50;
 
-corner_penalty = x(1);
-occlusion_penalty = x(2);
-mono_weight = x(3);
-stereo_weight = x(4);
-agreement_sigma = x(5);
-agreement_weight = x(6);
-occlusion_weight = x(7);
+occlusion_penalty = x(1);
+mono_weight = x(2);
+stereo_weight = x(3);
+agreement_weight = x(4);
+occlusion_weight = x(5);
+
+% this param is now fixed
+corner_penalty = 1;
 
 % Build the command
 cmd = ['./' executable_name];
-cmd = [cmd ' --mono_weight=' num2str(mono_weight)];
-cmd = [cmd ' --stereo_weight=' num2str(stereo_weight)];
-cmd = [cmd ' --3d_agreement_sigma=' num2str(agreement_sigma)];
-cmd = [cmd ' --3d_agreement_weight=' num2str(agreement_weight)];
-cmd = [cmd ' --3d_occlusion_weight=' num2str(occlusion_weight)];
 cmd = [cmd ' --corner_penalty=' num2str(corner_penalty)];
 cmd = [cmd ' --occlusion_penalty=' num2str(occlusion_penalty)];
+cmd = [cmd ' --mono_weight=' num2str(mono_weight)];
+cmd = [cmd ' --stereo_weight=' num2str(stereo_weight)];
+cmd = [cmd ' --3d_agreement_weight=' num2str(agreement_weight)];
+cmd = [cmd ' --3d_occlusion_weight=' num2str(occlusion_weight)];
 cmd = [cmd ' --frame_stride=' num2str(frame_stride)];
 for i = 1:length(sequences)
     cmd = [cmd ' --sequence=' sequences{i}];
+end
+
+if (precompute)
+    cmd = [cmd ' --store_payoffs=PrecomptuedData'];
+else
+    cmd = [cmd ' --load_payoffs=PrecomptuedData'];
 end
 
 %
@@ -60,11 +68,13 @@ if (status ~= 0)
     error(['Error in executable: ' output]);
 end
 
-lines = strsplit(output, char(10));  % char(10) is newline, '\n' does _not_ work
-
-% the last line is always empty, we want the second-last line
-y = str2num(lines{length(lines)-1});
-
-fprintf('  Result: %f\n', y);
+if (precompute)
+    disp('Precomputed payoffs');
+    y = nan;
+else
+    lines = strsplit(output, char(10));  % char(10) is newline, '\n' does _not_ work
+    y = str2num(lines{length(lines)-1});
+    fprintf('  Result: %f\n', y);
+end
 
 end

@@ -56,4 +56,6 @@ upper_bound = [ max_corner_penalty ...
    
 f = @evaluate_manhattan_dp;
    
-optimize_the_heck_out_of_this_thing(f, x0, lower_bound, upper_bound);
+evaluate_manhattan_dp(x0, 1);
+
+gpgo(f, x0, lower_bound, upper_bound);
