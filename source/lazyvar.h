@@ -1,5 +1,7 @@
 #pragma once
 
+#include <boost/thread.hpp>
+
 #include "common_types.h"
 
 namespace indoor_context {
@@ -32,6 +34,7 @@ namespace indoor_context {
 		const string name;
 		const T default_val;
 		const int flags;
+		mutable boost::mutex initialize_mutex;
 	public:
 		lazyvar(const string& name_)
 			: name(name_),
@@ -64,6 +67,7 @@ namespace indoor_context {
 		}
 
 		inline void EnsureInitialized() const {
+			boost::mutex::scoped_lock lock(initialize_mutex);
 			if (gvar2<T>::data == NULL) {
 				GV3::Register(*(gvar3<T>*)this, name, default_val, flags);
 			}

@@ -144,9 +144,9 @@ SET( EXTERNAL_LIBRARIES
 )
 
 # Include prefix.h, which is precompiled to speed up compilation
-IF(CMAKE_COMPILER_IS_GNUCC)
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -include ${CMAKE_SOURCE_DIR}/prefix.h")
-ENDIF(CMAKE_COMPILER_IS_GNUCC)
+#IF(CMAKE_COMPILER_IS_GNUCC)
+#  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -include ${CMAKE_SOURCE_DIR}/prefix.h")
+#ENDIF(CMAKE_COMPILER_IS_GNUCC)
 
 ###############################################################################
 # GENERATE PROTOCOL BUFFERS
@@ -155,6 +155,7 @@ SET( PROTOS
 	vector.proto
 	map.proto
 	model.proto
+	payoffs.proto
 )
 
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${PROTOS})
@@ -186,7 +187,6 @@ ADD_LIBRARY( core SHARED
 	progress_reporter.cpp
 	union_find.cpp
 	vanishing_points.cpp
-	worker.cpp
 	image_bundle.cpp
 	textons.cpp
 	clipping.cpp
@@ -197,6 +197,9 @@ ADD_LIBRARY( core SHARED
 	colors.cpp
 	mean_shift.cpp
 	line_segment.cpp
+
+	worker.cpp
+	thread_pool.cpp
 	
 	geom_utils.cpp
 	image_utils.cpp
@@ -272,14 +275,8 @@ SET( EXECUTABLES
 	test
 	map_viewer
 
-	table_speedtest
-
 	edit_floorplan
 	edit_map
-
-	cairo_test
-	clip_test
-	clip3d_test
 
 	map2pmvs
 	ply_viewer
@@ -294,11 +291,6 @@ SET( EXECUTABLES
 	
 	render_floorplan
 	
-	toon_speed_test
-	include_test
-	render_test
-	rectification_test
-	filter_test
 
 	poster_lines
 	poster_vpts
@@ -335,11 +327,19 @@ SET( EXECUTABLES
 	generate_svm_problem
 	bootstrap_train_dp
 	oneshot_train_dp
+	brostow
 
-	temp
+	toon_speed_test
+	render_test
+	rectification_test
+	filter_test
+	cairo_test
+	clip_test
+	clip3d_test
+	table_speedtest
 	gil_test
 	image_test
-	brostow
+	thread_pool_test
 )
 
 FOREACH( EXECUTABLE ${EXECUTABLES} )

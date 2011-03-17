@@ -84,8 +84,8 @@ Map::Map() {
 		camera.reset(new LinearCamera(cam, orig_camera->image_size()));
 
 		// Report the deviation
-		double err = CameraBase::GetMaxDeviation(*orig_camera, *camera);
-		DLOG << "Using a linear camera approximation with error=" << err;
+		//double err = CameraBase::GetMaxDeviation(*orig_camera, *camera);
+		//DLOG << "Using a linear camera approximation with error=" << err;
 	} else {
 		camera = orig_camera;
 	}
@@ -133,6 +133,9 @@ void Map::Load(const string& path) {
 	const TiXmlElement* kfs_elem = root_elem->FirstChildElement("KeyFrames");
 	CHECK(kfs_elem) << "There was no <KeyFrames> element in the map spec.";
 
+	// vector of keyframe IDs for which we fell back to B&W images
+	vector<int> fallback_frames;
+
 	// Create an ID-to-XMLElement map
 	for (const TiXmlElement* kf_elem = kfs_elem->FirstChildElement("KeyFrame");
 			kf_elem != NULL;
@@ -148,7 +151,7 @@ void Map::Load(const string& path) {
 			image_file = kf_elem->Attribute("name");
 		}
 		if (image_file.empty() || !*gvLoadOriginalFrames) {
-			DLOG << "Falling back to monochrome image for keyframe "<<id;
+			fallback_frames.push_back(id);
 			image_file = xml_dir/kf_elem->FirstChildElement("Image")->Attribute("file");
 		} else {
 			image_file = frames_dir/image_file;
@@ -188,6 +191,11 @@ void Map::Load(const string& path) {
 
 	DLOG << "Loaded " << pts.size() << " points and "
 			 << frames.size() << " frames (" << kfs.size() << " key frames)";
+	if (fallback_frames.size() == 1) {
+		DLOG << "Using grayscale image for frame " << fallback_frames[0];
+	} else if (!fallback_frames.empty()) {
+		DLOG << "Using grayscale image for frames " << iowrap(fallback_frames, ",");
+	}
 }
 
 void Map::LoadWithGroundTruth(const string& path, proto::TruthedMap& gt_map) {

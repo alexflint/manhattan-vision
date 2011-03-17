@@ -2,9 +2,11 @@
 
 #include "filters.h"
 #include "common_types.h"
+#include "hw_convolver.h"
+#include "worker.h"
+
 #include "numeric_utils.tpp"
 #include "image_utils.tpp"
-
 #include "functional_types.tpp"
 
 namespace indoor_context {

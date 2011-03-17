@@ -19,6 +19,7 @@
 #include "kmeans.h"
 #include "progress_reporter.h"
 #include "image_bundle.h"
+#include "worker.h"
 
 #include "io_utils.tpp"
 #include "image_utils.tpp"

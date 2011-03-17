@@ -1,7 +1,8 @@
 #pragma once
 
-#include <time.h>
+#include <sys/time.h>
 #include <string>
+#include <iostream>
 
 // This macro is used like this:
 //
@@ -24,18 +25,28 @@
 // output:
 // the loop: XX.XXms
 
-#define TIMED(str) if (scoped_timer __t = str)
-#define TIMED_SECTION(str) TITLED(str) if (scoped_timer __t = "Time taken")
+#define TIMED(str) if (ScopedTimer __t = str)
+#define TIMED_SECTION(str) TITLED(str) if (ScopedTimer __t = "Time taken")
 
 namespace indoor_context {
-	// Starts a timer on construction and reports its value on destruction
-	struct scoped_timer {
+	// Starts a timer on construction.
+	struct Timer {
 		const std::string str;
 		struct timeval start;
-		scoped_timer();
-		scoped_timer(const char* s);
-		scoped_timer(const std::string& s);
-		~scoped_timer();
+		Timer();
+		Timer(const std::string& s);
+	};
+
+	// Starts a timer on construction and reports its value on destruction
+	struct ScopedTimer {
+		Timer t;
+		ScopedTimer();
+		ScopedTimer(const char* s);
+		ScopedTimer(const std::string& s);
+		~ScopedTimer();
 		inline operator bool() { return true; }
 	};
+
+	// Stream insertion for timer
+	std::ostream& operator<<(std::ostream& o, const Timer& t);
 }

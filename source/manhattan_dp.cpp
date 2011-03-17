@@ -454,10 +454,10 @@ void ManhattanDP::Compute(const DPPayoffs& po,
 
 	// Begin the search
 	DPSubSolution best(-INFINITY);
-	DPState init(-1, geom->grid_size[0]/*yes x-coord is _past_ the image boundary*/, -1, -1, DPState::DIR_OUT);
+	DPState init(-1, geom->grid_size[0]/*yes, x-coord is _past_ the image boundary*/, -1, -1, DPState::DIR_OUT);
 	max_depth = cur_depth = 0;
 	bool feasible = false;
-	TIMED("Core DP")
+	//TIMED("Core DP")
 	for (init.axis = 0; init.axis <= 1; init.axis++) {
 		for (init.row = geom->horizon_row; init.row < geom->grid_size[1]; init.row++) {
 			// Need to account for the penalty for the first wall here since

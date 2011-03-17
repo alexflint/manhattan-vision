@@ -1,6 +1,10 @@
-#include <sys/time.h>
-#include <boost/format.hpp>
 #include "timer.h"
+
+#include <sys/time.h>
+#include <iostream>
+
+#include <boost/format.hpp>
+
 #include "common_types.h"
 
 namespace indoor_context {
@@ -8,36 +12,48 @@ namespace indoor_context {
 	static const long US_PER_SEC = US_PER_MS * 1000;
 	static const long US_PER_MIN = 60 * US_PER_SEC;
 
-	scoped_timer::scoped_timer() {
+	Timer::Timer() {
 		gettimeofday(&start, NULL);
 	}
 
-	scoped_timer::scoped_timer(const char* s) : str(s) {
+	Timer::Timer(const string& s) : str(s) {
 		gettimeofday(&start, NULL);
 	}
 
-	scoped_timer::scoped_timer(const string& s) : str(s) {
-		gettimeofday(&start, NULL);
-	}
-
-	scoped_timer::~scoped_timer() {
+	ostream& operator<<(ostream& o, const Timer& t) {	
 		struct timeval end;
 		gettimeofday(&end, NULL);
-		long dt = (end.tv_usec - start.tv_usec) + (end.tv_sec - start.tv_sec) * US_PER_SEC;
+		long dt = (end.tv_usec - t.start.tv_usec) + (end.tv_sec - t.start.tv_sec) * US_PER_SEC;
 
-		DLOG_N << str << ": ";
+		o << t.str << ": ";
 		if (dt > US_PER_MIN) {
 			long mins = dt / US_PER_MIN;
 			long secs = (dt % US_PER_MIN) / US_PER_SEC;
-			DLOG << boost::format("%ldm%lds") % mins % secs;
+			o << boost::format("%ldm%lds") % mins % secs << endl;
 		} else if (dt > US_PER_SEC) {
 			float secs = 1. * dt / US_PER_SEC;
-			DLOG << boost::format("%.3fs") % secs;
+			o << boost::format("%.3fs") % secs << endl;
 		} else if (dt > US_PER_MS) {
 			float millis = 1. * dt / US_PER_MS;
-			DLOG << boost::format("%.3fms") % millis;
+			o << boost::format("%.3fms") % millis << endl;
 		} else {
-			DLOG << boost::format("%ldus") % dt;
+			o << boost::format("%ldus") % dt << endl;
 		}
+
+		return o;
 	}
+
+
+	ScopedTimer::ScopedTimer() {
+	}
+
+	ScopedTimer::ScopedTimer(const char* s) : t(s) {
+	}
+
+	ScopedTimer::ScopedTimer(const string& s) : t(s) {
+	}
+
+	ScopedTimer::~ScopedTimer() {
+		DLOG << t;
+	}	
 }

@@ -5,11 +5,11 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include "worker.h"
 #include "common_types.h"
-#include "hw_convolver.h"
 
 namespace indoor_context {
+class Worker;
+class HwConvolver;
 using boost::shared_ptr;
 
 // Represents a filter that takes an input image and produces an

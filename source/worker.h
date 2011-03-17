@@ -1,3 +1,5 @@
+// Deprecated, use thread_pool from thread_pool.h instead.
+
 #pragma once
 
 #include <boost/thread.hpp>

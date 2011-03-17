@@ -29,7 +29,6 @@ public:
 		if(the_queue.empty()) {
 			return false;
 		}
-        
 		popped_value=the_queue.front();
 		the_queue.pop();
 		return true;
@@ -40,7 +39,6 @@ public:
 		while(the_queue.empty()) {
 			the_condition_variable.wait(lock);
 		}
-        
 		popped_value=the_queue.front();
 		the_queue.pop();
 	}
