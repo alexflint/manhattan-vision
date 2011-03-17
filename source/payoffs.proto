@@ -1,0 +1,28 @@
+package indoor_context.proto;
+
+import "vector.proto";
+
+message MatF {
+	required int32 rows = 1;
+	required int32 cols = 2;
+	repeated float entries = 3;
+}
+
+message MatI {
+	required int32 rows = 1;
+	required int32 cols = 2;
+	repeated int32 entries = 3;
+}
+
+message PayoffFeatures {
+	required MatF mono0 = 11;
+	required MatF mono1 = 12;
+	
+	required MatF occlusion = 21;
+	required MatF agreement = 22;
+	required float agreement_sigma = 23;
+
+	repeated int32 stereo_aux_ids = 31;
+	repeated MatF stereo = 32;
+}
+
