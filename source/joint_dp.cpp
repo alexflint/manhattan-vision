@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
 	// Process each frame
 	BOOST_FOREACH(int frame_id, frame_ids) {
 		TITLE("Frame "<<frame_id);
-		scoped_timer t("Process frame");
+		ScopedTimer t("Process frame");
 
 		// Get the frame
 		KeyFrame& frame = *map.KeyFrameById(frame_id);

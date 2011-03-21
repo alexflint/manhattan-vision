@@ -366,7 +366,7 @@ namespace indoor_context {
 
 		// Draw the original image
 		void OutputOrigViz(const string& path);
-		// Output the solution as an image blended with the solultion orientations
+		// Output the solution orientations overlayed on the input image
 		void OutputSolution(const string& path);
 		// Draw the solution in grid coordinates
 		void OutputGridViz(const string& path);

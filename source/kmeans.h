@@ -3,7 +3,6 @@
 #include "common_types.h"
 
 namespace indoor_context {
-
 	class KMeans {
 	public:
 		// Run K-means, write the final cluster centres to OUT_MEANS and
@@ -23,5 +22,4 @@ namespace indoor_context {
 												 vector<VecD>& out_means,
 												 MatD& out_responsibilities);
 	};
-
 }

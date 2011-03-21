@@ -25,8 +25,8 @@
 // output:
 // the loop: XX.XXms
 
-#define TIMED(str) if (ScopedTimer __t = str)
-#define TIMED_SECTION(str) TITLED(str) if (ScopedTimer __t = "Time taken")
+#define TIMED(str) if (indoor_context::ScopedTimer __t = str)
+#define TIMED_SECTION(str) TITLED(str) if (indoor_context::ScopedTimer __t = "Time taken")
 
 namespace indoor_context {
 	// Starts a timer on construction.

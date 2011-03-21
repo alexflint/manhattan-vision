@@ -9,19 +9,19 @@ init_occlusion_penalty = 1;
 min_occlusion_penalty = 1e-3;
 max_occlusion_penalty = 1e+3;
 
-init_mono_weight = .001;
-min_mono_weight = 1e-5;
+init_mono_weight = .00001;
+min_mono_weight = 1e-7;
 max_mono_weight = 1;
 
-init_stereo_weight = 50;
+init_stereo_weight = .2;
 min_stereo_weight = 1e-3;
 max_stereo_weight = 1e+3;
 
-init_agreement_weight = 1000;
+init_agreement_weight = 2;
 min_agreement_weight = 1e-3;
 max_agreement_weight = 1e+3;
 
-init_occlusion_weight = 40;
+init_occlusion_weight = .8;
 min_occlusion_weight = 1e-3;
 max_occlusion_weight = 1e+3;
  

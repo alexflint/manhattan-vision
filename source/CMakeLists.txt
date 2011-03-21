@@ -18,6 +18,7 @@ FIND_PACKAGE( Boost 1.44.0
 	REQUIRED )
 
 # Find required dependencies
+FIND_PACKAGE( Eigen3 )
 FIND_PACKAGE( Protobuf REQUIRED )
 # GL-related
 FIND_PACKAGE( OpenGL REQUIRED )
@@ -64,10 +65,9 @@ ENDIF( USE_CUDA )
 #LINK_DIRECTORIES(${libfreenect_LIBRARY_DIRS})
 
 # Eigen2 (only for kinect_transform)
-#FIND_PACKAGE(Eigen2)
-#INCLUDE_DIRECTORIES(${EIGEN2_INCLUDE_DIR})
-#LINK_DIRECTORIES(${EIGEN2_LIBRARY_DIRS})
-#LIST(APPEND LIBRARIES ${EIGEN2_LIBRARIES})
+#INCLUDE_DIRECTORIES(${EIGEN3_INCLUDE_DIR})
+#LINK_DIRECTORIES(${EIGEN3_LIBRARY_DIRS})
+#LIST(APPEND LIBRARIES ${EIGEN3_LIBRARIES})
 
 # Yaml (only for kinect_transform)
 #FIND_PACKAGE(yaml-cpp)
@@ -105,6 +105,7 @@ INCLUDE_DIRECTORIES(
 	#${GraphCuts_INCLUDE_DIR}
 	${PYTHON_INCLUDE_DIRS}
 	${ZLIB_INCLUDE_DIRS}
+	${EIGEN3_INCLUDE_DIR}
 )
 
 # Setup linked libraries
@@ -135,13 +136,20 @@ SET( EXTERNAL_LIBRARIES
 	#${libfreenect_LIBRARIES}
 
 	# Only for stereotracks
-	#${EIGEN2_LIBRARIES}
+	${EIGEN3_LIBRARIES}
 	#${Yaml-cpp_LIBRARIES}
 
 	# Profiling libraries (empty unless USE_CPU_PROFILER / USE_TCMALLOC are true)
 	${CPU_PROFILER_LIBRARIES}
 	${TCMALLOC_LIBRARY}
 )
+
+# If in release mode then compile Eigen without bounds checking
+IF (CMAKE_BUILD_TYPE STREQUAL "Release" OR
+		CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+	MESSAGE(STATUS "Eigen bounds checking is off.")
+	ADD_DEFINITIONS( -DNDEBUG )
+ENDIF()
 
 # Include prefix.h, which is precompiled to speed up compilation
 #IF(CMAKE_COMPILER_IS_GNUCC)
@@ -340,6 +348,7 @@ SET( EXECUTABLES
 	gil_test
 	image_test
 	thread_pool_test
+	test_eigen
 )
 
 FOREACH( EXECUTABLE ${EXECUTABLES} )

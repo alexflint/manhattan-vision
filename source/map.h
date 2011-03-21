@@ -68,13 +68,8 @@ public:
 // Represents a map from PTAM
 class Map {
 public:
-	// The dir for this map
-	string dir;
-	// The number of keyframes in the dir (they might not all be loaded!)
-	int num_kfs_available;
 	// The frame information read from XML
 	ptr_vector<Frame> frames;
-
 	// The keyframes
 	ptr_vector<KeyFrame> kfs;
 	// Id-to-keyframe map

@@ -9,13 +9,11 @@ for i in $SEQUENCES; do
 		SEQUENCE_ARGS="$SEQUENCE_ARGS --sequence=$i";
 done
 
-time -f "%E elapsed (real)" \
-		./dp_optimization_wrapper \
+./dp_optimization_wrapper \
 		--corner_penalty=400 \
 		--occlusion_penalty=300 \
 		--mono_weight=0.001 \
 		--stereo_weight=50 \
-		--3d_agreement_sigma=1.5 \
 		--3d_agreement_weight=1000 \
 		--3d_occlusion_weight=40 \
 		--frame_stride=10 \

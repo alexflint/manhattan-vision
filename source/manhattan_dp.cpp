@@ -848,6 +848,7 @@ void ManhattanDPReconstructor::OutputOrigViz(const string& path) {
 }
 
 void ManhattanDPReconstructor::OutputSolution(const string& path) {
+	CHECK(input->loaded());
 	ImageRGB<byte> canvas;
 	ImageCopy(input->rgb, canvas);
 	DrawOrientations(dp.solution.pixel_orients, canvas, 0.35);
@@ -862,6 +863,7 @@ void ManhattanDPReconstructor::OutputGridViz(const string& path) {
 }
 
 void ManhattanDPReconstructor::OutputManhattanHomologyViz(const string& path) {
+	CHECK(input->loaded());
 	FileCanvas canvas(path, input->size());
 	canvas.DrawImage(input->rgb);
 	for (int i = 0; i < 20; i++) {
@@ -877,6 +879,8 @@ void ManhattanDPReconstructor::OutputManhattanHomologyViz(const string& path) {
 }
 
 void ManhattanDPReconstructor::OutputPayoffsViz(int orient, const string& path) {
+	CHECK(input->loaded());
+
 	// Draw payoffs
 	ImageRGB<byte> payoff_image(geometry.grid_size[0], geometry.grid_size[1]);
 	DrawMatrixRecentred(payoffs->wall_scores[orient], payoff_image);

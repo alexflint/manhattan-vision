@@ -180,9 +180,16 @@ void LoadAndComputePayoffs(const fs::path& file,
 
 // Globals shared across frame processors
 vector<int> stereo_offsets;
+
+fs::path payoffs_dir;
 bool load_payoffs, store_payoffs, evaluate;
+
+bool draw_solutions;
+fs::path visualization_dir;
+
 Parameters params;
 PerformanceStatistics perf;
+
 
 // Processes frames
 class FrameProcessor {
@@ -199,7 +206,9 @@ public:
 	static boost::mutex perf_mutex;
 	static boost::mutex log_mutex;
 
-	void Process(KeyFrame& frame, string& payoff_file, const proto::TruthedMap& gt_map) {
+	void Process(KeyFrame& frame,
+							 const string& sequence,
+							 const proto::TruthedMap& gt_map) {
 		// Get path
 		DPPayoffs* payoffs = NULL;
 
@@ -208,8 +217,9 @@ public:
 														 gt_map.floorplan().zfloor(),
 														 gt_map.floorplan().zceil());
 
+		fs::path payoffs_file = payoffs_dir / fmt("%s_%03d_precomputed.protodata", sequence, frame.id);
 		if (load_payoffs) {
-			LoadAndComputePayoffs(payoff_file, params, features, loaded_payoffs);
+			LoadAndComputePayoffs(payoffs_file.string(), params, features, loaded_payoffs);
 			payoffs = &loaded_payoffs;
 
 		} else {
@@ -240,7 +250,7 @@ public:
 
 			// Store payoffs?
 			if (store_payoffs) {
-				SaveFeatures(payoff_file, aux_ids, joint);
+				SaveFeatures(payoffs_file.string(), aux_ids, joint);
 			}
 		}
 
@@ -260,11 +270,22 @@ public:
 				perf.sum_depth_error += recon.ReportDepthError(gt);
 				perf.num_frames++;
 			}
-		}
 
-		/*if (frame.image.loaded()) {
-			frame.UnloadImage();
-			}*/
+			// Visualize?
+			if (draw_solutions) {
+				if (!frame.image.loaded()) {
+					frame.LoadImage();
+				}
+
+				boost::format viz_filepat("%s/%s_%03d_%s.png");
+				viz_filepat.bind_arg(1, visualization_dir.string());
+				viz_filepat.bind_arg(2, sequence);
+				viz_filepat.bind_arg(3, frame.id);
+
+				// Draw solution
+				recon.OutputSolution(str(viz_filepat % "solution"));
+			}
+		}
 	}
 };
 
@@ -277,17 +298,31 @@ public:
 	boost::ptr_map<boost::thread::id, T> instances;
 	boost::mutex get_mutex;
 
+	// Get object for the current thread or construct one
 	T& Get(const boost::thread::id& id) {
 		// The lock is important as the ptr_map will have internal race
 		// conditions (it might need to construct a new object if one
 		// doesn't already exist for this thread).
-		boost::mutex::scoped_lock(get_mutex);
+		boost::mutex::scoped_lock lock(get_mutex);
 		return instances[id];
 	}
 
-	T& Get() {
-		return Get(this_thread::get_id());
+	// Get object for the current thread or construct one
+	const T& GetConst(const boost::thread::id& id) const {
+		return const_cast<ThreadLocal<T>*>(this)->Get(id);
 	}
+
+	// Get the object for this thread or construct one
+	T& Get() { return Get(this_thread::get_id()); }
+	const T& GetConst() const { return GetConst(this_thread::get_id()); }
+
+	// Shortcut for Get
+	T& operator*() { return Get(); }
+	const T& operator*() const { return Get(); }
+
+	// Shortcut for Get
+	T* operator->() { return &Get(); }
+	const T* operator->() const { return &Get(); }
 };
 
 int main(int argc, char **argv) {
@@ -304,6 +339,7 @@ int main(int argc, char **argv) {
     ("3d_occlusion_weight", po::value<float>()->required(), "weight for 3D occlusion payoffs")
     ("corner_penalty", po::value<float>()->required(), "per-corner penalty")
     ("occlusion_penalty", po::value<float>()->required(), "additional penalty for occluding corners")
+    ("loss", po::value<string>()->default_value("DepthError"), "Loss function: DepthError or LabellingError")
 
     ("sequence", po::value<vector<string> >()->required(), "sequences to evaluate")
 		("frame_stride", po::value<int>()->default_value(1), "number of frames per evaluation")
@@ -314,8 +350,8 @@ int main(int argc, char **argv) {
 
     ("concurrency", po::value<int>()->default_value(1), "number of independent threads -- not working yet")
 
-    ("loss", po::value<string>()->default_value("DepthError"),
-		 "Loss function: DepthError or LabellingError")
+		("visualization_dir", po::value<string>()->default_value("out"), "directory for visualization output")
+		("draw_solutions", "draw solutions as PNGs in output directory")
 		;
 
 	// Parse options
@@ -343,8 +379,14 @@ int main(int argc, char **argv) {
 	CHECK(loss_name == "DepthError" || loss_name == "LabellingError") << EXPR_STR(loss_name);
 	bool use_depth_loss = (loss_name == "DepthError");
 
+	// Output dir
+	visualization_dir = opts["visualization_dir"].as<string>();
+	draw_solutions = opts.count("draw_solutions") > 0;
+	if (draw_solutions) {
+		fs::create_directory(visualization_dir);
+	}
+
 	// Are we loading or storing payoffs?
-	fs::path payoffs_dir;
 	store_payoffs = false;
 	load_payoffs = false;
 	if (opts.count("store_payoffs")) {
@@ -373,7 +415,6 @@ int main(int argc, char **argv) {
 		CHECK_PRED1(fs::exists, payoffs_dir) << "Failed to create directory";
 		CHECK_PRED1(fs::is_directory, payoffs_dir) << "Exists but is not a directory";
 	}
-	boost::format payoffs_filepat("%s_%03d_precomputed.protodata");
 
 	// Create a thread pool and dispatcher
 	int concurrency = opts["concurrency"].as<int>();
@@ -381,7 +422,7 @@ int main(int argc, char **argv) {
 		concurrency = boost::thread::hardware_concurrency();
 	}
 	thread_pool pool(concurrency);
-	ThreadLocal<FrameProcessor> processors;
+	ThreadLocal<FrameProcessor> processor;
 
 	// Process each sequence
 	Map maps[sequences.size()];
@@ -390,16 +431,14 @@ int main(int argc, char **argv) {
 		maps[i].LoadWithGroundTruth(GetMapPath(sequences[i]), gt_maps[i]);
 		for (int j = 0; j < maps[i].kfs.size(); j += frame_stride) {
 			KeyFrame& frame = maps[i].kfs[j];
-			fs::path payoffs_file = payoffs_dir / str(payoffs_filepat % sequences[i] % frame.id);
-			boost::function<void()> job = boost::bind(&FrameProcessor::Process,
-																								boost::bind(&ThreadLocal<FrameProcessor>::Get, &processors),
-																								ref(frame),
-																								payoffs_file.string(),
-																								ref(gt_maps[i]));
 			if (concurrency == 1) {
-				job();
+				processor->Process(frame, sequences[i], gt_maps[i]);
 			} else {
-				pool.add(job);
+				pool.add(boost::bind(&FrameProcessor::Process,
+														 boost::bind(&ThreadLocal<FrameProcessor>::Get, &processor),
+														 ref(frame),
+														 ref(sequences[i]),
+														 ref(gt_maps[i])));
 			}
 		}
 	}

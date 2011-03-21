@@ -10,7 +10,7 @@
 #include "TooN/LU.h"
 
 #include "common_types.h"
-#include "map.pb.h"
+#include "vector.pb.h"
 
 #include "numeric_utils.tpp"
 #include "range_utils.tpp"

@@ -1,9 +1,16 @@
-function [ y output ] = evaluate_manhattan_dp( x, precompute )
+function [ y output ] = evaluate_manhattan_dp( x, precompute, args )
 %EVALUATE_MANHATTAN_DP Summary of this function goes here
 %   Detailed explanation goes here
 
-default precompute = 0;
+if (nargin < 2)
+    precompute = 0;
+end
 
+if (nargin < 3)
+    args = '';
+end
+    
+    
 if (length(x) ~= 5)
     error(['Expected 7 parameters, got ' num2str(length(x))]);
 end
@@ -25,10 +32,13 @@ sequences = {...
 
 sequences = {...
     'lab_foyer1'; ...
-    'exeter_mcr1'; ...
+    'lab_foyer2'; ...
+    'som_corr1'; ...
+    'lab_ground1'; ...
+    'lab_kitchen1'; ...
     };
 
-frame_stride = 50;
+frame_stride = 10;
 
 occlusion_penalty = x(1);
 mono_weight = x(2);
@@ -58,7 +68,9 @@ else
     cmd = [cmd ' --load_payoffs=PrecomptuedData'];
 end
 
-%
+cmd = [cmd ' ' args];
+
+% Print command
 fprintf('Command: %s\n', cmd);
 
 % Execute command
