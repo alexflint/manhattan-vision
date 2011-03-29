@@ -192,11 +192,11 @@ int main(int argc, char **argv) {
 		J_model_loglik[1] = -n2 - (exp2-exp12)/bottom;
 
 		// temp
-		DLOG << model_loglik;
+		/*DLOG << model_loglik;
 		DLOG << J_model_loglik;
 		DLOG << ftr_loglik;
 		DLOG << J_ftr_loglik;
-		return 0;
+		return 0;*/
 
 		// Accumulate
 		loglik += model_loglik + ftr_loglik;

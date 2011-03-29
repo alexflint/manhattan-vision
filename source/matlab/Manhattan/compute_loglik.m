@@ -1,4 +1,4 @@
-function [ model_loglik J_model_loglik ftr_loglik J_ftr_loglik cmd ] = compute_loglik( x, feature_set, args )
+function [ loglik J_loglik cmd ] = compute_loglik( x, feature_set, args )
 %COMPUTE_LOGLIK Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -40,6 +40,6 @@ cmd = [cmd ' ' args];
 fprintf('Command: %s\n', cmd);
 
 % Execute command and parse results
-[ model_loglik J_model_loglik ftr_loglik J_ftr_loglik ] = run_executable(cmd, executable_dir);
+[ loglik J_loglik ] = run_executable(cmd, executable_dir);
 
 end
