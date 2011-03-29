@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common_types.h"
+#include "line_segment.h"
 
 #include "floorplan_renderer.h"
 
@@ -23,6 +24,11 @@ namespace indoor_context {
 		int nwalls;
 		// Total number of occluding corners (always less than nwalls)
 		int nocclusions;
+		// Vertices of the floor/wall boundary in image coordinates, as
+		// start,end pairs.
+		vector<LineSeg> floor_segments;
+		vector<LineSeg> ceil_segments;
+		vector<int> segment_orients;  // orientation of vertices above
 
 		// Construct empty
 		ManhattanGroundTruth();
@@ -33,8 +39,8 @@ namespace indoor_context {
 		void Compute(const proto::FloorPlan& gt_floorplan,
 								 const PosedCamera& camera);
 		// Count walls and occlusions (called automatically by Compute)
-		void CountWalls(const proto::FloorPlan& gt_floorplan,
-										const PosedCamera& camera);
+		void ProcessWalls(const proto::FloorPlan& gt_floorplan,
+											const PosedCamera& camera);
 
 		// Get an image with labels drawn from {0,1,2} 
 		const MatI& orientations() const { return renderer.orientations(); }

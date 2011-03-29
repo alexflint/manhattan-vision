@@ -15,15 +15,15 @@
 #include "matrix_traits.tpp"  // for CHECK_SAME_SIZE etc, generates no extra includes
 
 // Turn a C++ expression into "expr: <value-of-expr>\n"
-#define EXPR_STR(x) AssertionManager::GetExprStr(#x,x)
+#define EXPR_STR(x) NS::AssertionManager::GetExprStr(#x,x)
 
 // The basic assertion
 //    Usage: CHECK(myVariable.someBooleanFunc(foo)) << "the function failed for args " << foo;
 #define CHECK(x)															\
 		if (!(x))															\
-			if (DelayedError __delayed_error = -1)							\
+			if (NS::DelayedError __delayed_error = -1)	\
 				__delayed_error <<											\
-					"Check failed: '" #x "'\n  at " __FILE__ ":" << __LINE__ << endl
+					"Check failed: '" #x "'\n  at " __FILE__ ":" << __LINE__ << std::endl
 
 // Check that an arbitrary binary operation evaluates to true
 #define CHECK_BINOP(x,op,y)												\
@@ -67,7 +67,7 @@
 
 // Check that two objects are the same size. Uses matrix_size() from matrix_utils.tpp
 #define CHECK_SAME_SIZE(a,b)										\
-	CHECK_EQ(matrix_size(a), matrix_size(b))
+	CHECK_EQ(NS::matrix_size(a), NS::matrix_size(b))
 
 // Check that a 2D vector is within the bounds of a matrix
 #define CHECK_POS(pos, m)														\

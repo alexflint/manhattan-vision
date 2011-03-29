@@ -26,3 +26,12 @@ message PayoffFeatures {
 	repeated MatF stereo = 32;
 }
 
+message FrameWithFeatures {
+	required string sequence = 1;  // name of the sequence
+	required int32 frame_id = 2;  // ID of the frame within the sequence
+	required PayoffFeatures features = 5;
+}
+
+message PayoffFeatureSet {
+	repeated FrameWithFeatures frames = 1;
+}

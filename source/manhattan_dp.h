@@ -235,6 +235,9 @@ namespace indoor_context {
 		// Clone this object
 		void CopyTo(DPPayoffs& other);
 
+		// Sum over a path (e.g. representing a candidate solution)
+		double SumOverPath(const VecI& path, const VecI& orientations) const;
+
 		// Add a payoff matrix weighted by a constant
 		void Add(const DPPayoffs& other, double weight=1.0);
 		// Add a payoff matrix to both wall_scores[0] and wall_scores[1], multiplied by a constant.

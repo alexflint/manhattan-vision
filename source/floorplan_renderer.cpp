@@ -40,9 +40,13 @@ void FloorPlanRenderer::Reset(double zfloor, double zceil) {
 	// Render the floor and ceiling planes.
 	renderer_.RenderInfinitePlane(zfloor, kVerticalAxis);
 	renderer_.RenderInfinitePlane(zceil, kVerticalAxis);
-}																
+}
 
-	void FloorPlanRenderer::RenderWall(const Vec2& u, const Vec2& v, double zfloor, double zceil) {
+int FloorPlanRenderer::GetWallOrientation(const Vec2& u, const Vec2& v) {
+	return abs(u[0]-v[0]) > abs(u[1]-v[1]) ? 1 : 0;
+}
+
+void FloorPlanRenderer::RenderWall(const Vec2& u, const Vec2& v, double zfloor, double zceil) {
 	// Construct the quad
 	Polygon<4> wall;
 	wall.verts[0] = concat(u, zceil);
@@ -51,7 +55,7 @@ void FloorPlanRenderer::Reset(double zfloor, double zceil) {
 	wall.verts[3] = concat(u, zfloor);
 
 	// Label surfaces by their normal direction
-	int label = abs(u[0]-v[0]) > abs(u[1]-v[1]) ? 1 : 0;
+	int label = GetWallOrientation(u, v);
 	renderer_.Render(wall.verts[0], wall.verts[1], wall.verts[2], label);
 	renderer_.Render(wall.verts[0], wall.verts[2], wall.verts[3], label);
 

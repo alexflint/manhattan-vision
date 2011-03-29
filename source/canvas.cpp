@@ -75,7 +75,7 @@ void Canvas::PopState() {
 void Canvas::SetColor(const PixelRGB<byte>& p) {
 	// The VW convention for alpha is 0=opaque, 255=transparent but
 	// the Cairo convention is 0=transparent, 1=opaque
-	c_->set_source_rgba(1.0*p.r/255.0, 1.0*p.g/255.0, 1.0*p.b/255.0, 1.0-(1.0*p.alpha/255.0));
+	c_->set_source_rgba(1.*p.r/255., 1.*p.g/255., 1.*p.b/255., 1.-(1.*p.alpha/255.));
 }
 
 void Canvas::SetLineWidth(double v) {
@@ -91,7 +91,7 @@ void Canvas::SetLineCap(Cairo::LineCap v) {
 }
 
 void Canvas::SetLineDash(vector<double>& pattern) {
-	c_->set_dash(pattern, 0.0);  // second param is the offset at which to start
+	c_->set_dash(pattern, 0.);  // second param is the offset at which to start
 }
 
 void Canvas::SetLineDash(double length) {
@@ -111,7 +111,7 @@ void Canvas::SetLineDash(bool enabled) {
 }
 
 void Canvas::DrawDot(const Vec2& c) {
-	DrawDot(c, 1.0);
+	DrawDot(c, 1.);
 }
 
 void Canvas::DrawDot(const Vec2& c, const PixelRGB<byte>& color) {
@@ -120,7 +120,7 @@ void Canvas::DrawDot(const Vec2& c, const PixelRGB<byte>& color) {
 }
 
 void Canvas::DrawDot(const Vec2& c, double radius) {
-	c_->arc(c[0], c[1], radius, 0.0, 2.0*M_PI);
+	c_->arc(c[0], c[1], radius, 0., 2.*M_PI);
 	c_->fill();
 }
 
@@ -154,13 +154,13 @@ void Canvas::Clear(const PixelRGB<byte>& bg_color) {
 }
 
 void Canvas::DrawImageRescaled(const MatF& image, double alpha) {
-	float scale = 255.0 / image.MaxValue();
+	float scale = 255. / image.MaxValue();
 	ImageRGB<byte> buffer(image.Cols(), image.Rows());
 	for (int y = 0; y < image.Rows(); y++) {
 		const float* in = image[y];
 		PixelRGB<byte>* out = buffer[y];
 		for (int x = 0; x < image.Cols(); x++) {
-			out[x].r = out[x].g = out[x].b = 255*pow(scale*in[x]/255.0, 2.0);
+			out[x].r = out[x].g = out[x].b = 255*pow(scale*in[x]/255., 2.);
 		}
 	}
 	ResetAlpha(buffer);
@@ -194,7 +194,7 @@ void Canvas::DrawImage(const ImageRGB<byte>& image, double alpha) {
 	// Draw the surface
 	PushState();
 	c_->set_source(surf, 0, 0);  // the last two parameters are the x and y offset
-	if (alpha == 1.0) {
+	if (alpha == 1.) {
 		c_->paint();
 	} else {
 		c_->paint_with_alpha(alpha);

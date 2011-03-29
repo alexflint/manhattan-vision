@@ -16,44 +16,40 @@ namespace indoor_context {
 		gettimeofday(&start, NULL);
 	}
 
-	Timer::Timer(const string& s) : str(s) {
-		gettimeofday(&start, NULL);
-	}
-
 	ostream& operator<<(ostream& o, const Timer& t) {	
 		struct timeval end;
 		gettimeofday(&end, NULL);
 		long dt = (end.tv_usec - t.start.tv_usec) + (end.tv_sec - t.start.tv_sec) * US_PER_SEC;
 
-		o << t.str << ": ";
 		if (dt > US_PER_MIN) {
 			long mins = dt / US_PER_MIN;
 			long secs = (dt % US_PER_MIN) / US_PER_SEC;
-			o << boost::format("%ldm%lds") % mins % secs << endl;
+			return o << boost::format("%ldm%lds") % mins % secs;
 		} else if (dt > US_PER_SEC) {
 			float secs = 1. * dt / US_PER_SEC;
-			o << boost::format("%.3fs") % secs << endl;
+			return o << boost::format("%.3fs") % secs;
 		} else if (dt > US_PER_MS) {
 			float millis = 1. * dt / US_PER_MS;
-			o << boost::format("%.3fms") % millis << endl;
+			return o << boost::format("%.3fms") % millis;
 		} else {
-			o << boost::format("%ldus") % dt << endl;
+			return o << boost::format("%ldus") % dt;
 		}
-
-		return o;
 	}
 
+	ostream& operator<<(ostream& o, const ScopedTimer& t) {	
+		return o << t.title << ": " << t.timer << endl;
+	}
 
 	ScopedTimer::ScopedTimer() {
 	}
 
-	ScopedTimer::ScopedTimer(const char* s) : t(s) {
+	ScopedTimer::ScopedTimer(const char* s) : title(s) {
 	}
 
-	ScopedTimer::ScopedTimer(const string& s) : t(s) {
+	ScopedTimer::ScopedTimer(const string& s) : title(s) {
 	}
 
 	ScopedTimer::~ScopedTimer() {
-		DLOG << t;
+		DLOG << (*this);
 	}	
 }

@@ -185,6 +185,7 @@ fs::path payoffs_dir;
 bool load_payoffs, store_payoffs, evaluate;
 
 bool draw_solutions;
+bool draw_ground_truth;
 fs::path visualization_dir;
 
 Parameters params;
@@ -272,7 +273,7 @@ public:
 			}
 
 			// Visualize?
-			if (draw_solutions) {
+			if (draw_solutions || draw_ground_truth) {
 				if (!frame.image.loaded()) {
 					frame.LoadImage();
 				}
@@ -283,7 +284,12 @@ public:
 				viz_filepat.bind_arg(3, frame.id);
 
 				// Draw solution
-				recon.OutputSolution(str(viz_filepat % "solution"));
+				if (draw_solutions) {
+					recon.OutputSolution(str(viz_filepat % "solution"));
+				}
+				if (draw_ground_truth) {
+					gt.OutputOrientations(frame.image.rgb, str(viz_filepat % "gt"));
+				}
 			}
 		}
 	}
@@ -352,6 +358,7 @@ int main(int argc, char **argv) {
 
 		("visualization_dir", po::value<string>()->default_value("out"), "directory for visualization output")
 		("draw_solutions", "draw solutions as PNGs in output directory")
+		("draw_ground_truth", "draw ground truth as PNGs in output directory")
 		;
 
 	// Parse options
@@ -382,7 +389,8 @@ int main(int argc, char **argv) {
 	// Output dir
 	visualization_dir = opts["visualization_dir"].as<string>();
 	draw_solutions = opts.count("draw_solutions") > 0;
-	if (draw_solutions) {
+	draw_ground_truth = opts.count("draw_ground_truth") > 0;
+	if (draw_solutions || draw_ground_truth) {
 		fs::create_directory(visualization_dir);
 	}
 

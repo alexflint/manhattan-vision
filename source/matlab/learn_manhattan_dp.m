@@ -84,28 +84,28 @@ function [weights loaded_cases]=learn_manhattan_dp(cases)
   %                                               SVM struct callbacks
   % ------------------------------------------------------------------
 
-  function delta = lossCB(param, estimated, ground_truth)
+  function delta = lossCB(~, estimated, ground_truth)
 	  disp('### Computing loss ###');
     delta = get_pixel_loss(estimated, ground_truth);
     %check prod(size(delta)) == 1;
     disp('# Done. #')
   end
 
-  function psi = featureCB(param, casedata, soln)
+  function psi = featureCB(~, casedata, soln)
 	  disp('### Computing psi ###');
 		psi = sparse(get_psi(casedata.pixel_features, casedata.wall_features, soln));
     check size(psi,2) == 1;
     disp('# Done. #')
   end
 
-  function soln = classifyCB(param, model, casedata)
+  function soln = classifyCB(~, model, casedata)
 	  disp('### Doing Inference ###');
     weights = unpack_weights(model.w', pix_ftr_size, wall_ftr_size);
     soln = reconstruct(casedata, weights);
     disp('# Done. #')
   end
 
-  function contra_soln = marginCB(param, model, casedata, ground_truth)
+  function contra_soln = marginCB(~, model, casedata, ground_truth)
   % find margin-rescaling largest violation
   % argmax_y delta(yi, y) + < psi(x,y), w >
 	  disp('### Finding most-violated constraint ###');

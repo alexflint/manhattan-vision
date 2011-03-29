@@ -400,6 +400,18 @@ void DPPayoffs::Resize(Vec2I size) {
 	wall_scores[1].Resize(size[1], size[0], 0);
 }
 
+double DPPayoffs::SumOverPath(const VecI& path, const VecI& orients) const {
+	CHECK_EQ(path.Size(), nx());
+
+	double score = 0.0;
+	for (int x = 0; x < path.Size(); x++) {
+		CHECK_INTERVAL(orients[x], 0, 1);
+		CHECK_INTERVAL(path[x], 0, ny()-1);
+		score += wall_scores[ orients[x] ][ path[x] ][ x ];
+	}
+	return score;
+}
+
 void DPPayoffs::Add(const DPPayoffs& other, double weight) {
 	CHECK_SAME_SIZE(other.wall_scores[0], wall_scores[0]);
 	CHECK_SAME_SIZE(other.wall_scores[1], wall_scores[1]);
@@ -670,7 +682,8 @@ void ManhattanDP::PopulateSolution(const DPSubSolution& soln_node) {
 		CHECK(state.col <= geom->grid_size[0]);  // state.col==geom->grid_size[0] is permitted
 		if (state.dir == DPState::DIR_OUT) {
 			int vpt_col = geom->vpt_cols[state.axis];
-			double m = (state.row-geom->horizon_row)/static_cast<double>(state.col-vpt_col);
+			double m = (state.row - geom->horizon_row)
+				/ static_cast<double>(state.col - vpt_col);
 			double c = geom->horizon_row - m*vpt_col;
 			for (int x = state.col-1; x >= next.col; x--) {
 				solution.path_ys[x] = roundi(m*x + c);

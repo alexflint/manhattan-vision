@@ -31,22 +31,23 @@
 namespace indoor_context {
 	// Starts a timer on construction.
 	struct Timer {
-		const std::string str;
 		struct timeval start;
 		Timer();
-		Timer(const std::string& s);
 	};
 
 	// Starts a timer on construction and reports its value on destruction
 	struct ScopedTimer {
-		Timer t;
+		Timer timer;
+		std::string title;
 		ScopedTimer();
-		ScopedTimer(const char* s);
-		ScopedTimer(const std::string& s);
+		ScopedTimer(const char* title);
+		ScopedTimer(const std::string& title);
 		~ScopedTimer();
 		inline operator bool() { return true; }
 	};
 
 	// Stream insertion for timer
 	std::ostream& operator<<(std::ostream& o, const Timer& t);
+	// Stream insertion for scoped timer
+	std::ostream& operator<<(std::ostream& o, const ScopedTimer& t);
 }

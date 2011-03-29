@@ -92,6 +92,11 @@ Map::Map() {
 }
 
 void Map::Load(const string& path) {
+	frames.clear();
+	kfs.clear();
+	kfs_by_id.clear();
+	pts.clear();
+
 	// Read the keyframe files one-by-one
 	TiXmlDocument doc;
 	CHECK(doc.LoadFile(path.c_str())) << "Failed to load " << path;

@@ -36,6 +36,9 @@ public:
 	// Reset with just the infinite floor and ceiling planes
 	void Reset(double zfloor, double zceil);
 
+	// Get the binary orientation label for a wall
+	int GetWallOrientation(const Vec2& u, const Vec2& v);
+
 	// Render orientations
 	void Render(const proto::FloorPlan& floorplan);
 	void Render(const proto::Model& model);

@@ -130,19 +130,19 @@ SET( EXTERNAL_LIBRARIES
 	-ljpeg # for GIL
 	-lpng  # for GIL
 
-  #-lcvd
-  #-lGKTools
   #${GraphCuts_LIBRARIES}
 	#${libfreenect_LIBRARIES}
 
 	# Only for stereotracks
 	${EIGEN3_LIBRARIES}
-	#${Yaml-cpp_LIBRARIES}
 
 	# Profiling libraries (empty unless USE_CPU_PROFILER / USE_TCMALLOC are true)
 	${CPU_PROFILER_LIBRARIES}
 	${TCMALLOC_LIBRARY}
 )
+
+# Use boost_filesystem version 3
+ADD_DEFINITIONS( "-DBOOST_FILESYSTEM_VERSION=3" )
 
 # If in release mode then compile Eigen without bounds checking
 IF (CMAKE_BUILD_TYPE STREQUAL "Release" OR
@@ -262,6 +262,7 @@ ADD_LIBRARY( manhattan SHARED
 	stereo_payoffs.cpp
 	point_cloud_payoffs.cpp
 	joint_payoffs.cpp
+	payoff_helpers.cpp
 
 	manhattan_bnb.cpp
 
@@ -298,7 +299,6 @@ SET( EXECUTABLES
 	predict_orientations
 	
 	render_floorplan
-	
 
 	poster_lines
 	poster_vpts
@@ -320,6 +320,8 @@ SET( EXECUTABLES
 	generate_video
 
 	dp_optimization_wrapper
+	compute_payoff_features
+	compute_loglik
 
 	inspect_geometry
 	test_gt_walls
@@ -348,7 +350,7 @@ SET( EXECUTABLES
 	gil_test
 	image_test
 	thread_pool_test
-	test_eigen
+	eigen_test
 )
 
 FOREACH( EXECUTABLE ${EXECUTABLES} )

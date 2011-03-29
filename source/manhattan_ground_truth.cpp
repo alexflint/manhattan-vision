@@ -11,13 +11,14 @@
 #include "clipping.h"
 #include "geom_utils.h"
 
+#include "image_utils.tpp"
 #include "vector_utils.tpp"
 #include "numeric_utils.tpp"
 
 namespace indoor_context {
 	using namespace toon;
 
-	// Some tools for CountWalls below...
+	// Some tools for ProcessWalls below
 	namespace {
 		struct Interval {
 			double lo, hi;
@@ -70,7 +71,7 @@ namespace indoor_context {
 		floorplan = &gt_floorplan;
 		camera = &cam;
 
-		CountWalls(gt_floorplan, cam);
+		ProcessWalls(gt_floorplan, cam);
 
 		renderer.Configure(cam);
 		renderer.Render(gt_floorplan);
@@ -89,8 +90,12 @@ namespace indoor_context {
 		return floorplan->zceil();
 	}
 
-	void ManhattanGroundTruth::CountWalls(const proto::FloorPlan& fp,
-																				const PosedCamera& pc) {
+	void ManhattanGroundTruth::ProcessWalls(const proto::FloorPlan& fp,
+																					const PosedCamera& pc) {
+		// Initialize
+		nocclusions = 0;
+		nwalls = 0;
+
 		// First strip out the NaN vertices
 		vector<Vec2> verts;
 		for (int i = 0; i < fp.vertices_size(); i++) {
@@ -108,7 +113,7 @@ namespace indoor_context {
 		Interval xbounds(ret_vrect_bounds.left(), ret_vrect_bounds.right());
 
 		// Note that the floorplan vertices do _not_ wrap around
-		Vec3 focal_line = makeVector(0, -1, 1e-6);  // cam coords: corresponds to {y>eps}
+		Vec3 focal_line = makeVector(0, -1, 1e-6);
 
 		vector<Vec3> lines;
 		vector<Interval> intervals;
@@ -118,12 +123,11 @@ namespace indoor_context {
 			Vec3 a_flat = makeVector(a_cam[0], a_cam[2], 1.0);  // y coord no longer matters, and now homogeneous
 			Vec3 b_flat = makeVector(b_cam[0], b_cam[2], 1.0);  // y coord no longer matters, and now homogeneous
 			bool nonempty = ClipAgainstLine(a_flat, b_flat, focal_line, -1);
-			// this must come after clipping...
 			if (nonempty) {
+				// project() must come after clipping
 				Vec2 a0 = project(a_flat);
 				Vec2 b0 = project(b_flat);
-				Interval iv(a0[0]/a0[1], b0[0]/b0[1]);
-				intervals.push_back(iv);
+				intervals.push_back(Interval(a0[0]/a0[1], b0[0]/b0[1]));
 				lines.push_back(a_flat ^ b_flat);
 			}
 		}
@@ -137,7 +141,7 @@ namespace indoor_context {
 				if (isct.empty()) {
 					interval_comp[i][j] = i>j ? 1 : -1;
 				} else {
-					double m = (isct.hi + isct.lo) / 2.0;
+					double m = (isct.hi + isct.lo) / 2.;
 					double zi = -lines[i][2] / (lines[i][0]*m + lines[i][1]);
 					double zj = -lines[j][2] / (lines[j][0]*m + lines[j][1]);
 					interval_comp[i][j] = zi > zj ? 1 : -1;
@@ -151,23 +155,27 @@ namespace indoor_context {
 			tokens.push_back(Token(intervals[i].lo, i, true));
 			tokens.push_back(Token(intervals[i].hi, i, false));
 		}
+		// Add tokens for left and right image bounds
+		tokens.push_back(Token(xbounds.lo, -1, true));
+		tokens.push_back(Token(xbounds.hi, -1, false));
 		sort_all(tokens);
 
-		// Initialize
-		nocclusions = 0;
-		nwalls = 1;  // walls are only counted if their leftmost edge is
-                 // inside the image bounds but there will always be
-                 // exactly one visible wall with leftmost edge
-                 // outside the image
-
 		// Walk from left to right
+		vector<Vec2> xs;
 		int prev = -1;
+		bool inbounds = false;
+		bool done = false;
 		VecI active(intervals.size(), 0);
 		TableComp comp(interval_comp);
 		priority_queue<int,vector<int>,TableComp> heap(comp);
-		for (int i = 0; i < tokens.size() && tokens[i].x < xbounds.hi; i++) {
-			// Update the heap
-			if (tokens[i].activate) {
+		for (int i = 0; !done; i++) {
+			// Process next token
+			bool bound_token = tokens[i].index == -1;
+			if (bound_token && tokens[i].activate) {
+				inbounds = true;
+			} else if (bound_token && !tokens[i].activate) {
+				done = true;
+			} else if (tokens[i].activate) {
 				active[tokens[i].index] = true;
 				heap.push(tokens[i].index);
 			} else {
@@ -177,24 +185,75 @@ namespace indoor_context {
 				}
 			}
 
-			// Count the walls
-			if (i == tokens.size()-1) {
-				DLOG << "Warning: Floorplan does not fully span the image in CountWalls().\n"
-						 << "Continuing for now, but the depth errors will likely be wrong.\n"
-						 << EXPR_STR(tokens[i].x)
-						 << EXPR_STR(xbounds.hi)
-						 << EXPR_STR(tokens.size());
-			} else if (tokens[i+1].x > tokens[i].x+1e-8) {
-				CHECK(!heap.empty()) << "Floorplan does not fully span the image";
-				if (heap.top() != prev && tokens[i].x > xbounds.lo) {
-					nwalls++;
-					if (prev == -1 || RingDist<int>(prev, heap.top(), intervals.size()) > 1) {
-						nocclusions++;
+			double xcur = tokens[i].x;
+			if ((tokens[i+1].x-xcur) > 1e-8) {
+				int cur = heap.empty() ? -1 : heap.top();
+
+				// Count walls
+				if (inbounds && (cur != prev || bound_token)) {
+					if (!done) {
+						nwalls++;
+						if (!bound_token && RingDist<int>(prev, cur, intervals.size()) > 1) {
+							nocclusions++;
+						}
+					}
+
+					// Reconstruct vertices
+					vector<int> to_add;
+					if (!xs.empty()) {
+						to_add.push_back(prev);
+					}
+					if (!done) {
+						to_add.push_back(cur);
+					}
+
+					// Compute vertices
+					BOOST_FOREACH(int j, to_add) {
+						const Vec3& line = lines[j];
+						const Interval& intv = intervals[j];
+						Vec2 pflat = project(line ^ makeVector(-1, xcur, 0));
+						Vec3 pcam = makeVector(pflat[0], 0, pflat[1]);
+						Vec3 pworld = pc.pose_inverse() * (ret_vrect_inv * pcam);
+						xs.push_back(pworld.slice<0,2>());
 					}
 				}
-				prev = heap.top();
+				prev = cur;
 			}
+		}
+		CHECK(xs.size()%2 == 0) << EXPR_STR(xs.size());
+
+		// Compile segments
+		segment_orients.clear();
+		floor_segments.clear();
+		ceil_segments.clear();
+		for (int i = 0; i < xs.size(); i += 2) {
+			floor_segments.push_back(LineSeg(pc.WorldToIm(concat(xs[i], fp.zfloor())),
+																			 pc.WorldToIm(concat(xs[i+1], fp.zfloor()))));
+			ceil_segments.push_back(LineSeg(pc.WorldToIm(concat(xs[i], fp.zceil())),
+																			pc.WorldToIm(concat(xs[i+1], fp.zceil()))));
+			segment_orients.push_back(renderer.GetWallOrientation(xs[i], xs[i+1]));
 		}
 	}
 
+	void ManhattanGroundTruth::DrawOrientations(ImageRGB<byte>& canvas, float alpha) {
+		indoor_context::DrawOrientations(orientations(), canvas, alpha);
+	}
+
+	void ManhattanGroundTruth::DrawDepthMap(ImageRGB<byte>& canvas) {
+		DrawMatrixRescaled(depthmap(), canvas);
+	}
+
+	void ManhattanGroundTruth::OutputOrientations(const ImageRGB<byte>& bg,
+																								const string& file) {
+		ImageRGB<byte> canvas;
+		ImageCopy(bg, canvas);
+		DrawOrientations(canvas, 0.35);
+		WriteImage(file, canvas);
+	}
+
+	void ManhattanGroundTruth::OutputDepthMap(const string& file) {
+		ImageRGB<byte> canvas;
+		DrawDepthMap(canvas);
+		WriteImage(file, canvas);
+	}
 }
