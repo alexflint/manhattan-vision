@@ -6,7 +6,7 @@ function [ loglik J_loglik cmd ] = compute_loglik( params, feature_set, args )
 if (nargin < 3)
     args = '';
     if (nargin < 2)
-        feature_set = 'PrecomptuedData/features.protodata';
+        feature_set = 'PrecomputedData/features.protodata';
     end
 end
 
