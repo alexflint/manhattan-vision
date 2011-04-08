@@ -62,9 +62,9 @@ for i = 1:length(sequences)
 end
 
 if (precompute)
-    cmd = [cmd ' --store_payoffs=PrecomptuedData'];
+    cmd = [cmd ' --store_payoffs=PrecomputedData'];
 else
-    cmd = [cmd ' --load_payoffs=PrecomptuedData'];
+    cmd = [cmd ' --load_payoffs=PrecomputedData'];
 end
 
 cmd = [cmd ' ' args];

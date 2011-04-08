@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OUTFILE=PrecomptuedData/features.protodata;
+OUTFILE=PrecomputedData/features.protodata;
 
 ./compute_payoff_features \
 		--sequence lab_kitchen1 \

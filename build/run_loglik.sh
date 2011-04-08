@@ -9,7 +9,7 @@ MIX='.2 .2 .2 .2'
 		--weights="$IDEAL $FALLOFF $NOISE $MIX" \
 		--corner_penalty=1 \
 		--occlusion_penalty=1 \
-		--features=PrecomptuedData/features.protodata \
+		--features=PrecomputedData/features.protodata \
 		$*
 
 ## uncomment for logistic version
