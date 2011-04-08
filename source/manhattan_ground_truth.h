@@ -8,6 +8,7 @@
 namespace indoor_context {
 	namespace proto { class FloorPlan; }
 	class PosedCamera;
+	class DPGeometry;
 
 	// Compute ground truth orientations in a frame from a ground truth
 	// floorplan and camera. Also counts the number of walls and occlusions.
@@ -28,7 +29,8 @@ namespace indoor_context {
 		// start,end pairs.
 		vector<LineSeg> floor_segments;
 		vector<LineSeg> ceil_segments;
-		vector<int> segment_orients;  // orientation of vertices above
+		// Orientation of the vertices above
+		vector<int> segment_orients;
 
 		// Construct empty
 		ManhattanGroundTruth();
@@ -54,6 +56,9 @@ namespace indoor_context {
 		double zfloor() const;
 		// Get the ceiling plane z positions
 		double zceil() const;
+
+		// Compute path+orients representation of the solution
+		void ComputePath(const DPGeometry& geometry, VecI& path, VecI& orients);
 
 		// Visualizations
 		void DrawOrientations(ImageRGB<byte>& canvas, float alpha=1.0);

@@ -10,6 +10,7 @@
 #include "map.pb.h"
 #include "clipping.h"
 #include "geom_utils.h"
+#include "manhattan_dp.h"
 
 #include "image_utils.tpp"
 #include "vector_utils.tpp"
@@ -220,7 +221,7 @@ namespace indoor_context {
 				prev = cur;
 			}
 		}
-		CHECK(xs.size()%2 == 0) << EXPR_STR(xs.size());
+		CHECK(xs.size()%2 == 0) << EXPR(xs.size());
 
 		// Compile segments
 		segment_orients.clear();
@@ -232,6 +233,40 @@ namespace indoor_context {
 			ceil_segments.push_back(LineSeg(pc.WorldToIm(concat(xs[i], fp.zceil())),
 																			pc.WorldToIm(concat(xs[i+1], fp.zceil()))));
 			segment_orients.push_back(renderer.GetWallOrientation(xs[i], xs[i+1]));
+		}
+	}
+
+	void ManhattanGroundTruth::ComputePath(const DPGeometry& geometry, VecI& path, VecI& orients) {
+		int nx = geometry.grid_size[0];
+		int ny = geometry.grid_size[1];
+		path.Resize(nx, -1);
+		orients.Resize(nx, -1);
+
+		// Choose floor or ceiling segments
+		const vector<LineSeg>& segs =
+			(geometry.horizon_row < .5*geometry.grid_size[1]) ?
+			floor_segments :
+			ceil_segments;
+
+		// Compute the path
+		for (int i = 0; i < segs.size(); i++) {
+			Vec3 grid_eqn = geometry.gridToImage.T() * segs[i].eqn();  // for lines we apply H^-T (inverse of transpose)
+			float x0 = geometry.ImageToGrid(segs[i].start)[0];
+			float x1 = geometry.ImageToGrid(segs[i].end)[0];
+			if (x0 > x1) {
+				swap(x0, x1);
+			}
+			for (int x = max(0,floori(x0)); x <= min(nx-1,ceili(x1)); x++) {
+				Vec3 isct = grid_eqn ^ makeVector(1, 0, -x);
+				int y = roundi(project(isct)[1]);
+				// This get messy near the edge of line segments that don't meet perfectly
+				path[x] = Clamp<int>(y, 0, ny-1);
+				orients[x] = segment_orients[i];
+			}
+		}
+		for (int x = 0; x < nx; x++) {
+			CHECK(path[x] != -1) << "Path does not fully span image at x="<<x;
+			CHECK_INTERVAL(orients[x], 0, 1) << "Invalid orientation at x="<<x;
 		}
 	}
 

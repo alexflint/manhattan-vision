@@ -27,7 +27,7 @@ namespace indoor_context {
 		SetUIState(UIState::INSERT);
 		
 		mapWidget.Configure(&map);
-		DREPORT(map.pts.size())
+		DREPORT(map.pts.size());
 		mapWidget.PreRender.add(bind(&FloorPlanEditor::mapWidget_PreRender, this));
 
 		planView.viewOrtho = true;

@@ -184,6 +184,9 @@ ADD_LIBRARY( core SHARED
 	log.cpp
 	check.cpp
 	timer.cpp
+	vararg_utils.cpp
+	streamable.cpp
+	report.cpp
 
 	canny.cpp
 	fast_sobel.cpp
@@ -263,6 +266,7 @@ ADD_LIBRARY( manhattan SHARED
 	point_cloud_payoffs.cpp
 	joint_payoffs.cpp
 	payoff_helpers.cpp
+	likelihoods.cpp
 
 	manhattan_bnb.cpp
 
@@ -293,6 +297,7 @@ SET( EXECUTABLES
 	mws
 	gc_example
 	glut_test
+	jac_test
 	
 	manhattan_colors
 	draw_top_view
@@ -351,6 +356,7 @@ SET( EXECUTABLES
 	image_test
 	thread_pool_test
 	eigen_test
+	expr_test
 )
 
 FOREACH( EXECUTABLE ${EXECUTABLES} )

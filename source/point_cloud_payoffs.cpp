@@ -4,6 +4,7 @@
 #include "map.h"
 #include "manhattan_dp.h"
 #include "colors.h"
+#include "gaussian.h"
 
 #include "canvas.tpp"
 

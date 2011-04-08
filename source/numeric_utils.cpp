@@ -10,46 +10,42 @@
 #include "common_types.h"
 
 namespace indoor_context {
-
-double Gauss1D(double x, double m, double s) {
-	return exp(-(x-m)*(x-m)/(2*s*s)) / (s*sqrt(2*M_PI));
-}
-
-double Gauss2D(const Vec2& x, const Vec2& m, double s) {
-	return exp(-0.5 * norm_sq(m-x) / s) / (2*M_PI*sqrt(s));
-}
-
-double LogSumExp(const VecD& ys) {
-	// Here we scale and then unscale by a factor k to avoid machine
-	// precision issues. Mathematically the result is identical.
-	double sum = 0.0, m = ys.MaxValue();
-	BOOST_FOREACH(const double& y, ys) {
-		sum += exp(y - m);
+	double LogSumExp(double y1, double y2) {
+		double m = max(y1, y2);
+		return log(exp(y1-m) + exp(y2-m)) + m;
 	}
-	return log(sum) + m;
-}
 
-double LogSumExp(const double* ys, int n) {
-	// Here we scale and then unscale by a factor k to avoid machine
-	// precision issues. Mathematically the result is identical.
-	double sum = 0.0, maxy = -INFINITY;
-	for (int i = 0; i < n; i++) {
-		if (ys[i] > maxy) maxy = ys[i];
+	double LogSumExp(const VecD& ys) {
+		// Here we scale and then unscale by a constant m to avoid machine
+		// precision issues.
+		double sum = 0.0, m = ys.MaxValue();
+		BOOST_FOREACH(const double& y, ys) {
+			sum += exp(y - m);
+		}
+		return log(sum) + m;
 	}
-	for (int i = 0; i < n; i++) {
-		sum += exp(ys[i] - maxy);
+
+	double LogSumExp(const double* ys, int n) {
+		// Here we scale and then unscale by a constant m to avoid machine
+		// precision issues.
+		double sum = 0.0, maxy = -INFINITY;
+		for (int i = 0; i < n; i++) {
+			if (ys[i] > maxy) maxy = ys[i];
+		}
+		for (int i = 0; i < n; i++) {
+			sum += exp(ys[i] - maxy);
+		}
+		return log(sum) + maxy;
 	}
-	return log(sum) + maxy;
-}
 
-void NormalizeLogDistr(VecD& ys) {
-	ys -= LogSumExp(ys);
-}
+	void NormalizeLogDistr(VecD& ys) {
+		ys -= LogSumExp(ys);
+	}
 
-VecD LogLikelihoodToDistr(const VecD& ys) {
-	VecD distr = ys;
-	NormalizeLogDistr(distr);
-	return distr.Apply(exp);
-}
+	VecD LogLikelihoodToDistr(const VecD& ys) {
+		VecD distr = ys;
+		NormalizeLogDistr(distr);
+		return distr.Apply(exp);
+	}
 
 }

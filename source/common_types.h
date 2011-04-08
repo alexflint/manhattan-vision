@@ -28,7 +28,8 @@ namespace indoor_context {
 
 // These rely on the above typedefs...
 #include "matrix_types.h"
-#include "log.tpp"
-#include "check.tpp"
+#include "log.tpp"    // defines DLOG and friends
+#include "report.tpp" // defines DREPORT and friends
+#include "check.tpp"  // defines CHECK and friends
 #include "lazyvar.h"
 #include "initialized_ptr.tpp"

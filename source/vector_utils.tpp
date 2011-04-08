@@ -202,12 +202,42 @@ namespace indoor_context {
 	}
 
 	// Concatenate two vectors
+	template <typename T>
+	toon::Vector<toon::Dynamic,T> concat(const toon::Vector<toon::Dynamic,T>& u,
+																			 const toon::Vector<toon::Dynamic,T>& v) {
+		toon::Vector<toon::Dynamic,T> r(u.size()+v.size());
+		r.slice(0, u.size()) = u;
+		r.slice(u.size(), v.size) = v;
+		return r;
+	}
+
+	// Concatenate two vectors
+	template <typename T, int N>
+	toon::Vector<toon::Dynamic,T> concat(const toon::Vector<N,T>& u,
+																			 const toon::Vector<toon::Dynamic,T>& v) {
+		toon::Vector<toon::Dynamic,T> r(N+v.size());
+		r.slice(0, N) = u;
+		r.slice(N, v.size()) = v;
+		return r;
+	}
+
+	// Concatenate two vectors
+	template <typename T, int N>
+	toon::Vector<toon::Dynamic,T> concat(const toon::Vector<toon::Dynamic,T>& u,
+																			 const toon::Vector<N,T>& v) {
+		toon::Vector<toon::Dynamic,T> r(u.size()+N);
+		r.slice(0, u.size()) = u;
+		r.slice(u.size(), N) = v;
+		return r;
+	}
+
+	// Concatenate two vectors
 	template <typename T, int M, int N>
 	toon::Vector<M+N,T> concat(const toon::Vector<M,T>& u, const toon::Vector<N,T>& v) {
 		toon::Vector<M+N,T> r;
 		r.template slice<0,M>() = u;
 		r.template slice<M,N>() = v;
-		return ;
+		return r;
 	}
 
 	// Append a scalar to the end of a vector

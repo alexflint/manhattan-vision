@@ -12,6 +12,7 @@
 
 #include "common_types.h"
 
+#include "io_utils.tpp"
 #include "log.tpp"
 
 namespace indoor_context {
@@ -43,26 +44,31 @@ public:
 };
 
 
-// Ends the current line whenever kNewline is
-// recieved, unless the line has already be ended.
+// Ends the current line whenever kNewline is recieved, unless the
+// line has already be ended.
 class AutoNewlineFilter : public ios::output_filter {
 public:
 	shared_ptr<int> last;  // this is a shared_ptr so all copies are connected
-	inline AutoNewlineFilter() : last(new int(SpecialLogTokens::kNullToken)) { }
+	inline AutoNewlineFilter() : last(new int(SpecialLogTokens::kNewline)) { }
 
 	// Output a char to the stream
 	template <typename Sink>
 	bool put(Sink& dest, int c)  {
 		if (c == SpecialLogTokens::kEndToken) {
 			if (*last == SpecialLogTokens::kNewline) {
-				*last = SpecialLogTokens::kNullToken;
+				//*last = SpecialLogTokens::kNullToken;
 				return true;
 			} else {
-				*last = SpecialLogTokens::kNullToken;
+				*last = SpecialLogTokens::kNewline;
 				return ios::put(dest, SpecialLogTokens::kNewline);
 			}
 		} else {
-			*last = c;
+			// if c < 0 then we must have a special indentation token, which
+			// should be passed through the stream, but ignored for purposes
+			// of deciding when to end the line.
+			if (c >= 0) {
+				*last = c;
+			}
 			return ios::put(dest, c);
 		}
 	}
@@ -182,30 +188,6 @@ void LogManager::EndCurrentLine() {
 LogManager::DelayedNewline::~DelayedNewline() {
 	s.put(SpecialLogTokens::kEndToken);
 	s << flush;
-}
-
-vector<string> LogManager::ParseVaExprs(const string& s) {
-	// We are essentially parsing C++ expressions here... uh oh.
-	// The logic I apply is that commas can only appear in function
-	// calls (or in for loops but they don't have a value so can't be
-	// passed in here), and they must be surrounded by parentheses, so
-	// we should only need to track parentheses, not other types of
-	// brackets
-
-	vector<string> vs;
-	int a = 0, depth = 0;
-	for (int i = 0; i <= s.length(); i++) {
-		if (i == s.length() || (depth == 0 && s[i] == ',')) {
-			vs.push_back(s.substr(a, i-a));
-			a = i+1;
-			while (a < s.length() && s[a] == ' ') a++;
-		} else if (s[i] == '(') {
-			depth++;
-		} else if (s[i] == ')') {
-			depth--;
-		}
-	}
-	return vs;
 }
 
 }

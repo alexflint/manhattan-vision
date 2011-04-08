@@ -18,7 +18,7 @@ void ReadPly(const string& file,
 
 	string magic, line;
 	getline(input, magic);
-	CHECK_EQ(magic, "ply") << "Wrong file format";
+	CHECK(magic == "ply") << EXPR(magic) << "Wrong file format";
 
 	getline(input, line); // trash
 

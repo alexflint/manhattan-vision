@@ -154,7 +154,7 @@ namespace indoor_context {
 		stats.sum_ab += intg_ab.Sum(col, row0, row1);
 
 		float delta_wts = intg_nsamples.Sum(col, row0, row1);
-		CHECK_GE(delta_wts, 0) << EXPR_STR(col) << EXPR_STR(row0) << EXPR_STR(row1);
+		CHECK_GE(delta_wts, 0) << EXPR(col, row0, row1);
 		stats.sum_wts += delta_wts;	// This is _not_ necessarily equal to row1-row0 !
 	}
 
@@ -243,8 +243,8 @@ namespace indoor_context {
 		// Check for NaNs
 		for (int y = 0; y < l_image.ny(); y++) {
 			for (int x = 0; x < l_image.nx(); x++) {
-				CHECK(isfinite(l_image.mono[y][x].y)) << EXPR_STR(x) << EXPR_STR(y) << EXPR_STR(l_image.mono[y][x]);
-				CHECK(isfinite(r_image.mono[y][x].y)) << EXPR_STR(x) << EXPR_STR(y) << EXPR_STR(r_image.mono[y][x]);
+				CHECK(isfinite(l_image.mono[y][x].y)) << EXPR(x, y, l_image.mono[y][x]);
+				CHECK(isfinite(r_image.mono[y][x].y)) << EXPR(x, y, r_image.mono[y][x]);
 			}
 		}
 
@@ -336,7 +336,7 @@ namespace indoor_context {
 				grid_y0 = Clamp<int>(grid_fToC_sy*y + grid_fToC_ty, 0, geom.grid_size[1]-1);
 				grid_y1 = y;
 			}
-			CHECK_LE(y0, y1);
+			CHECK_LE(grid_y0, grid_y1);
 
 			// Compute NCCs for each column
 			for (int x = 0; x < geom.grid_size[0]; x++) {

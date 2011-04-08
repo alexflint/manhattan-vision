@@ -1,3 +1,5 @@
+#pragma once
+
 #include <boost/ptr_container/ptr_vector.hpp>
 
 #include "common_types.h"
@@ -7,26 +9,21 @@
 namespace indoor_context {
 	class JointPayoffGen;
 
-	// Represents monocular, stereo, and 3D payoffs for a particular image
-	class PayoffFeatures {
-	public:
-		DPPayoffs mono_payoffs;
-		ptr_vector<MatF> stereo_payoffs;
-		MatF agreement_payoffs;
-		MatF occlusion_payoffs;
-	};
-
 	// Represents mixing coefficients and complexity penalties for
-	// combining payoff features into a final payoff function
-	class JointPayoffParameters {
+	// manhattan reconstruction.
+	class ManhattanHyperParameters {
 	public:
-		float mono_weight;
-		float agreement_weight;
-		float occlusion_weight;
-		float stereo_weight;
-
+		VecF weights;
 		float corner_penalty;
 		float occlusion_penalty;
+	};
+
+	// Represents monocular, stereo, and 3D payoffs for a particular image.
+	// Currently un-used.
+	class PayoffFeatures {
+	public:
+		ptr_vector<DPPayoffs> features;
+		vector<string> descriptions;
 	};
 
 	// Represents performance statistics for a reconstruction algorithm.
@@ -47,18 +44,17 @@ namespace indoor_context {
 	void UnpackMatrix(const proto::MatF& in, MatF& out);
 	// Unpack a VNL matrix from a protocol buffer
 	void UnpackMatrix(const proto::MatI& in, MatI& out);
+
 	// Pack payoff features into a protocol buffer
-	void PackFeatures(const vector<int>& aux_ids,
-										const JointPayoffGen& joint,
-										proto::PayoffFeatures& data);
+	void PackFeatures(const JointPayoffGen& joint,
+										proto::FrameWithFeatures& data);
 	// Unpack payoff features from a protocol buffer
-	void UnpackFeatures(const proto::PayoffFeatures& data,
+	void UnpackFeatures(const proto::FrameWithFeatures& data,
 											PayoffFeatures& features);
 	// Compile a payoff function from features and mixing parameters. If
 	// not null, the last parameter will be filled with derivatives of
 	// the payoff function with respect to each parameter.
 	void CompilePayoffs(const PayoffFeatures& features,
-											const JointPayoffParameters& params,
-											DPPayoffs& payoffs,
-											ptr_vector<DPPayoffs>* J_payoffs=NULL);
+											const ManhattanHyperParameters& params,
+											DPPayoffs& payoffs);
 }

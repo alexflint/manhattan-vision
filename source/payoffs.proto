@@ -14,22 +14,24 @@ message MatI {
 	repeated int32 entries = 3;
 }
 
-message PayoffFeatures {
-	required MatF mono0 = 11;
-	required MatF mono1 = 12;
-	
-	required MatF occlusion = 21;
-	required MatF agreement = 22;
-	required float agreement_sigma = 23;
-
-	repeated int32 stereo_aux_ids = 31;
-	repeated MatF stereo = 32;
+message PayoffFeature {
+	required MatF left = 5;
+	optional MatF right = 6;  // if omitted then right==left implicitly
+	optional string description = 10;  // human-readable description of this feature set
 }
 
 message FrameWithFeatures {
 	required string sequence = 1;  // name of the sequence
-	required int32 frame_id = 2;  // ID of the frame within the sequence
-	required PayoffFeatures features = 5;
+	required int32 frame_id = 2;
+
+	required MatI orients = 10;  // column vector
+	required MatI path = 11;  // column vector
+
+	required MatF path_features = 20;  // one row per feature
+	required int32 num_walls = 21;
+	required int32 num_occlusions = 22;
+
+	repeated PayoffFeature features = 30;  // might have zero elements
 }
 
 message PayoffFeatureSet {
