@@ -5,6 +5,6 @@ function brief_disp(expr, val)
 disp([expr ' = [' describe_var(val) ']']);
 
 dims = size(val);
-if prod(dims) <= 100
-  disp(val);
+if (numel(dims) <= 100)
+    disp(val);
 end

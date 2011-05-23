@@ -15,7 +15,7 @@ function r=is_simple_expression(expr)
 simplechars = [ '0':'9' '[](){}+-*/^''.<>=~e ' ];
 
 for i = 1:length(expr)
-  if length(strfind(simplechars, expr(i))) == 0
+  if (isempty(strfind(simplechars, expr(i))))
     r = 0;
     return;
   end

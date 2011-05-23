@@ -23,7 +23,7 @@ theta = params(3:length(params));
 cmd = ['./' executable_name];
 cmd = [cmd ' --corner_penalty=' num2str(corner_penalty, '%.18f')];
 cmd = [cmd ' --occlusion_penalty=' num2str(occlusion_penalty, '%.18f')];
-cmd = [cmd ' --weights=''' num2str(theta, '%.18f') ''''];
+cmd = [cmd ' --weights=''' num2str(theta, '%.18f ') ''''];
 cmd = [cmd ' --features=' feature_set];
 cmd = [cmd ' ' args];
 

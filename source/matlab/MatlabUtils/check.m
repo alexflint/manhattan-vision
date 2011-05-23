@@ -4,7 +4,7 @@ function check(varargin)
 %   check size(x) > 0
 %   check 2*x ~= foo(z)
 % Note that CHECK _only_ works without the brackets. For example,
-% check(f==g) will _not_ work expected.
+% check(f==g) will not work as expected.
 
 % Concatenate all the parameters together to form an expression string.
 expr = [varargin{:}];
@@ -36,12 +36,13 @@ try
   % whenever something goes wrong.
   pass = eval(sprintf('f(%d,%d)', caller_nargin, caller_nargout));
 catch me
-  ex = me;
-  pass = 0;
+    % will rethrow later (after reporting as many variables as possible)
+    ex = me;
+    pass = 0;
 end
 
 % Collapse r to a scalar
-while prod(size(pass)) > 1
+while numel(pass) > 1
   pass = all(pass);
 end
 
@@ -76,7 +77,7 @@ if ~pass
     end
   end
   
-  if exist('ex')
+  if exist('ex', 'var')
     ex.throwAsCaller();  % this hides check() from the stack frame
   else
     message = ['Assertion failed: ' expr];
@@ -85,10 +86,11 @@ if ~pass
   % use dbstack here to omit this function from the stack trace
   % printed by matlab
 end
-
+end
 
 
 function transparent_error(errstr)
 % raise an error which does not include the check() function in the
 % stack
 error(struct('message', errstr, 'stack', dbstack(2)));
+end

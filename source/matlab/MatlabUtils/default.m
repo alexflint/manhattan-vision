@@ -1,6 +1,5 @@
 function default(varargin)
 % http://dorophone.blogspot.com/2008/03/creating-simple-macros-in-matlab.html
-varargin
 wb = 1;
 wa = 1;
 vstr = [varargin{:} ';'];
@@ -16,5 +15,5 @@ str = [ '' ...
 '  %s;,'...
 'end'];
 %varargin{:}
-str = sprintf(str,v{1},[varargin{:}])
+str = sprintf(str,v{1},[varargin{:}]);
 evalin('caller', str);
