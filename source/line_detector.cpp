@@ -11,6 +11,7 @@
 #include "canny.h"
 #include "line_detector.h"
 #include "geom_utils.h"
+#include "canvas.h"
 
 #include "eigensystem2d.tpp"
 #include "numeric_utils.tpp"
@@ -51,6 +52,7 @@ namespace indoor_context {
 	}
 
 	void CannyLineDetector::Compute(const ImageBundle& image) {
+		detections.clear();
 		input = &image;
 		image.BuildMono();
 		// Run canny edge detector
@@ -215,10 +217,15 @@ namespace indoor_context {
 	}
 
 	void CannyLineDetector::OutputLineViz(const string& filename) {
-		ImageRGB<byte> canvas;
-		ImageCopy(input->rgb, canvas);
-		ResetAlpha(canvas);
-		Draw(canvas);
-		WriteImage(filename, canvas);
+		FileCanvas canvas(filename, input->rgb);
+		canvas.SetLineWidth(2.2);
+		BrightColors c;
+		for (int i = 0; i < detections.size(); i++) {
+			int a = detections[i].axis;
+			PixelRGB<byte> color = c.Next(); // (a == -1) ? kSpuriousColor : Colors::primary(a);
+			canvas.DrawDot(project(detections[i].seg.start), 2.0, color);
+			canvas.DrawDot(project(detections[i].seg.end), 2.0, color);
+			canvas.StrokeLine(detections[i].seg, color);
+		}
 	}
 }

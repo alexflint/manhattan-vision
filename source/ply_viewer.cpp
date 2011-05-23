@@ -1,7 +1,7 @@
 #include <boost/filesystem.hpp>
-#include <fstream>
+#include <boost/foreach.hpp>
 
-#include "common_types.h"
+#include "entrypoint_types.h"
 #include "viewer3d.h"
 #include "widget3d.h"
 #include "vars.h"
@@ -13,6 +13,25 @@
 
 using namespace indoor_context;
 using namespace std;
+
+void Normalize(vector<pair<Vec3, PixelRGB<byte> > >& points) {
+	Vec3 sum = Zeros;
+	for (int i = 0; i < points.size(); i++) {
+		sum += points[i].first;
+	}
+	Vec3 centre = sum / points.size();
+
+	double radius = 0;
+	for (int i = 0; i < points.size(); i++) {
+		radius = max(radius, norm(points[i].first - centre));
+	}
+
+	double scale = 10. / radius;
+	for (int i = 0; i < points.size(); i++) {
+		points[i].first = scale * (points[i].first - centre);
+	}
+}
+	
 
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
@@ -26,10 +45,16 @@ int main(int argc, char **argv) {
 	// Read the .ply file
 	ColoredPoints points;
 	ReadPly(argv[1], points.vs);
+	Normalize(points.vs);
+
+	DREPORT(points.vs.size());
+	
 
 	// Initialize the viewer
 	Viewer3D viewer;
 	viewer.Add(points, 'p');
+
+	viewer.AddOwned(new GroundPlaneWidget);
 
 	// Create the map
 	scoped_ptr<Map> map;

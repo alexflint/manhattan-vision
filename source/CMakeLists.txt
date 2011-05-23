@@ -15,10 +15,10 @@ SET( CMAKE_MODULE_PATH
 SET( Boost_FIND_QUIETLY OFF )
 FIND_PACKAGE( Boost 1.44.0
 	COMPONENTS date_time filesystem iostreams thread python system program_options
-	REQUIRED )
+	)
 
 # Find required dependencies
-FIND_PACKAGE( Eigen3 )
+#FIND_PACKAGE( Eigen3 )
 FIND_PACKAGE( Protobuf REQUIRED )
 # GL-related
 FIND_PACKAGE( OpenGL REQUIRED )
@@ -105,7 +105,7 @@ INCLUDE_DIRECTORIES(
 	#${GraphCuts_INCLUDE_DIR}
 	${PYTHON_INCLUDE_DIRS}
 	${ZLIB_INCLUDE_DIRS}
-	${EIGEN3_INCLUDE_DIR}
+	#${EIGEN3_INCLUDE_DIR}
 )
 
 # Setup linked libraries
@@ -204,10 +204,12 @@ ADD_LIBRARY( core SHARED
 	line_sweeper.cpp
 	rotation_estimator.cpp
 	map.cpp
+	map_io.cpp
 	vars.cpp
 	colors.cpp
 	mean_shift.cpp
 	line_segment.cpp
+	
 
 	worker.cpp
 	thread_pool.cpp
@@ -298,6 +300,7 @@ SET( EXECUTABLES
 	gc_example
 	glut_test
 	jac_test
+	load_bundle
 	
 	manhattan_colors
 	draw_top_view

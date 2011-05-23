@@ -15,6 +15,11 @@ namespace indoor_context {
 		return log(exp(y1-m) + exp(y2-m)) + m;
 	}
 
+	double LogSumExp(double y1, double y2, double y3) {
+		double m = max(y1, max(y2, y3));
+		return log(exp(y1-m) + exp(y2-m) + exp(y3-m)) + m;
+	}
+
 	double LogSumExp(const VecD& ys) {
 		// Here we scale and then unscale by a constant m to avoid machine
 		// precision issues.

@@ -12,11 +12,11 @@
 namespace indoor_context {
 	// Compute log(exp(y1) + exp(y2)) in a numerically stable way
 	double LogSumExp(double y1, double y2);
-
+	// Compute log(exp(y1) + exp(y2)) in a numerically stable way
+	double LogSumExp(double y1, double y2, double y3);
 	// Compute log( exp(y1)+exp(y2)+...+exp(yn) ) in a numerically
 	// stable way
 	double LogSumExp(const VecD& ys);
-
 	// Compute log( exp(y1)+exp(y2)+...+exp(yn) ) in a numerically
 	// stable way
 	double LogSumExp(const double* ys, int n);

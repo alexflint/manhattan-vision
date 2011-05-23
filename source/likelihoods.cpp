@@ -7,6 +7,11 @@
 #include "vector_utils.tpp"
 
 namespace indoor_context {
+
+	// TODO: compute these by simple average over training set
+	static const double kBgMean = 5;
+	static const double kBgVar = 5;
+
 	using namespace toon;
 	////////////////////////////////////////////////////////////////////
 	ModelLikelihood::ModelLikelihood() {
@@ -113,10 +118,6 @@ namespace indoor_context {
 		CHECK(instance.features_size() != 0)
 			<< "Features were omitted in this dataset. Re-generate with --store_features.";
 
-		// TODO: compute these by simple average over training set
-		static const double kBgMean = 5;
-		static const double kBgVar = 5;
-
 		// Unpack path
 		MatI mpath, morients;
 		UnpackMatrix(instance.path(), mpath);
@@ -159,9 +160,17 @@ namespace indoor_context {
 					double ppath = 1. * path[x] / ny;
 					const double& f = feature_row[ orients[x] ][ x ];
 					double f_mean = ideal_f * Gauss1D(py, ppath, fall_offs[k]);
-					double log_fg_comp = log_fg_prob + FastLogGauss1D(f, f_mean, log_noise_var, sqr_noise_var);
-					double log_bg_comp = log_bg_prob + FastLogGauss1D(f, kBgMean, log_bg_var, sqr_bg_var);
-					frame_loglik += LogSumExp(log_bg_comp, log_fg_comp);
+					double fg_loglik = FastLogGauss1D(f, f_mean, log_noise_var, sqr_noise_var);
+					double bg_loglik = FastLogGauss1D(f, kBgMean, log_bg_var, sqr_bg_var);
+					double fg_logjoint = log_fg_prob + fg_loglik;
+					double bg_logjoint = log_bg_prob + bg_loglik;
+					double logjoint = LogSumExp(fg_logjoint, bg_logjoint);
+					frame_loglik += logjoint;
+
+					// Compute jacobian w.r.t. fg_probs
+					for (int k = 0; k < nf; k++) {
+						J_loglik[nf*3+k] += exp(fg_loglik-logjoint) - exp(bg_loglik-logjoint);
+					}
 				}
 			}
 		}

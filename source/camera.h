@@ -136,6 +136,7 @@ public:
 	PosedCamera(const toon::SE3<>& pose, const CameraBase* cam);
 
 	// Get/set pose
+	toon::SE3<>& pose() { return pose_; }
 	const toon::SE3<>& pose() const { return pose_; }
 	const toon::SE3<>& pose_inverse() const { return invpose_; }
 	void SetPose(const toon::SE3<>& pose);

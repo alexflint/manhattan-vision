@@ -1,6 +1,7 @@
 #include "vw_image_io.h"
 
 #include <boost/gil/extension/io/png_dynamic_io.hpp>
+#include <boost/gil/extension/io/jpeg_dynamic_io.hpp>
 #include <boost/gil/image_view.hpp>
 
 #include <boost/filesystem/path.hpp>
@@ -28,14 +29,35 @@ namespace indoor_context {
 	// Minimal mock of VW imageio routines
 	void ReadImage(const std::string& file, ImageRGB<byte>& image) {
 		CHECK_PRED1(fs::exists, file);
-		point2<ptrdiff_t> size = png_read_dimensions(file);
+
+		// TODO: find a more reliable way to determine file format
+		string ext = fs::path(file).extension().string();
+		bool jpeg = (ext == ".jpg" || ext == ".JPG" || ext == ".jpeg" || ext == ".JPEG");
+
+		// Get size
+		point2<ptrdiff_t> size;
+		if (jpeg) {
+			size = jpeg_read_dimensions(file);
+		} else {
+			size = png_read_dimensions(file);
+		}
+
+		// Allocate image data
 		image.AllocImageData(size.x, size.y);
 		rgba8_view_t v = interleaved_view(image.GetWidth(),
-																								image.GetHeight(),
-																								(rgba8_pixel_t*)image.GetImageBuffer(),
-																								image.GetWidth()*sizeof(PixelRGB<byte>));
-		png_read_and_convert_view(file, v);
-		InvertAlpha(image);  // GIL uses 255=opaque but we use 0=opaque
+																			image.GetHeight(),
+																			(rgba8_pixel_t*)image.GetImageBuffer(),
+																			image.GetWidth()*sizeof(PixelRGB<byte>));
+
+		// Load the image
+		if (jpeg) {
+			jpeg_read_and_convert_view(file, v);
+		} else {
+			png_read_and_convert_view(file, v);
+		}
+
+		// GIL uses 255=opaque but we use 0=opaque
+		InvertAlpha(image);
 	}
 
 	void WriteImage(const std::string& file, const ImageRGB<byte>& image) {
@@ -49,7 +71,7 @@ namespace indoor_context {
 		InvertAlpha(const_cast<ImageRGB<byte>&>(image));
 	}
 
-	void WriteImage(const std::string& file, const ImageMono<float>& image) {
+ 	void WriteImage(const std::string& file, const ImageMono<float>& image) {
 		// Temporary hack until we find out how to do this properly with gil
 		ImageRGB<byte> canvas;
 		ImageConvert(image, canvas);

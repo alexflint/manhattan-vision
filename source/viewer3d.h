@@ -23,9 +23,9 @@ namespace indoor_context {
 	public:
 		// TODO: make all these private
 		// Center around which the camera rotates
-		toon::Vector<3> viewCentre;
+		Vec3 viewCentre;
 		// Rotation of the camera around viewCentre
-		toon::Vector<3> viewRotation;
+		Vec3 viewRotation;
 		// Dist of camera from center (stored as logarithm)
 		double viewLogDist;
 		// Whether the projection is orthographic or perspective (default)
@@ -117,7 +117,7 @@ namespace indoor_context {
 		// Project an object location to the screen. (0,0) is top left corner (i.e. not GL std).
 		toon::Vector<2> ProjectToScreen(const toon::Vector<4>& obj) const;
 		// Project an object location to the screen, assuming the last coord is 1.0.
-		toon::Vector<2> ProjectToScreen(const toon::Vector<3>& obj) const;
+		toon::Vector<2> ProjectToScreen(const Vec3& obj) const;
 
 		// Convert a mouse location to a viewport location
 		toon::Vector<2> WindowToViewport(const toon::Vector<2>& screenPt) const;
@@ -125,7 +125,7 @@ namespace indoor_context {
 		// Project a mouse location in window coordinates to a plane in
 		// 3D. Mouse coords should be as passed to glutMouseMotion
 		// etc. Returns a 3D point on the plane specified by planeEqn.
-		toon::Vector<3> MouseToPlane(const toon::Vector<2> mousePt,
+		Vec3 MouseToPlane(const toon::Vector<2> mousePt,
 				const toon::Vector<4>& planeEqn);
 
 		// Handlers for GLUT callbacks
@@ -181,7 +181,7 @@ namespace indoor_context {
 		// Loads the matrices from GL
 		void Configure(const ImageRef& winSize);
 		// Projects a point through the current matrices
-		toon::Vector<2> Project(const toon::Vector<3>& v) const;
+		toon::Vector<2> Project(const Vec3& v) const;
 	};
 
 

@@ -3,7 +3,7 @@
 #include "manhattan_dp.h"
 
 namespace indoor_context {
-	class KeyFrame;
+	class Frame;
 	class PosedCamera;
 
 	class PointCloudPayoffs {
@@ -34,8 +34,8 @@ namespace indoor_context {
 										 const DPGeometryWithScale& geom);
 		// Compute payoff matrices for consistency with observed landmarks
 		// Slow old implementation for comparison with Compute() only
-		void ComputeSlow(const KeyFrame& frame,
-								 const DPGeometryWithScale& geom);
+		void ComputeSlow(const Frame& frame,
+										 const DPGeometryWithScale& geom);
 
 		// Output points and the projections to floor/ceiling
 		void OutputProjectionViz(const ImageBundle& image,

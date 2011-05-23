@@ -93,15 +93,13 @@ namespace indoor_context {
 		}
 	}
 
-	void PointCloudPayoffs::ComputeSlow(const KeyFrame& frame,
+	void PointCloudPayoffs::ComputeSlow(const Frame& frame,
 																			const DPGeometryWithScale& geom) {
 		CHECK_NOT_NULL(frame.map);
 
 		// Extract all the points visible in this image
 		vector<Vec3> points;
-		BOOST_FOREACH(const Measurement& msm, frame.measurements) {
-			points.push_back(frame.map->pts[msm.point_index]);
-		}
+		frame.GetMeasuredPoints(points);
 
 		// Compute payoffs
 		ComputeSlow(points, frame.image.pc(), geom);

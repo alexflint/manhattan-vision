@@ -27,7 +27,7 @@ namespace indoor_context {
 		SetUIState(UIState::INSERT);
 		
 		mapWidget.Configure(&map);
-		DREPORT(map.pts.size());
+		DREPORT(map.points.size());
 		mapWidget.PreRender.add(bind(&FloorPlanEditor::mapWidget_PreRender, this));
 
 		planView.viewOrtho = true;
@@ -309,12 +309,12 @@ namespace indoor_context {
 		}
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		CHECK_LT(selectedFrameIndex_, map.kfs.size())
-			<< "There are only " << map.kfs.size() << " keyframes";
-		const KeyFrame& kf = map.kfs[selectedFrameIndex_];
-		ImageRef sz = kf.image.pc().image_size();
-		Vector<2> tl = kf.image.pc().retina_bounds().tl();
-		Vector<2> br = kf.image.pc().retina_bounds().br();
+		CHECK_LT(selectedFrameIndex_, map.frames.size())
+			<< "There are only " << map.frames.size() << " frames";
+		const Frame& frame = map.frames[selectedFrameIndex_];
+		ImageRef sz = frame.image.pc().image_size();
+		Vector<2> tl = frame.image.pc().retina_bounds().tl();
+		Vector<2> br = frame.image.pc().retina_bounds().br();
 
 		// Setup a projection matching that of the camera
 		glMatrixMode(GL_PROJECTION);
@@ -345,7 +345,7 @@ namespace indoor_context {
 		glColorP(Colors::red());
 		if (viewType == ViewType::WIREFRAME) {
 			GL_PRIMITIVE(GL_POINTS) {
-				BOOST_FOREACH(const Vector<3>& v, map.pts) {
+				BOOST_FOREACH(const Vector<3>& v, map.points) {
 					glVertexV(v);
 				}
 			}
@@ -406,14 +406,14 @@ namespace indoor_context {
 	}
 
 	void FloorPlanEditor::RenderCamView() {
-		const KeyFrame& kf = map.kfs[selectedFrameIndex_];
+		const Frame& frame = map.frames[selectedFrameIndex_];
 
 		// Draw the frame
 		if (camViewState == ViewType::WIREFRAME) {
-			Vector<2> tl = kf.image.pc().retina_bounds().tl();
-			Vector<2> br = kf.image.pc().retina_bounds().br();
+			Vector<2> tl = frame.image.pc().retina_bounds().tl();
+			Vector<2> br = frame.image.pc().retina_bounds().br();
 			glColorP(Colors::white());
-			camTextures.Select(&kf.image);
+			camTextures.Select(&frame.image);
 			WITHOUT(GL_BLEND) WITH(GL_TEXTURE_2D) GL_PRIMITIVE(GL_QUADS) {
 				glTexCoord2f(0, 0);
 				glVertex3f(tl[0], tl[1], 1);
@@ -428,8 +428,8 @@ namespace indoor_context {
 
 		// Transform to camera coords
 		Matrix<4> mv = Identity;
-		mv.slice<0,0,3,3>() = kf.image.pc().pose().get_rotation().get_matrix();
-		mv.slice<0,3,3,1>() = kf.image.pc().pose().get_translation().as_col();
+		mv.slice<0,0,3,3>() = frame.image.pc().pose().get_rotation().get_matrix();
+		mv.slice<0,3,3,1>() = frame.image.pc().pose().get_translation().as_col();
 		TransformGL(mv);
 
 		// Draw the floorplan
@@ -490,8 +490,8 @@ namespace indoor_context {
 
 	void FloorPlanEditor::mapWidget_PreRender() {
 		int i = selectedFrameIndex_;
-		if (i >= 0 && i < mapWidget.kf_widgets.size()) {
-			mapWidget.kf_widgets[i]->SetSelected(true);
+		if (i >= 0 && i < mapWidget.frame_widgets.size()) {
+			mapWidget.frame_widgets[i]->SetSelected(true);
 		}
 	}
 
@@ -505,10 +505,10 @@ namespace indoor_context {
 	void FloorPlanEditor::anyView_SpecialKeyDown(int key) {
 		switch (key) {
 		case GLUT_KEY_LEFT:
-			SelectFrameByIndex((selectedFrameIndex_+map.kfs.size()-1)%map.kfs.size());
+			SelectFrameByIndex((selectedFrameIndex_+map.frames.size()-1)%map.frames.size());
 			break;
 		case GLUT_KEY_RIGHT:
-			SelectFrameByIndex((selectedFrameIndex_+1)%map.kfs.size());
+			SelectFrameByIndex((selectedFrameIndex_+1)%map.frames.size());
 			break;
 		case GLUT_KEY_F2:
 			enableSnap = !enableSnap;
@@ -517,11 +517,11 @@ namespace indoor_context {
 
 	void FloorPlanEditor::SelectFrameByIndex(int index) {
 		CHECK_GE(index, 0);
-		CHECK_LT(index, map.kfs.size());
-		CHECK_EQ(mapWidget.kf_widgets.size(), map.kfs.size());
+		CHECK_LT(index, map.frames.size());
+		CHECK_EQ(mapWidget.frame_widgets.size(), map.frames.size());
 
 		selectedFrameIndex_ = index;
-		DLOG << "Selected frame ID " << map.kfs[index].id;
+		DLOG << "Selected frame ID " << map.frames[index].id;
 		Invalidate();
 	}
 

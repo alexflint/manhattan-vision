@@ -11,11 +11,6 @@ namespace indoor_context {
 	lazyvar<double> gvRelTol("RotationEstimator.RelTol");
 	lazyvar<double> gvMaxSteps("RotationEstimator.MaxSteps");
 
-	template <typename Matrix>
-	TooN::Vector<2> size(const Matrix& mat) {
-		return TooN::makeVector(mat.num_rows(), mat.num_cols());
-	}
-
 	RotationEstimator::RotationEstimator() : max_steps(*gvMaxSteps) {
 	}
 
@@ -35,9 +30,8 @@ namespace indoor_context {
 		while (!converged && num_steps < max_steps) {
 			Step(data, responsibilities);
 		}
-		DLOG_N << "SO(3) "
-					 << (converged ? "converged" : "did not converge")
-					 << " after "<<num_steps<<" iters. (Precisions:";
+		DLOG_N << (converged ? "Converged" : "Not converged")
+					 << " after "<<num_steps<<" iterations. (Precisions:";
 		BOOST_FOREACH(double x, residuals) {
 			DLOG_N << " " << -floori(log10(x));
 		}

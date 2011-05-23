@@ -7,37 +7,37 @@
 
 namespace indoor_context {
 // Represents a clickable keyframe quad
-class KeyFrameWidget : public Widget3D {
+class FrameWidget : public Widget3D {
 public:
 	// Projection of quad boundary onto the screen
 	Vec2 pa, pb, pc, pd;
 	// Distance from camera centre to image plane, in GL coordinates
 	double retina_z;
 	// The keyframe we represent
-	const KeyFrame& kf;
+	const Frame& frame;
 	// The child line widgets
 	vector<LineWidget*> line_widgets;
 	// The child guided line widgets
 	vector<LineWidget*> guided_line_widgets;
-	// The aggregator for line widgets from kf.line_detector
-	LineWidgetBloc line_bloc;
-	// The aggregator for line widgets from kf.guided_line_detector
-	LineWidgetBloc guided_line_bloc;
+	// The aggregator for line widgets from frame.line_detector
+	//LineWidgetBloc line_bloc;
+	// The aggregator for line widgets from frame.guided_line_detector
+	//LineWidgetBloc guided_line_bloc;
 
 	// Border parameters
 	float border_width;
 	PixelRGB<byte> border_color;
 
 	// Whether to show line segments in this keyframe:
-	// 0=no lines, 1=kf.line_detector, 2=kf.guided_line_detector
-	int line_state;
+	// 0=no lines, 1=frame.line_detector, 2=frame.guided_line_detector
+	//int line_state;
 	// Whether to render the texton map rather than the image
-	bool show_textons;
+	//bool show_textons;
 
 	// Initialize the keyframe widget
 	// retina_z: the distance from the camera center at which the
 	// image is rendered (aesthetic only).
-	KeyFrameWidget(const KeyFrame& kf, double retina_z = 1.0);
+	FrameWidget(const Frame& frame, double retina_z = 1.0);
 	// Draw the keyframe as a quad in 3D
 	virtual void OnRender();
 	// Return true if ths mouse location is inside the rendered keyframe
@@ -48,7 +48,7 @@ public:
 	virtual void OnDoubleClick(int button, const Vec2& mouse);
 
 	// Click handler for lines in the image
-	void Line_Click(int index, const string& label);
+	//void Line_Click(int index, const string& label);
 
 	// Transform to a coordinate frame in which this keyframe's camera
 	// centre is at the origin and the image plane is at z=1.
@@ -67,13 +67,13 @@ public:
 	void ConfigureBorder();
 
 	// Add a line widget for a line in retina coordinates
-	LineWidget& AddLineInRetina(const Vec3& ret_a,
+	/*LineWidget& AddLineInRetina(const Vec3& ret_a,
 	                            const Vec3& ret_b,
 	                            const float width,
-	                            const PixelRGB<byte>& color);
+	                            const PixelRGB<byte>& color);*/
 
 	// Transform a point from undistorted image coordinates to the world
-	Vec3 ImagePtToWorld(const Vec2& retinaPt);
+	Vec3 ImageToWorld(const Vec2& retinaPt);
 	// Project a world point to the retina (but still in world coords)
 	Vec3 WorldToRetina(const Vec3& worldPt);
 };
@@ -93,7 +93,7 @@ public:
 	Event<> SelectedPointChanged;
 	// Screen locations of the points. Updated in OnRender iff
 	// selectable() is true
-	vector<Vec2 > screen_pts;
+	vector<Vec2> screen_pts;
 	// Initialize the widget
 	PointCloudWidget(const vector<Vec3>& points);
 	// Draw the map points as GL_POINTs
@@ -114,7 +114,7 @@ public:
 	// The map
 	const Map* map;
 	// The keyframe widgets. Memory is owned by Viewer3D.
-	vector<KeyFrameWidget*> kf_widgets;
+	vector<FrameWidget*> frame_widgets;
 	// The point cloud widget. Memory is owned by Viewer3D.
 	PointCloudWidget* pts_widget;
 	// The ground plane grid.
@@ -126,7 +126,7 @@ public:
 	// Attach to a map
 	void Configure(const Map* themap);
 	// Register a newly added keyframe and add a widget for it
-	KeyFrameWidget& RegisterKeyFrame(const KeyFrame& kf);
+	FrameWidget& RegisterFrame(const Frame& frame);
 	// Bind keys in the viewer
 	void BindKeys();
 	// Change the retina plane z pos

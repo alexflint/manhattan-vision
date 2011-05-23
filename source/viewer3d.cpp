@@ -10,15 +10,12 @@
 #include "widget3d.h"
 
 #include "gl_utils.tpp"
-//#include "numeric_utils.tpp"
 
 namespace indoor_context {
-using namespace TooN;
+using namespace toon;
 
 double kRotateSpeed = 0.4;
 double kPanSpeed = 0.1;
-
-
 
 
 ///////////////// Viewer3D ///////////////////////
@@ -64,16 +61,16 @@ void Viewer3D::Init(int *argc, char **argv) {
 	GlutWindow::Init(argc, argv);
 }
 
-Vector<2> Viewer3D::ProjectToScreen(const Vector<3>& v) const {
+Vec2 Viewer3D::ProjectToScreen(const Vec3& v) const {
 	projector_->Configure(window().size());
 	return projector_->Project(v);
 }
 
-Vector<2> Viewer3D::ProjectToScreen(const Vector<4>& v) const {
-	return ProjectToScreen(toon::project(v));
+Vec2 Viewer3D::ProjectToScreen(const Vector<4>& v) const {
+	return ProjectToScreen(project(v));
 }
 
-Vector<2> Viewer3D::WindowToViewport(const Vector<2>& w) const {
+Vec2 Viewer3D::WindowToViewport(const Vec2& w) const {
 	Vector<4> vp = GetGLViewport();
 	return makeVector(2.0*(w[0]-vp[0])/vp[2] - 1.0,
 			2.0*(w[1]-vp[1])/vp[3] - 1.0);
@@ -82,10 +79,10 @@ Vector<2> Viewer3D::WindowToViewport(const Vector<2>& w) const {
 // Project a mouse location in window coordinates to a plane in
 // 3D. Mouse coords should be as passed to glutMouseMotion
 // etc. Returns a 3D point on the plane specified by planeEqn.
-Vector<3> Viewer3D::MouseToPlane(const Vector<2> mousePt,
+Vec3 Viewer3D::MouseToPlane(const Vec2 mousePt,
                                  const Vector<4>& planeEqn) {
-	Vector<2> viewPt = makeVector(mousePt[0], window().size().y-mousePt[1]); // invert Y coordinate
-	Vector<2> eyePt = WindowToViewport(viewPt);
+	Vec2 viewPt = makeVector(mousePt[0], window().size().y-mousePt[1]); // invert Y coordinate
+	Vec2 eyePt = WindowToViewport(viewPt);
 	Matrix<4> A = GetGLProjection() * GetGLModelView();
 	A.slice<2,0,1,4>() = planeEqn.as_row();
 	Vector<4> worldPt = LU<>(A).backsub(makeVector(eyePt[0], eyePt[1], 0, 1));
@@ -179,7 +176,7 @@ const vector<Widget3D*>& Viewer3D::children() const {
 	return rootWidget_->children();
 }
 
-Widget3D* Viewer3D::GetWidgetAt(const toon::Vector<2>& mouse) {
+Widget3D* Viewer3D::GetWidgetAt(const Vec2& mouse) {
 	return rootWidget_->GetWidgetAt(mouse);
 }
 
@@ -260,7 +257,7 @@ void Viewer3D::Window_Display() {
 	glDepthMask(GL_TRUE);
 }
 
-void Viewer3D::Window_MouseDown(int button, Vector<2> mousePt) {
+void Viewer3D::Window_MouseDown(int button, Vec2 mousePt) {
 	Widget3D* hit = GetWidgetAt(mousePt);
 	if (hit) {
 		hit->NotifyMouseDown(button, mousePt);
@@ -269,7 +266,7 @@ void Viewer3D::Window_MouseDown(int button, Vector<2> mousePt) {
 	Invalidate();
 }
 
-void Viewer3D::Window_MouseUp(int button, Vector<2> mousePt) {
+void Viewer3D::Window_MouseUp(int button, Vec2 mousePt) {
 	Widget3D* hit = GetWidgetAt(mousePt);
 	if (hit) {
 		hit->NotifyMouseUp(button, mousePt);
@@ -277,7 +274,7 @@ void Viewer3D::Window_MouseUp(int button, Vector<2> mousePt) {
 	Invalidate();
 }
 
-void Viewer3D::Window_Click(int button, Vector<2> mousePt) {
+void Viewer3D::Window_Click(int button, Vec2 mousePt) {
 	Widget3D* hit = GetWidgetAt(mousePt);
 	if (hit) {
 		hit->NotifyClick(button, mousePt);
@@ -285,7 +282,7 @@ void Viewer3D::Window_Click(int button, Vector<2> mousePt) {
 	Invalidate();
 }
 
-void Viewer3D::Window_DoubleClick(int button, Vector<2> mousePt) {
+void Viewer3D::Window_DoubleClick(int button, Vec2 mousePt) {
 	Widget3D* hit = GetWidgetAt(mousePt);
 	if (hit) {
 		hit->NotifyDoubleClick(button, mousePt);
@@ -293,7 +290,7 @@ void Viewer3D::Window_DoubleClick(int button, Vector<2> mousePt) {
 	Invalidate();
 }
 
-void Viewer3D::Window_MouseDrag(int button, Vector<2> mousePt) {
+void Viewer3D::Window_MouseDrag(int button, Vec2 mousePt) {
 	// now fire the event for the specific widget
 	if (hoverWidget_ != NULL && hoverWidget_->draggable()) {
 		hoverWidget_->NotifyMouseDrag(button, mousePt);
@@ -313,7 +310,7 @@ void Viewer3D::Window_MouseDrag(int button, Vector<2> mousePt) {
 	Invalidate();
 }
 
-void Viewer3D::Window_MouseMove(Vector<2> mousePt) {
+void Viewer3D::Window_MouseMove(Vec2 mousePt) {
 	// TODO: should only fire the event for the selected widget
 	rootWidget_->Traverse(bind(&Widget3D::NotifyMouseMove,
 			_1, ref(mousePt)));
@@ -360,8 +357,8 @@ void GluProjector::Configure(const ImageRef& winSize) {
 	glGetIntegerv(GL_VIEWPORT, viewport);
 }
 
-Vector<2> GluProjector::Project(const Vector<3>& v) const {
-	Vector<3> p;
+Vec2 GluProjector::Project(const Vec3& v) const {
+	Vec3 p;
 	gluProject(v[0],v[1],v[2], modelview, projection, viewport, &p[0],&p[1],&p[2]);
 	p[1] = windowSize.y-p[1];  // Move (0,0) to top-left rather than bottom-left
 	glError();

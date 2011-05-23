@@ -1,292 +1,205 @@
-#include <boost/format.hpp>
-#include <boost/filesystem.hpp>
-
 #include <so3.h>
 #include <LU.h>
 #include <determinant.h>
 
+#include <boost/foreach.hpp>
+
 #include "map.h"
-#include "safe_stream.h"
 #include "common_types.h"
-#include "tinyxml.h"
-#include "lazyvar.h"
 #include "image_utils.h"
-#include "vw_image_io.h"
 
 #include "vw_image.tpp"
-#include "io_utils.tpp"
-#include "counted_foreach.tpp"
-#include "vector_utils.tpp"
+//#include "vector_utils.tpp"
 
 namespace indoor_context {
-using namespace toon;
+	using namespace toon;
 
-lazyvar<Vec5> gvDefaultCameraParams("Map.DefaultCameraParameters");
-lazyvar<Vec2> gvDefaultImageSize("Map.DefaultImageSize");
-lazyvar<int> gvLinearizeCamera("Map.LinearizeCamera");
+	void Frame::Configure(Map* m, int i, const string& im_file, const SE3<>& pose) {
+		CHECK(m != NULL);
+		CHECK(m->camera != NULL);
+		map = m;
+		id = i;
+		image_file = im_file;
+		image.pc().SetPose(pose);
+		image.pc().SetCamera(map->camera.get());
+	}
 
-lazyvar<bool> gvLoadOriginalFrames("Map.LoadOriginalFrames");
-lazyvar<string> gvOrigFramesDir("Map.OrigFramesDir");
+	void Frame::LoadImage() {
+		if (!image.loaded()) {
+			image.Load(image_file);
+		}
+	}
+
+	void Frame::UnloadImage() {
+		if (image.loaded()) {
+			image.Unload();
+		}
+	}
+
+	void Frame::GetMeasuredPoints(vector<Vec3>& out) const {
+		CHECK(map != NULL);
+		BOOST_FOREACH(const Measurement& msm, measurements) {
+			out.push_back(map->points[msm.point_index]);
+		}
+	}
 
 
-void Frame::Configure(Map* m, int i, const string& im_file, const SE3<>& pose) {
-	map = m;
-	id = i;
-	image_file = im_file;
-	image.pc().SetPose(pose);
-	image.pc().SetCamera(map->camera.get());
-}
 
-void Frame::LoadImage() {
-	if (!image.loaded()) {
-		image.Load(image_file);
-		/*if (undistort) {
-			UndistortImage();
+
+	void Map::AddFrame(Frame* frame) {
+		frames.push_back(frame);
+		CHECK(frames_by_id.find(frame->id) == frames_by_id.end())
+			<< "A frame with ID=" << frame->id << " already exists";
+		frames_by_id[frame->id] = frame;
+	}
+
+	void Map::LoadAllImages() {
+		if (frames.size() > 100) {
+			DLOG << "Warning: loading " << frames.size() << " images simultaneously";
+		}
+		BOOST_FOREACH(Frame& frame, frames) {
+			frame.LoadImage();
+		}
+	}
+
+	Frame* Map::GetFrameById(int id) {
+		map<int, Frame*>::iterator it = frames_by_id.find(id);
+		if (it == frames_by_id.end()) {
+			return NULL;
+		} else {
+			return it->second;
+		}
+	}
+
+	const Frame* Map::GetFrameById(int id) const {
+		map<int, Frame*>::const_iterator it = frames_by_id.find(id);
+		if (it == frames_by_id.end()) {
+			return NULL;
+		} else {
+			return it->second;
+		}
+	}
+
+	Frame* Map::GetFrameByIdOrDie(int id) {
+		Frame* frame = GetFrameById(id);
+		CHECK_NOT_NULL(frame) << "No frame with ID=" << frame;
+		return frame;
+	}
+
+	const Frame* Map::GetFrameByIdOrDie(int id) const {
+		const Frame* frame = GetFrameById(id);
+		CHECK_NOT_NULL(frame) << "No frame with ID=" << id;
+		return frame;
+	}
+
+	PosedImage& Map::GetImageByIdOrDie(int id) {
+		Frame* f = GetFrameByIdOrDie(id);
+		f->LoadImage();
+		PosedImage& im = f->image;
+		im.BuildMono();
+		return im;
+	}
+
+
+	void Map::Transform(const SE3<>& M) {
+		// Transform the frames
+		SE3<> M_inv = M.inverse();
+		/*BOOST_FOREACH(KeyFrame& kf, kfs) {
+			kf.image.pc().Transform(M_inv);
 			}*/
-	}
-}
+		BOOST_FOREACH(Frame& f, frames) {
+			f.image.pc().Transform(M_inv);
+		}
 
-void Frame::UnloadImage() {
-	if (image.loaded()) {
-		image.Unload();
+		// Transform the points
+		BOOST_FOREACH(Vec3& v, points) {
+			v = M*v;
+		}
 	}
-}
+
+	void Map::Transform(const SO3<>& R) {
+		Vec3 t = Zeros;
+		Transform(SE3<>(R,t));
+	}
+
+	void Map::Translate(const Vec3& delta) {
+		Mat3 R = Identity;
+		Transform(SE3<>(R,delta));
+	}
+
+	void Map::Scale(double s) {
+		// For scaling we apply the same scale factor to both the points
+		// and the camera centers, and leave the rotations untouched.
+		BOOST_FOREACH(Vec3& v, points) {
+			v = s*v;
+		}
+		BOOST_FOREACH(Frame& f, frames) {
+			// This is a non-rigid transformation so it looks a bit ugly
+			PosedCamera& pc = f.image.pc();
+			pc.SetPose(SE3<>(pc.pose().get_rotation(), s*pc.pose().get_translation()));
+		}
+	}
+
+	void Map::Normalize(double radius) {
+		CenterAtOrigin();
+		double maxrad;
+		for (int i = 0; i < points.size(); i++) {
+			maxrad = max(maxrad, norm(points[i]));
+		}
+		Scale(radius / maxrad);
+	}
+
+		
+
+	void Map::CenterAtOrigin() {
+		Vec3 sum = Zeros;
+		for (int i = 0; i < points.size(); i++) {
+			sum += points[i];
+		}
+		Vec3 centre = sum / points.size();
+		Translate(-centre);
+	}
+
 
 	/*
-void Frame::UndistortImage() {
-	if (map->undistorter.input_size != image.sz()) {
-		map->undistorter.Compute(image.sz());
-	}
-	unwarped.Compute(image, map->undistorter);
-}
-
-void KeyFrame::RunGuidedLineDetector() {
-	guided_line_detector.Compute(image);
-}
-	*/
-
-void KeyFrame::GetMeasuredPoints(vector<Vec3>& out) const {
-	CHECK(map != NULL);
-	BOOST_FOREACH(const Measurement& msm, measurements) {
-		out.push_back(map->pts[msm.point_index]);
-	}
-}
-
-
-
-
-
-Map::Map() {
-	orig_camera.reset(new ATANCamera(*gvDefaultCameraParams, *gvDefaultImageSize));
-	if (*gvLinearizeCamera) {
-		// Use a fast approximation to the camera
-		Mat3 cam = orig_camera->Linearize();
-		camera.reset(new LinearCamera(cam, orig_camera->image_size()));
-
-		// Report the deviation
-		//double err = CameraBase::GetMaxDeviation(*orig_camera, *camera);
-		//DLOG << "Using a linear camera approximation with error=" << err;
-	} else {
-		camera = orig_camera;
-	}
-}
-
-void Map::Load(const string& path) {
-	frames.clear();
-	kfs.clear();
-	kfs_by_id.clear();
-	pts.clear();
-
-	// Read the keyframe files one-by-one
-	TiXmlDocument doc;
-	CHECK(doc.LoadFile(path.c_str())) << "Failed to load " << path;
-	fs::path xml_dir(fs::path(path).parent_path());
-	fs::path frames_dir(*gvOrigFramesDir);
-	const TiXmlElement* root_elem = doc.RootElement();
-
-	// Read frame poses
-	int next_id = 0;
-	const TiXmlElement* frames_elem = root_elem->FirstChildElement("FramePoses");
-	if (frames_elem != NULL) { // FramePoses is optional
-		for (const TiXmlElement* frame_elem = frames_elem->FirstChildElement("Frame");
-				frame_elem != NULL;
-				frame_elem = frame_elem->NextSiblingElement("Frame")) {
-			string image_file = (frames_dir/frame_elem->Attribute("name")).string();
-			Vec6 lnPose = stream_to<Vec6>(frame_elem->Attribute("pose"));
-			Frame* f = new Frame;  // will be owned by the ptr_vector
-			f->Configure(this, next_id++, image_file, SE3<>::exp(lnPose));
-			bool lost = frame_elem->Attribute("lost") == "1";
-			f->initializing = norm_sq(lnPose) == 0;
-			f->lost = lost || f->initializing;
-			frames.push_back(f);
-		}
-	}
-
-	// Read the points
-	map<int, int> points_id_to_index;
-	const TiXmlElement* pts_elem = root_elem->FirstChildElement("MapPoints");
-	CHECK(pts_elem) << "There was no <MapPoints> element in the map spec.";
-	for (const TiXmlElement* pt_elem = pts_elem->FirstChildElement("MapPoint");
-			pt_elem != NULL;
-			pt_elem = pt_elem->NextSiblingElement("MapPoint")) {
-		int id = lexical_cast<int>(pt_elem->Attribute("id"));
-		points_id_to_index[id] = pts.size();  // indices start from zero
-		pts.push_back(stream_to<Vec3>(pt_elem->Attribute("position")));
-	}
-
-	// Read key frames
-	const TiXmlElement* kfs_elem = root_elem->FirstChildElement("KeyFrames");
-	CHECK(kfs_elem) << "There was no <KeyFrames> element in the map spec.";
-
-	// vector of keyframe IDs for which we fell back to B&W images
-	vector<int> fallback_frames;
-
-	// Create an ID-to-XMLElement map
-	for (const TiXmlElement* kf_elem = kfs_elem->FirstChildElement("KeyFrame");
-			kf_elem != NULL;
-			kf_elem = kf_elem->NextSiblingElement("KeyFrame")) {
-		// Get the id, pose, and hash
-		int id = lexical_cast<int>(kf_elem->Attribute("id"));
-		Vec6 lnPose = stream_to<Vec6>(kf_elem->Attribute("pose"));
-		string hash = kf_elem->FirstChildElement("Image")->Attribute("md5");
-
-		// Get the filename
-		fs::path image_file;
-		if (kf_elem->Attribute("name") != NULL) {
-			image_file = kf_elem->Attribute("name");
-		}
-		if (image_file.empty() || !*gvLoadOriginalFrames) {
-			fallback_frames.push_back(id);
-			image_file = xml_dir/kf_elem->FirstChildElement("Image")->Attribute("file");
+	KeyFrame* Map::KeyFrameById(int id) {
+		map<int, KeyFrame*>::iterator it = kfs_by_id.find(id);
+		if (it == kfs_by_id.end()) {
+			return NULL;
 		} else {
-			image_file = frames_dir/image_file;
+			return it->second;
 		}
+	}
 
-		// Add the keyframe
-		KeyFrame* kf = new KeyFrame;
-		kf->Configure(this, id, image_file.string(), SE3<>::exp(lnPose));
-		kf->image_hash = hash;
-		kf->lost = false;
-		kf->initializing = false;
-		kfs.push_back(kf);
-
-		// Add the measurements
-		const TiXmlElement* msms_elem = kf_elem->FirstChildElement("Measurements");
-		for (const TiXmlElement* msm_elem = msms_elem->FirstChildElement("Measurement");
-				msm_elem != NULL;
-				msm_elem = msm_elem->NextSiblingElement("Measurement")) {
-			Measurement msm;
-			int point_id = lexical_cast<int>(msm_elem->Attribute("id"));
-			map<int, int>::const_iterator it = points_id_to_index.find(point_id);
-			if (it == points_id_to_index.end()) {
-				DLOG << "No point with ID="<<point_id;
-			} else {
-				msm.point_index = it->second;
-				msm.image_pos = stream_to<Vec2>(msm_elem->Attribute("v2RootPos"));
-				msm.retina_pos = stream_to<Vec2>(msm_elem->Attribute("v2ImplanePos"));
-				msm.pyramid_level = lexical_cast<int>(msm_elem->Attribute("nLevel"));
-			}
-			kf->measurements.push_back(msm);
+	const KeyFrame* Map::KeyFrameById(int id) const {
+		map<int, KeyFrame*>::const_iterator it = kfs_by_id.find(id);
+		if (it == kfs_by_id.end()) {
+			return NULL;
+		} else {
+			return it->second;
 		}
-
-		CHECK(kfs_by_id.find(id) == kfs_by_id.end())
-		<< "A keyframe with ID="<<id<<" already loaded";
-		kfs_by_id[id] = kf;
 	}
 
-	DLOG << "Loaded " << pts.size() << " points and "
-			 << frames.size() << " frames (" << kfs.size() << " key frames)";
-	if (fallback_frames.size() == 1) {
-		DLOG << "Using grayscale image for frame " << fallback_frames[0];
-	} else if (!fallback_frames.empty()) {
-		DLOG << "Using grayscale image for frames " << iowrap(fallback_frames, ",");
-	}
-}
-
-void Map::LoadWithGroundTruth(const string& path, proto::TruthedMap& gt_map) {
-	ReadProto(path, gt_map);
-	Load(gt_map.spec_file());
-	RotateToSceneFrame(SO3<>::exp(asToon(gt_map.ln_scene_from_slam())));
-
-	double zfloor = gt_map.floorplan().zfloor();
-	double zceil = gt_map.floorplan().zceil();
-	Vec3 vup = kfs[0].image.pc().pose_inverse() * makeVector(0,1,0);
-	if (Sign(zceil-zfloor) == Sign(vup[2])) {
-		swap(zfloor, zceil);
-		gt_map.mutable_floorplan()->set_zfloor(zfloor);
-		gt_map.mutable_floorplan()->set_zceil(zceil);
-	}
-}
-
-void Map::LoadXml(const string& xml_file) {
-	Load(xml_file);
-}
-
-void Map::LoadImages() {
-	BOOST_FOREACH(KeyFrame& kf, kfs) {
-		kf.LoadImage();
-	}
-}
-
-KeyFrame* Map::KeyFrameById(int id) {
-	map<int, KeyFrame*>::iterator it = kfs_by_id.find(id);
-	if (it == kfs_by_id.end()) {
-		return NULL;
-	} else {
-		return it->second;
-	}
-}
-
-const KeyFrame* Map::KeyFrameById(int id) const {
-	map<int, KeyFrame*>::const_iterator it = kfs_by_id.find(id);
-	if (it == kfs_by_id.end()) {
-		return NULL;
-	} else {
-		return it->second;
-	}
-}
-
-KeyFrame* Map::KeyFrameByIdOrDie(int id) {
-	KeyFrame* kf = KeyFrameById(id);
-	CHECK_NOT_NULL(kf) << "No keyframe with ID=" << id;
-	return kf;
-}
-
-const KeyFrame* Map::KeyFrameByIdOrDie(int id) const {
-	const KeyFrame* kf = KeyFrameById(id);
-	CHECK_NOT_NULL(kf) << "No keyframe with ID=" << id;
-	return kf;
-}
-
-PosedImage& Map::ImageByIdOrDie(int id) {
-	Frame* f = KeyFrameByIdOrDie(id);
-	f->LoadImage();
-	PosedImage& im = f->image;
-	im.BuildMono();
-	return im;
-}
-
-
-void Map::Transform(const SE3<>& M) {
-	// Transform the frames
-	SE3<> M_inv = M.inverse();
-	BOOST_FOREACH(KeyFrame& kf, kfs) {
-		kf.image.pc().Transform(M_inv);
-	}
-	BOOST_FOREACH(Frame& f, frames) {
-		f.image.pc().Transform(M_inv);
+	KeyFrame* Map::KeyFrameByIdOrDie(int id) {
+		KeyFrame* kf = KeyFrameById(id);
+		CHECK_NOT_NULL(kf) << "No keyframe with ID=" << id;
+		return kf;
 	}
 
-	// Transform the points
-	BOOST_FOREACH(Vec3& v, pts) {
-		v = M*v;
+	const KeyFrame* Map::KeyFrameByIdOrDie(int id) const {
+		const KeyFrame* kf = KeyFrameById(id);
+		CHECK_NOT_NULL(kf) << "No keyframe with ID=" << id;
+		return kf;
 	}
-}
 
-void Map::Rotate(const SO3<>& R) {
-	Vec3 t = Zeros;
-	Transform(SE3<>(R,t));
-}
+	PosedImage& Map::ImageByIdOrDie(int id) {
+		Frame* f = KeyFrameByIdOrDie(id);
+		f->LoadImage();
+		PosedImage& im = f->image;
+		im.BuildMono();
+		return im;
+	}
+	*/
 
 	/*void Map::DetectLines() {
 	// Detect lines in each keyframe
@@ -398,9 +311,9 @@ void Map::RotateToSceneFrame() {
 	RotateToSceneFrame(scene_from_slam);
 	}*/
 
-void Map::RotateToSceneFrame(const SO3<>& R) {
-	scene_from_slam = R;
-	Rotate(R);
-}
+	/*void Map::RotateToSceneFrame(const SO3<>& R) {
+	//scene_from_slam = R;
+	Transform(R);
+	}*/
 
 }

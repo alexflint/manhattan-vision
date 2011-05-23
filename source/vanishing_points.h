@@ -55,23 +55,26 @@ public:
 	// Rotation estimator
 	RotationEstimator rot_est;
 
-	// Compute vanishing points
-	void Compute(vector<LineDetection>& segments, bool use_prev = false);
+	// Estimate the Manhattan coordinate frame
+	void Compute(vector<LineDetection>& segments);
+	// Estimate the Manhattan coordinate frame given an initial estimate
+	void Compute(vector<LineDetection>& segments, const toon::SO3<>& init);
 
 	// Compute the (approximate) log posterior for a hypothesized coordinate frame
 	double GetLogPosterior(const toon::SO3<>& hypothesis);
+
+	// Bootstrap the EM process by running K-means
+	toon::SO3<> Bootstrap(const vector<LineDetection>& segments);
 
 	//
 	// Detailed control over EM
 	//
 
 	// Resize internal buffers in preparation for new observations
-	void Prepare(const vector<LineDetection>& segments);
-	// Bootstrap the EM process by running K-means
-	void Bootstrap(const vector<LineDetection>& segments);
-	// Compute responsibilities given current vanishing points
+	void Prepare(vector<LineDetection>& segments);
+	// Estimate responsibilities given current vanishing points
 	void EStep();
-	// Compute vanishing points given current responsibilities.
+	// Estimate vanishing points given current responsibilities.
 	// Also check for convergence.
 	void MStep();
 	// Populate owners, num_spurious
@@ -108,7 +111,7 @@ public:
 
 	// Find vanishing points. If use_prev is true then the EM will be
 	// initialized with the result of the last iteration
-	void Compute(const CalibratedImage& image, bool use_prev = false);
+	void Compute(const CalibratedImage& image);
 
 	// Output a visualization of the final vanishing points
 	void DrawVanPointViz(ImageRGB<byte>& canvas) const;

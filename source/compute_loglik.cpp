@@ -23,6 +23,8 @@
 #include "io_utils.tpp"
 #include "image_utils.tpp"
 
+lazyvar<double> gvDelta("LikelihoodDerivatives.Delta");
+
 lazyvar<string> gvStereoOffsets("JointDP.Stereo.AuxOffsets");
 
 double EvaluateModelLogLik(ModelLikelihood& likelihood,
@@ -51,6 +53,7 @@ double EvaluateFeatureLogLik(FeatureLikelihood& likelihood,
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
 	Timer timer;
+	DREPORT(*gvDelta);
 
 	// Declare the supported options.
 	po::options_description desc("Allowed options");
@@ -60,6 +63,7 @@ int main(int argc, char **argv) {
 		("weights", po::value<string>(), "feature weights")
     ("corner_penalty", po::value<float>()->required(), "per-corner penalty")
     ("occlusion_penalty", po::value<float>()->required(), "additional penalty for occluding corners")
+    ("with_jacobian", "also compute Jacobians")
     ("logit", "use logistic likelihood (default is Gaussian)")
 		;
 
@@ -94,6 +98,8 @@ int main(int argc, char **argv) {
 	CHECK_GE(params.occlusion_penalty, 1e-18)
 		<< "Penalties mut be positive (since constant in geometric series must be < 1)";
 
+	bool jacs = opts.count("with_jacobian") > 0;
+
 	// Initialize map
 	Map map;
 	proto::TruthedMap gt_map;
@@ -112,35 +118,35 @@ int main(int argc, char **argv) {
 		ftr_lik.reset(new GaussianFeatureLikelihood(theta));
 	}
 
-	static const double kDelta = 1e-6;
-
-	// Compute feature likelihood and jacobian
+	// Prepare functions (for convenience with Jacobians
 	boost::function<double(const Vec2&)> model_loglik_func =
 		boost::bind(&EvaluateModelLogLik, ref(*model_lik), ref(feature_set), _1);
-	double model_loglik = model_loglik_func(lambda);
-	Vec2 J_model_loglik = NumericalJacobian(model_loglik_func, lambda, kDelta);
-
-	// Compute model likelihood and jacobian
 	boost::function<double(const Vector<>&)> ftr_loglik_func =
 		boost::bind(&EvaluateFeatureLogLik, ref(*ftr_lik), ref(feature_set), _1);
+
+	// Compute likelihood
+	double model_loglik = model_loglik_func(lambda);
 	double ftr_loglik = EvaluateFeatureLogLik(*ftr_lik, feature_set, theta);
-	Vector<> J_ftr_loglik = NumericalJacobian(ftr_loglik_func, theta, kDelta);
-
-	// Combine together
 	double loglik = ftr_loglik + model_loglik;
-	Vector<> J_loglik = concat(J_model_loglik, J_ftr_loglik);
-
-	// Compute numerical jacobians
-	//Vector<> num_J_model_loglik
 
 	// Done. Print with high precision so matlab can read with high precision.
 	DLOG << "Processed " << feature_set.frames_size() << " frames in " << timer;
 	format fmt("%.18e ");
 	DLOG << fmt % loglik;
-	for (int i = 0; i < J_loglik.size(); i++) {
-		DLOG_N << fmt % J_loglik[i];
+
+	if (jacs) {
+		Vec2 J_model_loglik = NumericalJacobian(model_loglik_func, lambda, *gvDelta);
+		Vector<> J_ftr_loglik = NumericalJacobian(ftr_loglik_func, theta, *gvDelta);
+		Vector<> J_loglik = concat(J_model_loglik, J_ftr_loglik);
+
+		//Vector<> analytic_J_loglik = concat(model_lik->jacobian(), ftr_lik->jacobian());
+		//DREPORT(analytic_J_loglik - J_loglik);
+
+		for (int i = 0; i < J_loglik.size(); i++) {
+			DLOG_N << fmt % J_loglik[i];
+		}
+		DLOG;  // end the line
 	}
-	DLOG;  // end the line
 
 	return 0;
 }
