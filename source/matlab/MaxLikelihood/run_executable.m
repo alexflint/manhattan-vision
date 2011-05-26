@@ -11,9 +11,6 @@ if (status ~= 0)
     error(['Error in executable: ' output]);
 end
 
-% For indoor_context binaries
-setenv('LD_PRELOAD', '/usr/lib/liblapack.so');
-
 % Split lines and parse results
 lines = strsplit(output, char(10));  % char(10) is newline, '\n' fails
 for i = 1:nargout

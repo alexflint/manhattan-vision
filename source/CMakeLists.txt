@@ -12,10 +12,10 @@ SET( CMAKE_MODULE_PATH
 	${CMAKE_ROOT}/Modules )
 
 # Find Boost
-SET( Boost_FIND_QUIETLY OFF )
-FIND_PACKAGE( Boost 1.44.0
-	COMPONENTS date_time filesystem iostreams thread python system program_options
-	)
+#SET( Boost_FIND_QUIETLY OFF )
+#FIND_PACKAGE( Boost 1.44.0
+#	COMPONENTS date_time filesystem iostreams thread python system program_options
+#	REQUIRED )
 
 # Find required dependencies
 #FIND_PACKAGE( Eigen3 )

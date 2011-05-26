@@ -70,16 +70,11 @@ upper = [ ...
     1-eps ...
     ];
 
-% Force the linker to get the correct LAPACK
-setenv('LD_PRELOAD', '/usr/lib/liblapack.so')
-
 % Transform between log-likelihood and objective function for optimization
 % Log-likelihood is always <= 0
-ty = @(y)(-y);
+%ty = @(y)(-y);
 inv_ty = @(y)(-y);
 
-% Flip problem upside down (for minimization)
-f = @(theta)(ty(compute_loglik(theta)));
 
 % Report objective function value at initial point
 yinit = f(init);
@@ -87,17 +82,30 @@ disp(['Objective function at init: ' num2str(yinit)]);
 
 if (strcmp(optimizer, 'direct'))
     disp('Optimizing with Direct...');
-    Problem.f = f;
+    Problem.f = @f;
     opts.maxevals = 1000;
     opts.showits = true;
     [ymin, thetamin] = Direct(Problem, [lower' upper'], opts);
 
 elseif (strcmp(optimizer, 'gpgo'))
     disp('Optimizing with gpgo...');
-    [ymin thetamin] = gpgo(f, init, lower, upper);
+    opt.save_str = 'opt_alex_flint';
+    opt.function_evaluations = 500;
+    opt.exp_loss_evals = 100;
+    opt.num_hypersamples = 1;
+    opt.derivative_observations = false;
+    [ymin thetamin] = gpgo(@f, init, lower, upper, opt);
 else
     error(['Unknown optimizer: ' optimizer]);
 end
 
 % Flip back
 ymin = inv_ty(ymin);
+
+function [neglogL, grad_neglogL] = f(theta)
+% Flip problem upside down (for minimization)
+neglogL = -compute_loglik(theta);
+if nargout>1
+[dummy, grad_neglogL] = compute_loglik(theta);
+grad_neglogL = -grad_neglogL;
+end

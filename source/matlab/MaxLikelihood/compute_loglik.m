@@ -11,7 +11,7 @@ if (nargin < 3)
 end
 
 executable_dir = '~/Code/indoor_context/build/';
-executable_name = 'compute_loglik';
+executable_name = './compute_loglik_wrapper.sh';
 
 if (mod(length(params)-2, 4) ~= 0)
     error('Parameter vector should have length n*4+2 for some integer n');
@@ -28,7 +28,7 @@ theta = params(3:length(params));
 
 % Build the command. Important to use high precisions here so that no data
 % is lost in transmission to c++.
-cmd = ['./' executable_name];
+cmd = executable_name;
 cmd = [cmd ' --corner_penalty=' num2str(corner_penalty, '%.18f')];
 cmd = [cmd ' --occlusion_penalty=' num2str(occlusion_penalty, '%.18f')];
 cmd = [cmd ' --weights=''' num2str(theta, '%.18f ') ''''];
