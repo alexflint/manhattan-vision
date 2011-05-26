@@ -10,6 +10,7 @@ MIX='.2 .2 .2 .2'
 		--corner_penalty=1 \
 		--occlusion_penalty=1 \
 		--features=PrecomputedData/features.protodata \
+		--with_gradient
 		$*
 
 ## uncomment for logistic version

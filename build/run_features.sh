@@ -2,9 +2,10 @@
 
 OUTFILE=PrecomputedData/features.protodata;
 
+# TODO: change frame_stride back (it is 100 to keep evaluation fast during testing)
 ./compute_payoff_features \
 		--sequence lab_kitchen1 \
-		--frame_stride 10 \
+		--frame_stride 100 \
 		--store_features \
 		--output $OUTFILE \
 		$*
