@@ -53,7 +53,6 @@ double EvaluateFeatureLogLik(FeatureLikelihood& likelihood,
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
 	Timer timer;
-	DREPORT(*gvDelta);
 
 	// Declare the supported options.
 	po::options_description desc("Allowed options");
@@ -63,7 +62,7 @@ int main(int argc, char **argv) {
 		("weights", po::value<string>(), "feature weights")
     ("corner_penalty", po::value<float>()->required(), "per-corner penalty")
     ("occlusion_penalty", po::value<float>()->required(), "additional penalty for occluding corners")
-    ("with_jacobian", "also compute Jacobians")
+    ("with_gradient", "also compute gradient")
     ("logit", "use logistic likelihood (default is Gaussian)")
 		;
 
@@ -98,12 +97,14 @@ int main(int argc, char **argv) {
 	CHECK_GE(params.occlusion_penalty, 1e-18)
 		<< "Penalties mut be positive (since constant in geometric series must be < 1)";
 
-	bool jacs = opts.count("with_jacobian") > 0;
+	bool grad = opts.count("with_gradient") > 0;
 
 	// Initialize map
 	Map map;
 	proto::TruthedMap gt_map;
 	string cur_sequence = "";
+
+	bool kComputeAnalyticalGradients = false;
 
 	// Initialize likelihood functions
 	Vec2 lambda = makeVector(params.corner_penalty, params.occlusion_penalty);
@@ -115,10 +116,14 @@ int main(int argc, char **argv) {
 		ftr_lik.reset(new LogitFeatureLikelihood(theta));
 	} else {
 		DLOG << "Using Gaussian feature likelihood";
-		ftr_lik.reset(new GaussianFeatureLikelihood(theta));
+		GaussianFeatureLikelihood* ftr_likelihood = new GaussianFeatureLikelihood(theta);
+		ftr_likelihood->enable_jacobian = kComputeAnalyticalGradients;
+		ftr_lik.reset(ftr_likelihood);
 	}
 
-	// Prepare functions (for convenience with Jacobians
+	DREPORT(lambda, theta);
+
+	// Prepare functions (for convenience with numerical gradientJacobians)
 	boost::function<double(const Vec2&)> model_loglik_func =
 		boost::bind(&EvaluateModelLogLik, ref(*model_lik), ref(feature_set), _1);
 	boost::function<double(const Vector<>&)> ftr_loglik_func =
@@ -134,16 +139,22 @@ int main(int argc, char **argv) {
 	format fmt("%.18e ");
 	DLOG << fmt % loglik;
 
-	if (jacs) {
+	if (grad) {
+		LogManager::Disable();
 		Vec2 J_model_loglik = NumericalJacobian(model_loglik_func, lambda, *gvDelta);
 		Vector<> J_ftr_loglik = NumericalJacobian(ftr_loglik_func, theta, *gvDelta);
-		Vector<> J_loglik = concat(J_model_loglik, J_ftr_loglik);
+		Vector<> numerical_J_loglik = concat(J_model_loglik, J_ftr_loglik);
+		LogManager::Enable();
 
-		//Vector<> analytic_J_loglik = concat(model_lik->jacobian(), ftr_lik->jacobian());
-		//DREPORT(analytic_J_loglik - J_loglik);
-
+		/*Vector<> J_loglik = concat(model_lik->jacobian(), ftr_lik->jacobian());
+		DLOG << format("%|5t|ANALYTIC %|30t|NUMERICAL %|55t|REL ERR\n");
 		for (int i = 0; i < J_loglik.size(); i++) {
-			DLOG_N << fmt % J_loglik[i];
+			double relerr = (J_loglik[i] - numerical_J_loglik[i]) / numerical_J_loglik[i];
+			DLOG << format("%2d) %|5t|%f %|30t|%f %|55t|%f%%\n") % i % J_loglik[i] % numerical_J_loglik[i] % (relerr*100);
+			}*/
+
+		for (int i = 0; i < numerical_J_loglik.size(); i++) {
+			DLOG_N << fmt % numerical_J_loglik[i];
 		}
 		DLOG;  // end the line
 	}

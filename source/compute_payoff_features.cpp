@@ -9,6 +9,7 @@
 #include "joint_payoffs.h"
 #include "manhattan_dp.h"
 #include "map.h"
+#include "map_io.h"
 #include "bld_helpers.h"
 #include "safe_stream.h"
 #include "timer.h"
@@ -74,10 +75,10 @@ int main(int argc, char **argv) {
 	proto::TruthedMap gt_maps[sequences.size()];
 	for (int i = 0; i < sequences.size(); i++) {
 		TITLE("Processing " << sequences[i]);
-		maps[i].LoadWithGroundTruth(GetMapPath(sequences[i]), gt_maps[i]);
+		LoadXmlMapWithGroundTruth(GetMapPath(sequences[i]), maps[i], gt_maps[i]);
 
-		for (int j = 0; j < maps[i].kfs.size(); j += frame_stride) {
-			KeyFrame& frame = maps[i].kfs[j];
+		for (int j = 0; j < maps[i].frames.size(); j += frame_stride) {
+			Frame& frame = maps[i].frames[j];
 			frame.LoadImage();
 			num_frames++;
 
@@ -98,7 +99,7 @@ int main(int argc, char **argv) {
 			vector<const PosedImage*> aux_images;
 			vector<int> aux_ids;
 			BOOST_FOREACH(int offset, stereo_offsets) {
-				Frame* aux_frame = frame.map->KeyFrameById(frame.id+offset);
+				Frame* aux_frame = frame.map->GetFrameById(frame.id+offset);
 				if (aux_frame != NULL) {
 					aux_frame->LoadImage();
 					aux_images.push_back(&aux_frame->image);

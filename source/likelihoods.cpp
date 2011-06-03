@@ -10,7 +10,7 @@ namespace indoor_context {
 
 	// TODO: compute these by simple average over training set
 	static const double kBgMean = 5;
-	static const double kBgVar = 5;
+	static const double kBgVariance = 5;
 
 	using namespace toon;
 	////////////////////////////////////////////////////////////////////
@@ -103,7 +103,7 @@ namespace indoor_context {
 
 	/////////////////////////////////////////////////////////////////////////////////
 	GaussianFeatureLikelihood::GaussianFeatureLikelihood(const Vector<>& th)
-		: J_loglik(th.size()), theta(th) {
+		: theta(th), J_loglik(th.size()), enable_jacobian(true) {
 		Configure(th);
 	}
 
@@ -136,42 +136,73 @@ namespace indoor_context {
 		Vector<> ideal_fs = theta.slice(0, nf);
 		Vector<> fall_offs = theta.slice(nf, nf);
 		Vector<> noise_vars = theta.slice(nf*2, nf);
-		Vector<> fg_probs = theta.slice(nf*3, nf);
+		Vector<> fg_priors = theta.slice(nf*3, nf);
 
-		double log_bg_var = log(kBgVar);
-		double sqr_bg_var = kBgVar*kBgVar;
+		double log_bg_var = log(kBgVariance);
+		double sqr_bg_var = kBgVariance*kBgVariance;
 
 		// Accumulate the log likelihood
 		double frame_loglik = 0;
 		Vector<> frame_J_loglik(theta.size());
 		frame_J_loglik = Zeros;
 		for (int k = 0; k < nf; k++) {
-			CHECK_INTERVAL(fg_probs[k], 1e-17, 1.);
-			double ideal_f = ideal_fs[k];
-			double log_fg_prob = log(fg_probs[k]);
-			double log_bg_prob = log(1. - fg_probs[k]);
+			CHECK_INTERVAL(fg_priors[k], 1e-17, 1.);
+			double fg_logprior = log(fg_priors[k]);
+			double bg_logprior = log(1. - fg_priors[k]);
 			double log_noise_var = log(noise_vars[k]);
-			double sqr_noise_var = noise_vars[k] * noise_vars[k];
+			double noise_recip = 1. / noise_vars[k];
+
 			const DPPayoffs& po = features.features[k];
 			for (int y = 0; y < ny; y++) {
+				//if (y != 478) continue;  // debug only
 				double py = 1.* y / ny;
-				const float* feature_row[] = { po.wall_scores[0][ y ], po.wall_scores[1][ y ] };
+				const float* feature_row[] = { po.wall_scores[0][y], po.wall_scores[1][y] };
 				for (int x = 0; x < nx; x++) {
+					//if (x != 155) continue;
+					double f = feature_row[ orients[x] ][ x ];
+					//TITLE(k<<":"<<x<<","<<y<<" = "<<f);
 					double ppath = 1. * path[x] / ny;
-					const double& f = feature_row[ orients[x] ][ x ];
-					double f_mean = ideal_f * Gauss1D(py, ppath, fall_offs[k]);
-					double fg_loglik = FastLogGauss1D(f, f_mean, log_noise_var, sqr_noise_var);
-					double bg_loglik = FastLogGauss1D(f, kBgMean, log_bg_var, sqr_bg_var);
-					double fg_logjoint = log_fg_prob + fg_loglik;
-					double bg_logjoint = log_bg_prob + bg_loglik;
-					double logjoint = LogSumExp(fg_logjoint, bg_logjoint);
+					double f_ampl = Gauss1D(py, ppath, fall_offs[k]);
+					double f_mean = ideal_fs[k] * f_ampl;
+					double fg_loglik = FastLogGauss1D(f, f_mean, noise_vars[k], log_noise_var);
+					double bg_loglik = FastLogGauss1D(f, kBgMean, kBgVariance, log_bg_var);
+					double fg_logpost = fg_logprior + fg_loglik;
+					double bg_logpost = bg_logprior + bg_loglik;
+					double logjoint = LogSumExp(fg_logpost, bg_logpost);
+					//DREPORT(fg_logpost, bg_logpost, logjoint);
 					frame_loglik += logjoint;
 
-					// Compute jacobian w.r.t. fg_probs
-					for (int k = 0; k < nf; k++) {
-						J_loglik[nf*3+k] += exp(fg_loglik-logjoint) - exp(bg_loglik-logjoint);
+					if (enable_jacobian) {
+						// Compute gradient w.r.t. ideal feature
+						//double ideal_grad = noise_recip * (f-f_mean) * ampl;
+						//DREPORT(f, noise_recip, f-f_mean, ampl, ideal_grad);
+						double top = (fg_priors[k] * (f-f_mean) / noise_vars[k]) * exp(fg_logpost) * f_ampl;
+						double ideal_grad = top / exp(logjoint);
+						frame_J_loglik[k] += ideal_grad;
+						//DREPORT(ideal_grad);
+
+						// Compute gradient w.r.t. fall-off
+						double y_dev = (py-ppath)*(py-ppath) / (2*fall_offs[k]*fall_offs[k]);
+						frame_J_loglik[nf+k] += noise_recip * (f-f_mean) * f_mean * y_dev;
+
+						// Compute gradient w.r.t. noise variance
+						double f_dev = (f-f_mean)*(f-f_mean) / (noise_vars[k]*noise_vars[k]*2);
+						double term1 = -.5*noise_recip + f_dev;
+						double term2_log_top = bg_logprior + bg_loglik - fg_loglik;
+						double term2_log_bottom = LogSumExp(fg_logprior, term2_log_top);
+						double noise_grad = term1 + exp(term2_log_top - term2_log_bottom);
+						frame_J_loglik[nf*2+k] += noise_grad;
+
+						// Compute jacobian w.r.t. fg_priors
+						double log_top = 1. - exp(bg_loglik - fg_loglik);
+						double log_bottom = LogSumExp(fg_logprior, bg_logprior + bg_loglik - fg_loglik);
+						double fg_grad = exp(log_top - log_bottom);
+						frame_J_loglik[nf*3+k] += fg_grad;
 					}
+
+					//break;  // debug
 				}
+				//break;  // debug
 			}
 		}
 		loglik += frame_loglik;

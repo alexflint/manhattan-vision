@@ -15,12 +15,12 @@ namespace indoor_context {
 	// If all_frames is true then load all frames; otherwise load just the key frames.
 	void LoadXmlMap(const string& path,
 									Map& map,
-									bool all_frames=false);
+									bool include_non_keyframes=false);
 
 	// Load a map with ground truth. Store the ground truth in gt_map.
 	// If all_frames is true then load all frames; otherwise load just the key frames.
 	void LoadXmlMapWithGroundTruth(const string& path,
 																 Map& map,
 																 proto::TruthedMap& gt_map,
-																 bool all_frames=false);
+																 bool include_non_keyframes=false);
 }

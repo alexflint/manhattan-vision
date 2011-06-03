@@ -25,20 +25,20 @@ namespace indoor_context {
 	static const double kSqrtTwoPi = sqrt(2*M_PI);
 	static const double kLogSqrtTwoPi = log(sqrt(2*M_PI));
 
-	double LogGauss1D(double x, double m, double s) {
-		return -(x-m)*(x-m)/(2*s*s) - log(s) - kLogSqrtTwoPi;
+	double Gauss1D(double x, double m, double var) {
+		return exp(-(x-m)*(x-m)/(2*var)) / (sqrt(var)*kSqrtTwoPi);
 	}
 
-	double FastLogGauss1D(double x, double m, double log_s, double s_sqr) {
-		return -(x-m)*(x-m)/(2*s_sqr) - log_s - kLogSqrtTwoPi;
-	}
-
-	double Gauss1D(double x, double m, double s) {
-		return exp(-(x-m)*(x-m)/(2*s*s)) / (s*kSqrtTwoPi);
-	}
-
-	double Gauss2D(const Vec2& x, const Vec2& m, double s) {
+	/*double Gauss2D(const Vec2& x, const Vec2& m, double s) {
 		return exp(-0.5 * norm_sq(m-x) / s) / (2*M_PI*sqrt(s));
+		}*/
+
+	double LogGauss1D(double x, double m, double var) {
+		return FastLogGauss1D(x, m, var, log(var));
+	}
+
+	double FastLogGauss1D(double x, double m, double var, double log_var) {
+		return -(x-m)*(x-m)/(2*var) - log_var/2 - kLogSqrtTwoPi;
 	}
 
 	double Gaussian::Evaluate(const VecD& x) const {

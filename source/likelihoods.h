@@ -71,6 +71,8 @@ namespace indoor_context {
 		double log_likelihood() const { return loglik; }
 		// Returns the jacobian of the *log* likelihood
 		const toon::Vector<>& jacobian() const { return J_loglik; }
+		// whether to compute jacobians
+		bool enable_jacobian;
 	private:
 		toon::Vector<> theta;
 		double loglik;

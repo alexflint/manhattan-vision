@@ -34,7 +34,7 @@ cmd = [cmd ' --occlusion_penalty=' num2str(occlusion_penalty, '%.18f')];
 cmd = [cmd ' --weights=''' num2str(theta, '%.18f ') ''''];
 cmd = [cmd ' --features=' feature_set];
 if (nargout > 1) 
-    cmd = [cmd ' --with_jacobian'];
+    cmd = [cmd ' --with_gradient'];
 end
 cmd = [cmd ' ' args];
 

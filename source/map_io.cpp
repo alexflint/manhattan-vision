@@ -118,8 +118,6 @@ namespace indoor_context {
 									bool all_frames) {
 		// Clear any old state
 		map.frames.clear();
-		//map.kfs.clear();
-		//map.kfs_by_id.clear();
 		map.points.clear();
 
 		// Configure the camera
@@ -233,9 +231,12 @@ namespace indoor_context {
 		}
 	}
 
-	void LoadXmlMapGroundTruth(const string& path, Map& map, proto::TruthedMap& gt_map) {
+	void LoadXmlMapWithGroundTruth(const string& path,
+																 Map& map,
+																 proto::TruthedMap& gt_map,
+																 bool include_non_keyframes) {
 		ReadProto(path, gt_map);
-		LoadXmlMap(gt_map.spec_file(), map);
+		LoadXmlMap(gt_map.spec_file(), map, include_non_keyframes);
 		map.Transform(SO3<>::exp(asToon(gt_map.ln_scene_from_slam())));
 
 		double zfloor = gt_map.floorplan().zfloor();

@@ -7,7 +7,6 @@
 #include "camera.h"
 
 namespace indoor_context {
-
 	// Import boost for this file only
 	namespace { using namespace boost; }
 
@@ -58,11 +57,6 @@ namespace indoor_context {
 		void UnloadImage();
 	};
 
-	// Represents a frame that was selected as a key frame by PTAM
-	/*class KeyFrame : public Frame {
-	public:
-		};*/
-
 	// Represents a map from PTAM
 	class Map {
 	public:
@@ -74,11 +68,6 @@ namespace indoor_context {
 		// The camera model for frames in this map
 		shared_ptr<ATANCamera> orig_camera;
 		shared_ptr<CameraBase> camera;
-
-		// The keyframes
-		//ptr_vector<KeyFrame> kfs;
-		// Rotation from SLAM coordinates to canonical scene coordinates
-		//toon::SO3<> scene_from_slam;
 
 		// Add a frame to the map. The map takes ownership of the memory.
 		void AddFrame(Frame* frame);
@@ -112,21 +101,6 @@ namespace indoor_context {
 		// Translate the map at the origin and scale so that the radius of
 		// the map is radius.
 		void Normalize(double radius=1.);
-
-		// Rotate to scene frame with a pre-computed rotation. Just calls
-		// Rotate() and saves the transform as this->scene_from_slam
-		//void RotateToSceneFrame(const toon::SO3<>& scene_from_slam);
-		
-		/*
-		// Get a key frame by its index in the original map. Return NULL
-		// if this keyframe is not loaded or does not exist.
-		KeyFrame* KeyFrameById(int id);
-		const KeyFrame* KeyFrameById(int id) const;
-		// As above but die with an error message if specified key frame not present.
-		KeyFrame* KeyFrameByIdOrDie(int id);
-		const KeyFrame* KeyFrameByIdOrDie(int id) const;
-		*/
-
 	private:
 		// Id-to-frame map
 		map<int, Frame*> frames_by_id;
