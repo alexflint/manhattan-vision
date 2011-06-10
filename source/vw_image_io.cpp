@@ -31,7 +31,11 @@ namespace indoor_context {
 		CHECK_PRED1(fs::exists, file);
 
 		// TODO: find a more reliable way to determine file format
+#if BOOST_VERSION >= 104400
 		string ext = fs::path(file).extension().string();
+#else
+		string ext = fs::path(file).extension();
+#endif
 		bool jpeg = (ext == ".jpg" || ext == ".JPG" || ext == ".jpeg" || ext == ".JPEG");
 
 		// Get size

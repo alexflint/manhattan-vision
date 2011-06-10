@@ -161,7 +161,7 @@ ios::filtering_ostream& GetLogStreamImpl() {
 	//static AutoNewlineFilter newline_filter;
 	//static IndentFilter indent_filter;
 	if (log_stream.get() == NULL) {
-		SetLogSinkImpl(ios::file_descriptor_sink(kLogFileNo, ios::never_close_handle));
+		SetLogSinkImpl(ios::file_descriptor_sink(kLogFileNo/*, ios::never_close_handle*/));
 	}
 	return *log_stream;
 }

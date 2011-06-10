@@ -11,11 +11,16 @@ SET( CMAKE_MODULE_PATH
 	${CMAKE_SOURCE_DIR}/../cmake_modules
 	${CMAKE_ROOT}/Modules )
 
+
+###############################################################################
+# FIND DEPENDENCIES
+###############################################################################
+
 # Find Boost
-#SET( Boost_FIND_QUIETLY OFF )
-#FIND_PACKAGE( Boost 1.44.0
-#	COMPONENTS date_time filesystem iostreams thread python system program_options
-#	REQUIRED )
+SET( Boost_FIND_QUIETLY OFF )
+FIND_PACKAGE( Boost 1.44.0
+	COMPONENTS date_time filesystem iostreams thread system program_options # python
+	REQUIRED )
 
 # Find required dependencies
 #FIND_PACKAGE( Eigen3 )
@@ -33,6 +38,12 @@ FIND_PACKAGE( PythonLibs REQUIRED ) # Required by Boost.Python
 FIND_PACKAGE( ZLIB REQUIRED ) # Required by Python
 FIND_PACKAGE( Matlab )	# for mex stuff
 
+# Find lapack
+FIND_LIBRARY( LAPACK_LIBRARY liblapack.so )
+IF( NOT LAPACK_LIBRARY )
+	MESSAGE( FATAL_ERROR "Could not find LAPACK library" )
+ENDIF()
+
 # Find VW
 SET( VW_USE_LIBS VNL )
 FIND_PACKAGE( VW REQUIRED )
@@ -43,6 +54,14 @@ FIND_PATH( TOON_INCLUDE_DIR TooN.h
 IF( NOT TOON_INCLUDE_DIR )
 	MESSAGE( FATAL_ERROR "Could not find TooN include directory." )
 ENDIF( NOT TOON_INCLUDE_DIR )
+
+# Find GVars3
+FIND_PATH( GVars3_INCLUDE_DIR gvars3/gvars3.h )
+FIND_LIBRARY( GVars3_LIBRARY libGVars3.so )
+IF( NOT GVars3_INCLUDE_DIR )
+  MESSAGE( FATAL_ERROR "Could not find GVars3 include directory.")
+ENDIF( NOT GVars3_INCLUDE_DIR )
+MESSAGE( ${GVars3_INCLUDE_DIR} )
 
 # Find CUDA if it's enabled
 IF( USE_CUDA )
@@ -92,7 +111,7 @@ ENDIF ( USE_TCMALLOC)
 INCLUDE_DIRECTORIES(
 	${VW_INCLUDE_DIR}
 	${TOON_INCLUDE_DIR}
-	${CMAKE_CURRENT_BINARY_DIR}	 # because protobufs will be generated here
+	${GVars3_INCLUDE_DIR}
 	${OPENGL_INCLUDE_DIR}
 	${GLUT_INCLUDE_DIR}
 	${PROTOBUF_INCLUDE_DIR}
@@ -106,12 +125,15 @@ INCLUDE_DIRECTORIES(
 	${PYTHON_INCLUDE_DIRS}
 	${ZLIB_INCLUDE_DIRS}
 	#${EIGEN3_INCLUDE_DIR}
+
+	${CMAKE_SOURCE_DIR} # because subdirs will need to find includes from this dir
+	${CMAKE_CURRENT_BINARY_DIR}	 # because protobufs will be generated here
 )
 
 # Setup linked libraries
 SET( EXTERNAL_LIBRARIES
-	-lGVars3
-	-llapack
+	${GVars3_LIBRARY}
+	${LAPACK_LIBRARY}
 	${PROTOBUF_LIBRARY}
 	${GLUT_LIBRARIES}
 	${OPENGL_LIBRARIES}
@@ -127,10 +149,11 @@ SET( EXTERNAL_LIBRARIES
 	${Boost_thread_LIBRARY}
 	${Boost_program_options_LIBRARY}
 
-	-ljpeg # for GIL
-	-lpng  # for GIL
+	# for GIL
+	-ljpeg
+	-lpng
 
-  #${GraphCuts_LIBRARIES}
+	#${GraphCuts_LIBRARIES}
 	#${libfreenect_LIBRARIES}
 
 	# Only for stereotracks
@@ -245,7 +268,6 @@ ADD_LIBRARY( core SHARED
 	floorplan_renderer.cpp
 
 # Temporarily commented to remove dependency on libfreenect
-
 #	kinect_device.cpp
 #	kinect_transform.cpp
 
@@ -282,90 +304,12 @@ ADD_LIBRARY( manhattan SHARED
 	gaussian_pyramid.cpp  # TODO: move to core
 )
 
+ADD_DEPENDENCIES( manhattan core )   # mostly for protobufs
+
 ###############################################################################
 # BUILD EXECUTABLES
 ###############################################################################
-SET( EXECUTABLES
-	sweep_lines
-	test
-	map_viewer
-
-	edit_floorplan
-	edit_map
-
-	map2pmvs
-	ply_viewer
-	draw_pts
-	mws
-	gc_example
-	glut_test
-	jac_test
-	load_bundle
-	
-	manhattan_colors
-	draw_top_view
-	predict_orientations
-	
-	render_floorplan
-
-	poster_lines
-	poster_vpts
-	poster_sweeps
-	
-	draw_gt
-	draw_sweeps
-
-	monocular_bnb
-	monocular_dp
-	multiview_dp
-	feature_dp
-	evaluate_mv
-	stereo_dp
-	point_dp
-	joint_dp
-	kinect_dp
-	estimate_floorplan
-	generate_video
-
-	dp_optimization_wrapper
-	compute_payoff_features
-	compute_loglik
-
-	inspect_geometry
-	test_gt_walls
-	tata_video
-
-	test_solution_path
-	test_atancamera
-
-	joint_vpt_calib
-
-	kinect_viewer
-
-	generate_svm_problem
-	bootstrap_train_dp
-	oneshot_train_dp
-	brostow
-
-	toon_speed_test
-	render_test
-	rectification_test
-	filter_test
-	cairo_test
-	clip_test
-	clip3d_test
-	table_speedtest
-	gil_test
-	image_test
-	thread_pool_test
-	eigen_test
-	expr_test
-)
-
-FOREACH( EXECUTABLE ${EXECUTABLES} )
-	ADD_EXECUTABLE( ${EXECUTABLE} ${EXECUTABLE}.cpp )
-	TARGET_LINK_LIBRARIES( ${EXECUTABLE} core manhattan ${EXTERNAL_LIBRARIES} )
-ENDFOREACH( EXECUTABLE )
+ADD_SUBDIRECTORY(progs)
 
 
 ###############################################################################
