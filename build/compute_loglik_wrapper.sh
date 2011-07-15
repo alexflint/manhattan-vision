@@ -1,3 +1,3 @@
 #!/bin/bash
 
-LD_PRELOAD=/usr/lib/liblapack.so ./compute_loglik "$@"
+LD_PRELOAD=/usr/lib/liblapack.so progs/compute_loglik "$@"

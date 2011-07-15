@@ -10,7 +10,6 @@
 
 #include "counted_foreach.tpp"
 #include "gl_utils.tpp"
-//#include "numeric_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
@@ -41,7 +40,6 @@ namespace indoor_context {
 		planView.Add(bind(&FloorPlanEditor::RenderPlanView, this));
 
 		sideView.viewOrtho = true;
-		//sideView.SetNavigable(false);
 		sideView.window().SetTitle("Side View");
 		sideView.window().MouseMove.add(bind(&FloorPlanEditor::sideView_MouseMove, this, _1));
 		sideView.window().MouseDown.add(bind(&FloorPlanEditor::sideView_MouseDown, this, _1, _2));
@@ -127,17 +125,17 @@ namespace indoor_context {
 		}
 	}
 
-	Vector<2> FloorPlanEditor::MouseToCanvas(const Vector<2>& mousePt) {
+	Vec2 FloorPlanEditor::MouseToCanvas(const Vec2& mousePt) {
 		return planView.MouseToPlane(mousePt, makeVector(0,0,1,0)).slice<0,2>();
 	}
 
-	Vector<2> FloorPlanEditor::Snap(const Vector<2>& v, int snap_axis, int ignore) {
+	Vec2 FloorPlanEditor::Snap(const Vec2& v, int snap_axis, int ignore) {
 		const double kSnapMargin = 0.2;  // in canvas coordinates
 
 		double dmin = kSnapMargin;
 		double snap = v[snap_axis];
 		COUNTED_FOREACH(int i, const proto::Vec2& vert, floorplan->vertices()) {
-			Vector<2> u = asToon(vert);
+			Vec2 u = asToon(vert);
 			if (i == ignore || i == ignore+1) continue;
 			double d = abs(u[snap_axis]-v[snap_axis]);
 			if (d < dmin) {
@@ -146,12 +144,12 @@ namespace indoor_context {
 			}
 		}
 
-		Vector<2> snapped = v;
+		Vec2 snapped = v;
 		snapped[snap_axis] = snap;
 		return snapped;
 	}
 
-	void FloorPlanEditor::planView_MouseDown(int button, const Vector<2>& mousePt) {
+	void FloorPlanEditor::planView_MouseDown(int button, const Vec2& mousePt) {
 		static const double kNan = numeric_limits<double>::quiet_NaN();
 		if (uiState == UIState::INSERT) {
 			mouseState = 1;  // means clicked but no move yet
@@ -181,16 +179,16 @@ namespace indoor_context {
 				double dx = floorplan->vertices(hoverItem).x1() - floorplan->vertices(hoverItem+1).x1();
 				double dy = floorplan->vertices(hoverItem).x2() - floorplan->vertices(hoverItem+1).x2();
 				dragAxis = abs(dx) < abs(dy) ? 0 : 1;
-				Vector<2> canvasPt = MouseToCanvas(mousePt);
-				Vector<2> hoverPt = asToon(floorplan->vertices(hoverItem));
+				Vec2 canvasPt = MouseToCanvas(mousePt);
+				Vec2 hoverPt = asToon(floorplan->vertices(hoverItem));
 				dragOffset = hoverPt[dragAxis] - canvasPt[dragAxis];
 			}
 		}
 	}
 
-	void FloorPlanEditor::planView_MouseDrag(int button, const Vector<2>& mousePt) {
+	void FloorPlanEditor::planView_MouseDrag(int button, const Vec2& mousePt) {
 		if (uiState == UIState::MODIFY && selectedItem != -1) {
-			Vector<2> dragPt = MouseToCanvas(mousePt);
+			Vec2 dragPt = MouseToCanvas(mousePt);
 			dragPt[dragAxis] += dragOffset;
 			if (enableSnap) {
 				dragPt = Snap(dragPt, dragAxis, selectedItem);
@@ -207,14 +205,14 @@ namespace indoor_context {
 		}
 	}
 
-	void FloorPlanEditor::planView_MouseMove(const Vector<2>& mousePt) {
+	void FloorPlanEditor::planView_MouseMove(const Vec2& mousePt) {
 		if (uiState == UIState::INSERT) {
 			if (mouseState == 1) {
 				mouseState = 2; // means hovering
 			}
 			hoverPt = MouseToCanvas(mousePt);
 			if (mouseState == 2) {
-				Vector<2> ref = asToon(floorplan->vertices(floorplan->vertices_size()-1));
+				Vec2 ref = asToon(floorplan->vertices(floorplan->vertices_size()-1));
 				int draw_axis = (abs(hoverPt[0]-ref[0]) > abs(hoverPt[1]-ref[1])) ? 0 : 1;
 				if (enableSnap) {
 					endPt = Snap(hoverPt, draw_axis);
@@ -223,11 +221,11 @@ namespace indoor_context {
 			}
 
 		} else if (uiState == UIState::MODIFY) {
-			Vector<2> planePt = MouseToCanvas(mousePt);
+			Vec2 planePt = MouseToCanvas(mousePt);
 			hoverItem = -1;
 			for (int i = 0; i+1 < floorplan->vertices_size(); i++) {
-				Vector<2> a = asToon(floorplan->vertices(i));
-				Vector<2> b = asToon(floorplan->vertices(i+1));
+				Vec2 a = asToon(floorplan->vertices(i));
+				Vec2 b = asToon(floorplan->vertices(i+1));
 				if (!isnan(a[0]) && !isnan(b[0]) &&
 						GetLineSegDistance(a, b, planePt) < kHitMargin) {
 					hoverItem = i;
@@ -245,11 +243,11 @@ namespace indoor_context {
 
 
 
-	double FloorPlanEditor::MouseToHeight(const Vector<2>& mousePt) {
+	double FloorPlanEditor::MouseToHeight(const Vec2& mousePt) {
 		return sideView.MouseToPlane(mousePt, makeVector(0,1,0,0))[2];
 	}
 
-	void FloorPlanEditor::sideView_MouseDown(int button, const Vector<2>& mousePt) {
+	void FloorPlanEditor::sideView_MouseDown(int button, const Vec2& mousePt) {
 		double z = MouseToHeight(mousePt);
 		if (sideHoverItem == 1) {
 			sideDragOffset = z-floorplan->zfloor();
@@ -261,7 +259,7 @@ namespace indoor_context {
 		camView.Invalidate();
 	}
 
-	void FloorPlanEditor::sideView_MouseUp(int button, const Vector<2>& mousePt) {
+	void FloorPlanEditor::sideView_MouseUp(int button, const Vec2& mousePt) {
 		if (sideDragItem == 1) {
 			DLOG << "Floor plane set to z=" << floorplan->zfloor();
 		} else if (sideDragItem == 2) {
@@ -273,7 +271,7 @@ namespace indoor_context {
 		camView.Invalidate();
 	}
 
-	void FloorPlanEditor::sideView_MouseDrag(int button, const Vector<2>& mousePt) {
+	void FloorPlanEditor::sideView_MouseDrag(int button, const Vec2& mousePt) {
 		double z = MouseToHeight(mousePt);
 		if (sideDragItem == 1) {
 			floorplan->set_zfloor(z-sideDragOffset);
@@ -284,7 +282,7 @@ namespace indoor_context {
 		camView.Invalidate();
 	}
 
-	void FloorPlanEditor::sideView_MouseMove(const Vector<2>& mousePt) {
+	void FloorPlanEditor::sideView_MouseMove(const Vec2& mousePt) {
 		double z = MouseToHeight(mousePt);
 		if (abs(z-floorplan->zfloor()) < kHitMargin) {
 			sideHoverItem = 1;
@@ -313,8 +311,8 @@ namespace indoor_context {
 			<< "There are only " << map.frames.size() << " frames";
 		const Frame& frame = map.frames[selectedFrameIndex_];
 		ImageRef sz = frame.image.pc().image_size();
-		Vector<2> tl = frame.image.pc().retina_bounds().tl();
-		Vector<2> br = frame.image.pc().retina_bounds().br();
+		Vec2 tl = frame.image.pc().retina_bounds().tl();
+		Vec2 br = frame.image.pc().retina_bounds().br();
 
 		// Setup a projection matching that of the camera
 		glMatrixMode(GL_PROJECTION);
@@ -345,7 +343,7 @@ namespace indoor_context {
 		glColorP(Colors::red());
 		if (viewType == ViewType::WIREFRAME) {
 			GL_PRIMITIVE(GL_POINTS) {
-				BOOST_FOREACH(const Vector<3>& v, map.points) {
+				BOOST_FOREACH(const Vec3& v, map.points) {
 					glVertexV(v);
 				}
 			}
@@ -356,8 +354,8 @@ namespace indoor_context {
 			glColorP(Colors::aqua());
 		}
 		for (int i = 0; i+1 < floorplan->vertices_size(); i++) {
-			Vector<2> a = asToon(floorplan->vertices(i));
-			Vector<2> b = asToon(floorplan->vertices(i+1));
+			Vec2 a = asToon(floorplan->vertices(i));
+			Vec2 b = asToon(floorplan->vertices(i+1));
 			if (!isnan(a[0]) && !isnan(b[0])) {
 				if (viewType == ViewType::FILLED) {
 					// TODO: chose the color based on the index of the vanishing point!
@@ -381,7 +379,7 @@ namespace indoor_context {
 		if (viewType == ViewType::WIREFRAME) {
 			GL_PRIMITIVE(GL_LINES) {
 				BOOST_FOREACH(const proto::Vec2& vert, floorplan->vertices()) {
-					Vector<2> v = asToon(vert);
+					Vec2 v = asToon(vert);
 					if (!isnan(v[0])) {
 						glVertex3f(v[0], v[1], floorplan->zfloor());
 						glVertex3f(v[0], v[1], floorplan->zceil());
@@ -391,7 +389,7 @@ namespace indoor_context {
 
 			if (uiState == UIState::INSERT && mouseState == 2) {
 				GL_PRIMITIVE(GL_LINES) {
-					Vector<2> last = asToon(floorplan->vertices(floorplan->vertices_size()-1));
+					Vec2 last = asToon(floorplan->vertices(floorplan->vertices_size()-1));
 					glVertex3f(last[0], last[1], floorplan->zfloor());
 					glVertex3f(endPt[0], endPt[1], floorplan->zfloor());
 					glVertex3f(last[0], last[1], floorplan->zceil());
@@ -407,11 +405,14 @@ namespace indoor_context {
 
 	void FloorPlanEditor::RenderCamView() {
 		const Frame& frame = map.frames[selectedFrameIndex_];
+		if (!frame.image.loaded()) {
+			((Frame&)frame).LoadImage();
+		}
 
 		// Draw the frame
 		if (camViewState == ViewType::WIREFRAME) {
-			Vector<2> tl = frame.image.pc().retina_bounds().tl();
-			Vector<2> br = frame.image.pc().retina_bounds().br();
+			Vec2 tl = frame.image.pc().retina_bounds().tl();
+			Vec2 br = frame.image.pc().retina_bounds().br();
 			glColorP(Colors::white());
 			camTextures.Select(&frame.image);
 			WITHOUT(GL_BLEND) WITH(GL_TEXTURE_2D) GL_PRIMITIVE(GL_QUADS) {
@@ -454,9 +455,9 @@ namespace indoor_context {
 		glLineWidth(2.0);
 		glPointSize(2.0);
 		for (int i = 0; i+1 < floorplan->vertices_size(); i++) {
-			Vector<2> a = asToon(floorplan->vertices(i));
+			Vec2 a = asToon(floorplan->vertices(i));
 			// Draw the line segment
-			Vector<2> b = asToon(floorplan->vertices(i+1));
+			Vec2 b = asToon(floorplan->vertices(i+1));
 			if (!isnan(a[0]) && !isnan(b[0])) {
 				if (i == selectedItem) {
 					glColorP(Colors::fuchsia());
@@ -503,15 +504,17 @@ namespace indoor_context {
 	}
 
 	void FloorPlanEditor::anyView_SpecialKeyDown(int key) {
+		int nf = map.frames.size();
 		switch (key) {
 		case GLUT_KEY_LEFT:
-			SelectFrameByIndex((selectedFrameIndex_+map.frames.size()-1)%map.frames.size());
+			SelectFrameByIndex((selectedFrameIndex_ + nf - 1) % nf);
 			break;
 		case GLUT_KEY_RIGHT:
-			SelectFrameByIndex((selectedFrameIndex_+1)%map.frames.size());
+			SelectFrameByIndex((selectedFrameIndex_ + 1) % nf);
 			break;
 		case GLUT_KEY_F2:
 			enableSnap = !enableSnap;
+			break;
 		}
 	}
 

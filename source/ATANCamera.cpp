@@ -7,17 +7,6 @@ namespace PTAMM {
 
 using namespace std;
 
-	/*ATANCamera::ATANCamera(string sName)
-{
-  // The camera name is used to find the camera's parameters in a GVar.
-  msName = sName;
-  mvCameraParams = GV2.Get(sName+".Parameters", mvDefaultParams, HIDDEN | FATAL_IF_NOT_DEFINED);
-  mvImageSize[0] = 640.0;
-  mvImageSize[1] = 480.0;
-  RefreshParams();
-}
-	*/
-
 /**
  * Create a camera using the specified name, image size, and parameters.
  * This will overwrite any existing GVars of the same name (e.g. Camera.Parameters)

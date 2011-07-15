@@ -8,6 +8,7 @@
 #include "read_ply.h"
 #include "colored_points.h"
 #include "map_widgets.h"
+#include "map_io.h"
 
 #include "gl_utils.tpp"
 
@@ -31,7 +32,7 @@ void Normalize(vector<pair<Vec3, PixelRGB<byte> > >& points) {
 		points[i].first = scale * (points[i].first - centre);
 	}
 }
-	
+
 
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
@@ -40,27 +41,23 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	CHECK_PRED(exists, fs::path(argv[1]));
+	CHECK_PRED(fs::exists, fs::path(argv[1]));
 
 	// Read the .ply file
 	ColoredPoints points;
-	ReadPly(argv[1], points.vs);
+	ReadPly(argv[1], points.vs, true);
 	Normalize(points.vs);
-
-	DREPORT(points.vs.size());
-	
 
 	// Initialize the viewer
 	Viewer3D viewer;
 	viewer.Add(points, 'p');
-
 	viewer.AddOwned(new GroundPlaneWidget);
 
 	// Create the map
 	scoped_ptr<Map> map;
 	if (argc == 3) {
 		map.reset(new Map);
-		map->LoadXml(argv[2]);
+		LoadXmlMap(argv[2], *map);
 		viewer.AddOwned(new MapWidget(map.get()), 'm');
 	}
 

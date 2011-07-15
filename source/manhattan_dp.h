@@ -13,11 +13,12 @@
 #include "histogram.tpp"
 
 namespace indoor_context {
+	// From dp_payoffs.h
+	class DPPayoffs;
+	class DPObjective;
 
 	extern "C" lazyvar<Vec2> gvGridSize;
 	extern "C" lazyvar<float> gvLineJumpThreshold;
-	extern "C" lazyvar<float> gvDefaultWallPenalty;
-	extern "C" lazyvar<float> gvDefaultOcclusionPenalty;
 	
 	////////////////////////////////////////////////////////////////////////////////
 	// Represents a node in the DP graph.
@@ -76,7 +77,6 @@ namespace indoor_context {
 	// Represents a solution to an entire DP problem
 	// Unlike DPSubSolution, this is mostly used externally to examine the
 	// solution produced by ManhattanDP.
-	class DPPayoffs;
 	class DPGeometryWithScale;
 	class DPSolution {
 	public:
@@ -180,71 +180,6 @@ namespace indoor_context {
 		void Configure(const DPGeometry& geom, double zfloor, double zceil);
 		// Back-project an image point onto the floor or ceiling plane
 		Vec3 BackProject(const Vec3& image_point) const;
-	};
-
-	////////////////////////////////////////////////////////////////////////////////
-	// Represents a cost function that ManhattanDP optimizes, in terms of
-	// the cost of assigning label A to pixel [Y,X] (stored in
-	// pixel_scores[A][Y][X]). An object of this form is converted to the
-	// more general representation of DPPayoffs
-	class DPObjective {
-	public:
-		double wall_penalty;  // the cost per wall segment (for regularisation)
-		double occl_penalty;  // the cost per occluding wall segment (_additional_ to wall_penalty)
-		MatF pixel_scores[3];  // score associated with assigning each label to each pixel (image coords)
-
-		// Constructors
-		DPObjective();
-		DPObjective(const Vec2I& size);
-		// Get size
-		int nx() const { return pixel_scores[0].Cols(); }
-		int ny() const { return pixel_scores[0].Rows(); }
-		// Change size
-		void Resize(const Vec2I& size);
-		// Deep copy
-		void CopyTo(DPObjective& rhs);
-	private:
-		// Disallow copy constructor (CopyTo explicitly)
-		DPObjective(const DPObjective& rhs);
-	};
-
-
-
-	////////////////////////////////////////////////////////////////////////////////
-	// The cost function the DP optimizes, specified in terms of the cost
-	// of placing the top/bottom of a wall at each pixel.
-	class DPPayoffs {
-	public:
-		double wall_penalty;  // the cost per wall segment (for regularisation)
-		double occl_penalty;  // the cost per occluding wall segment (_additional_ to wall_penalty)
-		MatF wall_scores[2];  // cost of building the top/bottom of a wall at p (grid coords)
-
-		// Initialize empty
-		DPPayoffs();
-		// Initialize and allocate (and initiale all payoffs to zero)
-		DPPayoffs(Vec2I size);
-		// Get width
-		int nx() const { return wall_scores[0].Cols(); }
-		// Get Height
-		int ny() const { return wall_scores[0].Rows(); }
-
-		// Resize the score matrix and initialze to zero
-		void Resize(Vec2I size);
-		// Resize the score matrix and reset all elements to the specified value
-		void Clear(float fill);
-		// Clone this object
-		void CopyTo(DPPayoffs& other);
-
-		// Sum over a path (e.g. representing a candidate solution)
-		double SumOverPath(const VecI& path, const VecI& orientations) const;
-
-		// Add a payoff matrix weighted by a constant
-		void Add(const DPPayoffs& other, double weight=1.0);
-		// Add a payoff matrix to both wall_scores[0] and wall_scores[1], multiplied by a constant.
-		void Add(const MatF& delta, double weight=1.0);
-	private:
-		// Disallow copy constructor (use CopyTo explicitly instead)
-		DPPayoffs(const DPPayoffs& rhs);
 	};
 
 

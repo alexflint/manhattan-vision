@@ -13,7 +13,8 @@
 
 namespace indoor_context {
 	void ReadPly(const string& file,
-							 vector<pair<Vec3,PixelRGB<byte> > >& points) {
+							 vector<pair<Vec3,PixelRGB<byte> > >& points,
+							 bool read_normals) {
 		ifstream input(file.c_str());
 
 		string magic, line;
@@ -33,7 +34,11 @@ namespace indoor_context {
 		int r, g, b;
 		for (int i = 0; i < num_verts; i++) {
 			// streaming directly into PixelRGB<byte>::r etc seems to fail
-			input >> v[0] >> v[1] >> v[2] /* >> n[0] >> n[1] >> n[2] */ >> r >> g >> b;
+			input >> v[0] >> v[1] >> v[2];
+			if (read_normals) {
+				input >> n[0] >> n[1] >> n[2];
+			}
+			input >> r >> g >> b;
 			points.push_back(make_pair(v, PixelRGB<byte>(r, g, b)));
 		}
 	}

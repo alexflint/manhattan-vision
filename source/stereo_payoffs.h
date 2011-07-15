@@ -1,5 +1,6 @@
 #include "camera.h"
 #include "manhattan_dp.h"
+#include "dp_payoffs.h"
 
 #include "integral_image.tpp"
 

@@ -1,6 +1,7 @@
 #include <VW/Image/imagecopy.h>
 #include <VNL/vector.tpp>
 
+#include "vars.h"
 #include "common_types_vw.h"
 #include "timer.h"
 #include "vanishing_points.h"
@@ -10,9 +11,15 @@
 
 using namespace indoor_context;
 
+lazyvar<Vec5> gvDefaultCameraParams("Map.DefaultCameraParameters");
+lazyvar<Vec2> gvDefaultImageSize("Map.DefaultImageSize");
+
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
-	ImageBundle image(argv[1]);
+
+	// Load image
+	ATANCamera camera(*gvDefaultCameraParams, *gvDefaultImageSize);
+	CalibratedImage image(&camera, argv[1]);
 
 	// Find vanishing points
 	VanishingPoints vpts;
@@ -20,9 +27,9 @@ int main(int argc, char **argv) {
 
 	// Output vizualizations
 	WriteMatrixImageRescaled("out/magnitude_sqr.png",
-													 vpts.lines.canny.magnitude_sqr);
+													 vpts.line_detector.canny.magnitude_sqr);
 	WriteMatrixImageRescaled("out/edges.png",
-													 vpts.lines.canny.edge_map);
+													 vpts.line_detector.canny.edge_map);
 	vpts.OutputLineViz("out/linesegs.png");
 	vpts.OutputVanPointViz("out/vpts.png");
 

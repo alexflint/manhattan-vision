@@ -66,9 +66,9 @@ namespace indoor_context {
 
 	void WriteImage(const std::string& file, const ImageRGB<byte>& image) {
 		rgba8c_view_t v = interleaved_view(image.GetWidth(),
-																								 image.GetHeight(),
-																								 (const rgba8_pixel_t*)image.GetImageBuffer(),
-																								 image.GetWidth()*sizeof(PixelRGB<byte>));
+																			 image.GetHeight(),
+																			 (const rgba8_pixel_t*)image.GetImageBuffer(),
+																			 image.GetWidth()*sizeof(PixelRGB<byte>));
 		// Here we use a hack to work around the fact that GIL uses 255=opaque but we use 0=opaque
 		InvertAlpha(const_cast<ImageRGB<byte>&>(image));
 		png_write_view(file, v);
@@ -80,15 +80,5 @@ namespace indoor_context {
 		ImageRGB<byte> canvas;
 		ImageConvert(image, canvas);
 		WriteImage(file, canvas);
-
-		// From http://lists.boost.org/Archives/boost/2006/12/114308.php
-		/*typedef boost::mpl::vector<gray8_image_t, gray16_image_t, rgb8_image_t, rgb16_image_t> img_types;
-		typedef any_image<img_types>::view_t::const_t::types_t view_types; 
-		gray32fc_view_t v = interleaved_view(image.GetWidth(),
-																				 image.GetHeight(),
-																				 (const gray32f_pixel_t*)image.GetData(),
-																				 image.GetWidth()*sizeof(PixelMono<float>));*/
-		//png_write_view(file, any_color_converted_view<view_types, gray8_pixel_t>(v));
-		//png_write_view(file, v);
 	}
 }

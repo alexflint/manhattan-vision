@@ -3,29 +3,18 @@
 
 #include <boost/exception/all.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/ptr_container/ptr_map.hpp>
-#include <boost/thread.hpp>
 
 #include "entrypoint_types.h"
-#include "joint_payoffs.h"
-#include "manhattan_dp.h"
-#include "map.h"
-#include "bld_helpers.h"
-#include "safe_stream.h"
-#include "timer.h"
-#include "payoff_helpers.h"
-#include "canvas.h"
 #include "numeric_utils.h"
 #include "likelihoods.h"
 
-#include "numerical_jacobian.tpp"
-#include "format_utils.tpp"
 #include "io_utils.tpp"
-#include "image_utils.tpp"
+#include "numerical_jacobian.tpp"
+#include "protobuf_utils.tpp"
 
-lazyvar<double> gvDelta("LikelihoodDerivatives.Delta");
-
-lazyvar<string> gvStereoOffsets("JointDP.Stereo.AuxOffsets");
+// Window size for finite differences
+// Avoid using gvars here
+static const double kDefaultDelta = 1e-8;
 
 double EvaluateModelLogLik(ModelLikelihood& likelihood,
 													 const proto::PayoffFeatureSet& featureset,
@@ -51,8 +40,7 @@ double EvaluateFeatureLogLik(FeatureLikelihood& likelihood,
 
 ///////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
-	InitVars(argc, argv);
-	Timer timer;
+	//InitVars(argc, argv);
 
 	// Declare the supported options.
 	po::options_description desc("Allowed options");
@@ -61,9 +49,12 @@ int main(int argc, char **argv) {
 		("features", po::value<string>()->required(), "file containing payoff features")
 		("weights", po::value<string>(), "feature weights")
     ("corner_penalty", po::value<float>()->required(), "per-corner penalty")
-    ("occlusion_penalty", po::value<float>()->required(), "additional penalty for occluding corners")
+    ("occlusion_penalty", po::value<float>()->required(),
+		 "additional penalty for occluding corners")
     ("with_gradient", "also compute gradient")
     ("logit", "use logistic likelihood (default is Gaussian)")
+    ("delta", po::value<double>()->default_value(kDefaultDelta),
+		 "Window size for finite differences.")
 		;
 
 	// Parse options
@@ -98,12 +89,9 @@ int main(int argc, char **argv) {
 		<< "Penalties mut be positive (since constant in geometric series must be < 1)";
 
 	bool grad = opts.count("with_gradient") > 0;
+	double delta = opts["delta"].as<double>();
 
-	// Initialize map
-	Map map;
-	proto::TruthedMap gt_map;
-	string cur_sequence = "";
-
+	// TODO: finish implementing analytic gradients
 	bool kComputeAnalyticalGradients = false;
 
 	// Initialize likelihood functions
@@ -121,8 +109,6 @@ int main(int argc, char **argv) {
 		ftr_lik.reset(ftr_likelihood);
 	}
 
-	DREPORT(lambda, theta);
-
 	// Prepare functions (for convenience with numerical gradientJacobians)
 	boost::function<double(const Vec2&)> model_loglik_func =
 		boost::bind(&EvaluateModelLogLik, ref(*model_lik), ref(feature_set), _1);
@@ -135,14 +121,13 @@ int main(int argc, char **argv) {
 	double loglik = ftr_loglik + model_loglik;
 
 	// Done. Print with high precision so matlab can read with high precision.
-	DLOG << "Processed " << feature_set.frames_size() << " frames in " << timer;
 	format fmt("%.18e ");
 	DLOG << fmt % loglik;
 
 	if (grad) {
 		LogManager::Disable();
-		Vec2 J_model_loglik = NumericalJacobian(model_loglik_func, lambda, *gvDelta);
-		Vector<> J_ftr_loglik = NumericalJacobian(ftr_loglik_func, theta, *gvDelta);
+		Vec2 J_model_loglik = NumericalJacobian(model_loglik_func, lambda, delta);
+		Vector<> J_ftr_loglik = NumericalJacobian(ftr_loglik_func, theta, delta);
 		Vector<> numerical_J_loglik = concat(J_model_loglik, J_ftr_loglik);
 		LogManager::Enable();
 

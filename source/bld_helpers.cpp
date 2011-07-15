@@ -15,6 +15,7 @@
 #include "geom_utils.h"
 #include "canvas.h"
 #include "vw_image_io.h"
+#include "dp_payoffs.h"
 
 #include "vw_image.tpp"
 #include "image_utils.tpp"

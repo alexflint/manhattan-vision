@@ -3,6 +3,7 @@
 #include "payoff_helpers.h"
 #include "numeric_utils.h"
 #include "gaussian.h"
+#include "dp_payoffs.h"
 
 #include "vector_utils.tpp"
 

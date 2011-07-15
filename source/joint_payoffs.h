@@ -6,6 +6,7 @@
 #include "point_cloud_payoffs.h"
 #include "line_sweep_features.h"
 #include "manhattan_dp.h"
+#include "dp_payoffs.h"
 
 namespace indoor_context {
 

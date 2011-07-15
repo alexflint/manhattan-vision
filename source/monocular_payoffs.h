@@ -2,6 +2,7 @@
 
 #include "common_types.h"
 #include "manhattan_dp.h"
+#include "dp_payoffs.h"
 
 #include "integral_image.tpp"
 

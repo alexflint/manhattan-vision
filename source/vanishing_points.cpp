@@ -368,14 +368,16 @@ namespace indoor_context {
 			DLOG << "Error: too few lines detected to proceed with vanishing point estimation";
 		} else {
 			// Transfer to calibrated domain
-			// TODO: implement this when we don't have a linear camera
-
 			// If M is a 3x3 matrix mapping points from one space to another,
 			// then M^-T is the corresponding mapping for lines. Since points
 			// are mapped through the _inverse_ of the camera intrinsics, we
 			// should map lines through the transpose of the (non-inverted)
 			// camera intrinsics.
-			Mat3 line_calib = ((LinearCamera&)image.camera()).intrinsics().T();
+
+			// If the camera is a LinearCamera then this operation just gets
+			// the internal camera matrix; otherwise it fits a least-squares
+			// linear camera.
+			Mat3 line_calib = image.camera().Linearize().T();
 			BOOST_FOREACH(LineDetection& det, line_detector.detections) {
 				det.eqn = line_calib * det.eqn;
 			}

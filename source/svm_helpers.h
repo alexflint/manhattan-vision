@@ -6,6 +6,7 @@
 #include "manhattan_dp.h"
 #include "image_bundle.h"
 #include "svm_light_wrappers.h"
+#include "dp_payoffs.h"
 
 namespace indoor_context {
 

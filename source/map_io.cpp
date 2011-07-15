@@ -9,6 +9,7 @@
 #include "vw_image_io.h"
 
 #include "io_utils.tpp"
+#include "protobuf_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {

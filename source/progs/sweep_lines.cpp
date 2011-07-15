@@ -1,6 +1,8 @@
 #include "entrypoint_types.h"
 #include "line_sweeper.h"
+#include "guided_line_detector.h"
 #include "map.h"
+#include "map_io.h"
 #include "map.pb.h"
 
 #include "bld_helpers.h"
@@ -17,18 +19,21 @@ int main(int argc, char **argv) {
 
 	Map map;
 	proto::TruthedMap gt_map;
-	map.LoadWithGroundTruth(GetMapPath(sequence), gt_map);
+	string path = GetMapPath(sequence);
+	LoadXmlMapWithGroundTruth(path, map, gt_map);
 
-	KeyFrame* kf = map.KeyFrameByIdOrDie(frame_id);
-	kf->LoadImage();
+	Frame* f = map.GetFrameByIdOrDie(frame_id);
+	DLOG << "Loading image...";
+	f->LoadImage();
+	DLOG << "Loaded image.";
 
 	GuidedLineDetector line_detector;
-	line_detector.Compute(kf->image);
+	line_detector.Compute(f->image);
 
 	IsctGeomLabeller sweeper;
-	sweeper.Compute(kf->image, line_detector.detections);
+	sweeper.Compute(f->image, line_detector.detections);
 
-	sweeper.OutputOrientViz("orients.png");
+	sweeper.OutputOrientViz("out/orients.png");
 
 	return 0;
 }

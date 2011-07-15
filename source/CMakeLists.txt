@@ -280,6 +280,7 @@ ADD_LIBRARY( core SHARED
 # BUILD MANHATTAN LIBRARY
 ###############################################################################
 ADD_LIBRARY( manhattan SHARED
+	dp_payoffs.cpp
 	manhattan_dp.cpp
 	manhattan_ground_truth.cpp
 

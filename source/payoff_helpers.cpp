@@ -109,12 +109,6 @@ namespace indoor_context {
 		}
 	}
 
-	/*void LoadFeatures(const string& file, PayoffFeatures& features) {
-		proto::FrameWithFeatures data;
-		ReadProto(file, data);
-		UnpackFeatures(data, features);
-		}*/
-
 	void CompilePayoffs(const PayoffFeatures& features,
 											const ManhattanHyperParameters& params,
 											DPPayoffs& payoffs) {

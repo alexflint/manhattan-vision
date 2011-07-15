@@ -2,6 +2,7 @@
 #include "camera.h"
 #include "guided_line_detector.h"
 #include "manhattan_dp.h"
+#include "dp_payoffs.h"
 
 namespace indoor_context {
 	// Compute costs by sweeping lines
