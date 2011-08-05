@@ -112,7 +112,6 @@ int main(int argc, char **argv) {
 	if (argc == 2) {
 		// Load an existing floorplan
 		LoadXmlMapWithGroundTruth(GetMapPath(argv[1]), *slam_map, gt_map);
-		DLOG << "Loaded a Truthed Map for " << gt_map.spec_file();
 
 	} else {
 		// Check args
@@ -123,13 +122,12 @@ int main(int argc, char **argv) {
 		}
 		fs::path spec_file(argv[3]);
 		CHECK_PRED1(fs::exists, spec_file) << "You must specify an XML map file";
-		DLOG << "Creating a tru map for " << spec_file.string();
+		DLOG << "Creating ground truth for " << spec_file.string();
 			
 		// Load the map and estimate a Manhattan frame
 		LoadXmlMap(spec_file.string(), *slam_map);
 		cout << "***** TODO: re-wire Map::RotateToSceneFrame!";
-		cout << "Not estimating any Manhattan frame, outputting identity";
-		
+		cout << "Not estimating any Manhattan frame, outputting identity";		
 		//slam_map->RotateToSceneFrame();
 
 		// Create a new truthed map

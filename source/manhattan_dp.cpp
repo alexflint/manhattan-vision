@@ -161,7 +161,7 @@ using namespace toon;
 			Vec3 tr = makeVector(r[0], r[1], geometry.zceil);
 			Vec3 bl = makeVector(l[0], l[1], geometry.zfloor);
 			Vec3 br = makeVector(r[0], r[1], geometry.zfloor);
-			renderer.Render(tl, br, tr, 0);  // use 0 because we're only going to use the depth buffer
+			renderer.Render(tl, br, tr, 0);  // we're only interested in depth
 			renderer.Render(tl, br, bl, 0);
 		}
 
@@ -221,16 +221,20 @@ using namespace toon;
 
 		// Compute the horizon at the left and right of the image
 		Vec2 horizon_at_left = project(horizon ^ makeVector(-1,0,0));
-		Vec2 horizon_at_right = project(horizon ^ makeVector(-1,0,cam.image_size().x));
-		CHECK(!isnan(horizon_at_left)) << "horizon does not intersect the left image boundary!";
-		CHECK(!isnan(horizon_at_right)) << "horizon does not intersect the right image boundary!";
+		Vec2 horizon_at_right = project(horizon ^ makeVector(-1,0,cam.nx()));
+		CHECK(!isnan(horizon_at_left))
+			<< "horizon does not intersect the left image boundary!";
+		CHECK(!isnan(horizon_at_right))
+			<< "horizon does not intersect the right image boundary!";
 		horizon_row = roundi(0.5*horizon_at_left[1] + 0.5*horizon_at_right[1]);
 
-		// Check that image is not flipped. This should be guaranteed by GetVerticalRectifier
+		// Check that image is not flipped. This should be guaranteed by
+		// GetVerticalRectifier
 		Vec2 floor_pt = makeVector(0, horizon_row+1);
-		// Note that PosedCamera::GetImageHorizon always returns a line with positive half on the floor...
+		// Note that PosedCamera::GetImageHorizon always returns a line
+		// with positive half on the floor...
 		CHECK_GT(GridToImage(floor_pt) * cam.GetImageHorizon(), 0)
-			<< "The matrix returned by GetVerticalRectifier flips the image upside down!";
+			<< "The matrix returned by GetVerticalRectifier flips the image!";
 	}
 
 	Vec3 DPGeometry::GridToImage(const Vec2& x) const {
@@ -242,7 +246,6 @@ using namespace toon;
 	}
 
 	Vec2 DPGeometry::Transfer(const Vec2& grid_pt) const {
-		//const Mat3& m = grid_pt[1] < horizon_row ? grid_ceilToFloor : grid_floorToCeil;
 		return project(Transfer(unproject(grid_pt)));
 	}
 
@@ -252,7 +255,7 @@ using namespace toon;
 	}
 
 	void DPGeometry::TransformDataToGrid(const MatF& in, MatF& out) const {
-		CHECK_EQ(matrix_size(in), asToon(camera->image_size()));
+		CHECK_EQ(matrix_size(in), camera->image_size());
 		out.Resize(grid_size[1], grid_size[0], 0.0);
 
 		// Check that the four corners project within the grid bounds
@@ -450,7 +453,9 @@ using namespace toon;
 
 			// Try going up/down. Never cross the horizon or the image bounds.
 			int next_row = state.row + (state.dir == DPState::DIR_UP ? -1 : 1);
-			if (next_row != geom->horizon_row && next_row >= 0 && next_row < geom->grid_size[1]) {
+			if (next_row != geom->horizon_row &&
+					next_row >= 0 &&
+					next_row < geom->grid_size[1]) {
 				DPState next = state;
 				next.row = next_row;
 				best.ReplaceIfSuperior(Solve(next), next);
@@ -534,8 +539,8 @@ using namespace toon;
 		solution.num_occlusions = 0;
 		solution.wall_segments.clear();
 		solution.wall_orients.clear();
-		solution.pixel_orients.Resize(geom->camera->image_size().y,
-																	geom->camera->image_size().x,
+		solution.pixel_orients.Resize(geom->camera->ny(),
+																	geom->camera->nx(),
 																	kVerticalAxis);
 
 		// Backtrack through the graph
@@ -610,8 +615,8 @@ using namespace toon;
 		MatI grid_orients;
 		ComputeGridOrients(grid_orients);
 
-		orients.Resize(geom->camera->image_size().y,
-									 geom->camera->image_size().x);
+		orients.Resize(geom->camera->ny(),
+									 geom->camera->nx());
 		for (int y = 0; y < orients.Rows(); y++) {
 			int* row = orients[y];
 			for (int x = 0; x < orients.Cols(); x++) {

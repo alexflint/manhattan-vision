@@ -16,8 +16,9 @@ namespace indoor_context {
 	//   myWindow.Display.add(bind(&myDrawFunc, foo, bar));
 	//   myWindow.Run();   // begins GLUT loop
 	//
-	// Safe to create window from GLUT callbacks, and create multiple windows before calling run().
-	// Do NOT run() multiple windows in different threads. One GLUT thread handles _all_ windows.
+	// Safe to create window from GLUT callbacks, and create multiple
+	// windows before calling run(). Do not run() windows from multiple
+	// different threads. One GLUT thread handles all windows.
 	class GlutWindow {
 	public:
 		// Create a GLUT window with the given title.
@@ -75,7 +76,7 @@ namespace indoor_context {
 		inline int id() const { return handle_; }
 
 		// Get the mouse location
-		inline const toon::Vector<2>& mouse_location() const { return mousePt_; }
+		inline const Vec2& mouse_location() const { return mousePt_; }
 
 		// Get/set window size
 		inline const ImageRef& size() const { return size_; }
@@ -114,19 +115,19 @@ namespace indoor_context {
 		void OutputFrameBuffer(const string& filename) const;
 
 		// Events
-		Event<> Display;  // fired when the window needs to be redrawn. Make gl* calls here
+		Event<> Display;  // fired when the window needs to be redrawn.
 		Event<> AfterDisplay;  // fired after all gl* calls complete and flushed
 		Event<> Idle;
 		Event<> MouseIn;
 		Event<> MouseOut;
 		Event<void(byte c)> KeyDown;
 		Event<void(int key)> SpecialKeyDown;  // arrows, function keys, etc
-		Event<void(toon::Vector<2> pos)> MouseMove;
-		Event<void(int button, toon::Vector<2> pos)> MouseDown;
-		Event<void(int button, toon::Vector<2> pos)> MouseUp;
-		Event<void(int button, toon::Vector<2> pos)> MouseDrag;
-		Event<void(int button, toon::Vector<2> pos)> Click;
-		Event<void(int button, toon::Vector<2> pos)> DoubleClick;
+		Event<void(Vec2 pos)> MouseMove;
+		Event<void(int button, Vec2 pos)> MouseDown;
+		Event<void(int button, Vec2 pos)> MouseUp;
+		Event<void(int button, Vec2 pos)> MouseDrag;
+		Event<void(int button, Vec2 pos)> Click;
+		Event<void(int button, Vec2 pos)> DoubleClick;
 		Event<> VisibilityChanged;
 		Event<> SizeChanged;
 		Event<> Closing;
@@ -211,13 +212,13 @@ namespace indoor_context {
 		int cursor_;
 
 		// Last position at which the mouse went down
-		toon::Vector<2> mouseDownPt_;
+		Vec2 mouseDownPt_;
 		// Last mouse button pressed
 		int mouseDownButton_;
 		// Whether the mouse has been dragged since the last mouseDown event
 		bool mouseDragFlag_;
 		// Current position of the mouse
-		toon::Vector<2> mousePt_;
+		Vec2 mousePt_;
 		// Time of the last click, used for detecting double-clicks
 		//VW::Timer mouseTimer_;
 

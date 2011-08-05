@@ -66,7 +66,7 @@ namespace indoor_context {
 		static void RunWidget(Widget3D& w);
 
 		// Get the mouse location
-		inline const toon::Vector<2>& mouse_location() const { return window().mouse_location(); }
+		inline const Vec2& mouse_location() const { return window().mouse_location(); }
 
 		// Control whether the mouse navigates the environment
 		void SetNavigable(bool v);
@@ -109,33 +109,33 @@ namespace indoor_context {
 
 
 		// Get the widget at a given mouse location, or null if there isn't one there
-		Widget3D* GetWidgetAt(const toon::Vector<2>& mouse);
+		Widget3D* GetWidgetAt(const Vec2& mouse);
 
 		// Reset the GL projection matrix, usually after window resize
 		void ConfigureProjection();
 
 		// Project an object location to the screen. (0,0) is top left corner (i.e. not GL std).
-		toon::Vector<2> ProjectToScreen(const toon::Vector<4>& obj) const;
+		Vec2 ProjectToScreen(const Vec4& obj) const;
 		// Project an object location to the screen, assuming the last coord is 1.0.
-		toon::Vector<2> ProjectToScreen(const Vec3& obj) const;
+		Vec2 ProjectToScreen(const Vec3& obj) const;
 
 		// Convert a mouse location to a viewport location
-		toon::Vector<2> WindowToViewport(const toon::Vector<2>& screenPt) const;
+		Vec2 WindowToViewport(const Vec2& screenPt) const;
 
 		// Project a mouse location in window coordinates to a plane in
 		// 3D. Mouse coords should be as passed to glutMouseMotion
 		// etc. Returns a 3D point on the plane specified by planeEqn.
-		Vec3 MouseToPlane(const toon::Vector<2> mousePt,
-				const toon::Vector<4>& planeEqn);
+		Vec3 MouseToPlane(const Vec2& mousePt,
+											const Vec4& planeEqn) const;
 
 		// Handlers for GLUT callbacks
 		void Window_Display();
-		void Window_MouseMove(toon::Vector<2> mousePt);
-		void Window_MouseUp(int button, toon::Vector<2> mousePt);
-		void Window_MouseDown(int button, toon::Vector<2> mousePt);
-		void Window_MouseDrag(int button, toon::Vector<2> mousePt);
-		void Window_Click(int button, toon::Vector<2> mousePt);
-		void Window_DoubleClick(int button, toon::Vector<2> mousePt);
+		void Window_MouseMove(Vec2 mousePt);
+		void Window_MouseUp(int button, Vec2 mousePt);
+		void Window_MouseDown(int button, Vec2 mousePt);
+		void Window_MouseDrag(int button, Vec2 mousePt);
+		void Window_Click(int button, Vec2 mousePt);
+		void Window_DoubleClick(int button, Vec2 mousePt);
 		void Window_SizeChanged();
 	private:
 		// The window we're displayed in
@@ -148,7 +148,7 @@ namespace indoor_context {
 		mutable initialized_ptr<GluProjector> projector_;
 
 		// Previous mouse location, used during mouse drag
-		toon::Vector<2> prevMousePt_;
+		Vec2 prevMousePt_;
 		// The selected widget, or NULL if nothing is selected
 		Widget3D* selection_;
 		// The widget the mouse is hovering over, or NULL if nothing is selected
@@ -181,34 +181,6 @@ namespace indoor_context {
 		// Loads the matrices from GL
 		void Configure(const ImageRef& winSize);
 		// Projects a point through the current matrices
-		toon::Vector<2> Project(const Vec3& v) const;
-	};
-
-
-
-
-
-	// Manages loading, unloading, and binding GL textures
-	class TextureManager {
-	public:
-		// Select the texture for a given image. If the image has not yet
-		// been loaded into GL then it will be loaded under a generated
-		// texture ID.
-		void Select(const ImageBundle* image);
-		// Load an image as a GL texture or look up its texture ID if it
-		// has already been loaded.
-		GLuint LoadOrLookup(const ImageBundle* image);
-		// Reload a texture into GL (or load it for the first time if has
-		// not been loaded).
-		GLuint Reload(const ImageBundle* image);
-		// Remove a texture from GL (or do nothing if it has not been loaded)
-		void Delete(const ImageBundle* image);
-		// Draw a texture
-		void Render(const ImageBundle* image, const GlutWindow* window);
-		// Draw a texture full-screen
-		void RenderFullScreen(const ImageBundle* image, const GlutWindow* window);
-	private:
-		// Map of images to texture IDs
-		map<const ImageBundle*,unsigned> textureIds_;
+		Vec2 Project(const Vec3& v) const;
 	};
 }

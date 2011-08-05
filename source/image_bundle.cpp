@@ -69,7 +69,7 @@ namespace indoor_context {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexImage2D(GL_TEXTURE_2D, 0, 4, nx(), ny(), 
-								 0, GL_BGRA, GL_UNSIGNED_BYTE,
+								 0, GL_RGBA, GL_UNSIGNED_BYTE,
 								 rgb.GetImageBuffer());
 		glError();
 		return gl_texture_id;

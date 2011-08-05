@@ -1,12 +1,14 @@
 #include <map>
 
 #include <boost/filesystem.hpp>
+#include <boost/format.hpp>
 
 #include "common_types.h"
 #include "safe_stream.h"
 #include "map_io.h"
 #include "tinyxml.h"
 #include "vw_image_io.h"
+#include "filesystem_utils.h"
 
 #include "io_utils.tpp"
 #include "protobuf_utils.tpp"
@@ -46,7 +48,7 @@ namespace indoor_context {
 			if (list_in.eof()) break;
 			fs::path path = basedir / image_file;
 			if (!fs::exists(path)) {
-				DLOG << "Warning: image file not found: " << path;
+				DLOG << "WARNING: image file not found: " << path;
 			}
 			image_paths.push_back(path);
 		}
@@ -64,9 +66,12 @@ namespace indoor_context {
 
 		CHECK(num_cameras > 0);
 		CHECK_EQ(image_paths.size(), num_cameras)
-			<< "Number of cameras should equal number of image files in " << image_list_file;
+			<< "Number of cameras should equal number of image files in "
+			<< image_list_file;
 
 		// Load poses
+		bool warned_focal = false;
+		bool warned_distortion = false;
 		double focal_length;
 		double f;
 		Mat3 R;
@@ -74,29 +79,31 @@ namespace indoor_context {
 		Vec2 distortion;
 		for (int i = 0; i < num_cameras; i++) {
 			in >> f >> distortion >> R >> t;
-			CHECK_EQ(distortion, makeVector(0,0)) << "Can't handle distorted cameras yet";
+			if (distortion != makeVector(0,0) && !warned_distortion) {
+				DLOG << "WARNING: Distorted cameras not supported yet, "
+						 << "loading map anyway";
+				warned_distortion = true;
+			}
 			if (i == 0) {
 				focal_length = f;
 				// Construct a linear camera
 				Mat3 cam = Identity;
 				cam[0][0] = cam[1][1] = focal_length;
-				map.camera.reset(new LinearCamera(cam, asIR(*gvDefaultImageSize)));
+				map.camera.reset(new LinearCamera(cam, *gvDefaultImageSize));
 			} else {
-				CHECK_EQ(f, focal_length) << EXPR(i) << "Can't handle multiple focal lengths yet";
+				if (f != focal_length && !warned_focal) {
+					DLOG << "WARNING: Multiple focal lengths not supported yet, "
+						"loading map anyway";
+					warned_focal = true;
+				}
 			}
 
 			// Bundler considers cameras looking down the negative Z axis so
 			// invert (this only really matters for visualizations and
 			// visibility testing).
-			R = -R;
-			t = -t;
-
-			Frame* frame = new Frame;
+			SE3<> pose(SO3<>(-R), -t);
 			string image_file = i < image_paths.size() ? image_paths[i].string() : "";
-			frame->Configure(&map, i, image_file, SE3<>(SO3<>(R),t));
-			frame->initializing = false;
-			frame->lost = false;
-			map.frames.push_back(frame);
+			map.AddFrame(new Frame(i, image_file, pose));
 		}
 
 
@@ -162,11 +169,10 @@ namespace indoor_context {
 						 frame_elem = frame_elem->NextSiblingElement("Frame")) {
 					string image_file = (frames_dir/frame_elem->Attribute("name")).string();
 					Vec6 lnPose = stream_to<Vec6>(frame_elem->Attribute("pose"));
-					Frame* f = new Frame;  // will be owned by the ptr_vector
-					f->Configure(&map, next_id++, image_file, SE3<>::exp(lnPose));
+					Frame* f = new Frame(next_id++, image_file, SE3<>::exp(lnPose));
 					f->initializing = norm_sq(lnPose) == 0;
 					f->lost = frame_elem->Attribute("lost") == "1" || f->initializing;
-					map.frames.push_back(f);
+					map.AddFrame(f);
 				}
 			}
 		} else {
@@ -197,10 +203,7 @@ namespace indoor_context {
 				}
 
 				// Add the keyframe
-				Frame* frame = new Frame;
-				frame->Configure(&map, id, image_file.string(), SE3<>::exp(lnPose));
-				frame->lost = false;
-				frame->initializing = false;
+				Frame* frame = new Frame(id, image_file.string(), SE3<>::exp(lnPose));
 				map.AddFrame(frame);
 
 				// Add the measurements
@@ -224,11 +227,14 @@ namespace indoor_context {
 			}
 		}
 
-		DLOG << "Loaded " << map.points.size() << " points and " << map.frames.size() << " frames";
+		DLOG << "Loaded " << map.points.size() << " points and "
+				 << map.frames.size() << " frames";
 		if (fallback_frames.size() == 1) {
-			DLOG << "Using grayscale image for frame " << fallback_frames[0];
+			DLOG << "Using grayscale image for frame "
+					 << fallback_frames[0];
 		} else if (!fallback_frames.empty()) {
-			DLOG << "Using grayscale image for frames " << iowrap(fallback_frames, ",");
+			DLOG << "Using grayscale image for frames "
+					 << iowrap(fallback_frames, ",");
 		}
 	}
 
@@ -247,6 +253,67 @@ namespace indoor_context {
 			swap(zfloor, zceil);
 			gt_map.mutable_floorplan()->set_zfloor(zfloor);
 			gt_map.mutable_floorplan()->set_zceil(zceil);
+		}
+	}
+
+	void LoadMapFromVoodooTextFile(const string& text_file,
+																 const string& image_pattern,
+																 Map& map) {
+		static const string kMagic = "#timeindex";
+		static const string kPointsHeader = "# 3D Feature Points";
+		sifstream in(expand_path(text_file));
+
+		double Cx, Cy, Cz, Ax, Ay, Az, Hx, Hy, Hz, Vx, Vy, Vz, K3, K5;
+		double sx, sy, Width, Height, ppx, ppy, f, fov;
+		double H0x, H0y, H0z, V0x, V0y, V0z;
+
+
+		DLOG << "WARNING: using first camera intrinsics for all cameras";
+		int i = 0;
+		Vec3 v;
+		bool reading_points = false;
+		boost::format image_fmt(image_pattern);
+		while (!in.eof()) {
+			if (reading_points) {
+				in >> v[0] >> v[1] >> v[2];
+				map.points.push_back(v);
+			} else {
+				string line;
+				getline(in, line);
+				if (line.substr(0,kMagic.size()) == kMagic) {
+					int id = lexical_cast<int>(line.substr(kMagic.size()+1));
+					in >> Cx >> Cy >> Cz >> Ax >> Ay >> Az
+						 >> Hx >> Hy >> Hz >> Vx >> Vy >> Vz >> K3 >> K5
+						 >> sx >> sy >> Width >> Height >> ppx >> ppy >> f >> fov
+						 >> H0x >> H0y >> H0z >> V0x >> V0y >> V0z;
+				
+					string image_file = str(image_fmt % 21);//id);
+					CHECK_PRED1(fs::exists, image_file);
+
+					Mat3 C;
+					C[0] = makeVector(f/sx, 0, ppx);
+					C[1] = makeVector(0, f/sy, ppx);
+					C[2] = makeVector(0, 0, 1);
+					if (i == 0) {
+						Vec2I image_size = GetImageSize(expand_path(image_file));
+						map.camera.reset(new LinearCamera(C, image_size));
+					}
+
+					Mat3 R;
+					R[0] = makeVector(H0x, H0z, H0y);
+					R[1] = makeVector(V0x, V0z, V0y);
+					R[2] = makeVector(Ax, Az, Ay);
+					Vec3 t = makeVector(-Cx, -Cy, -Cz);
+					SE3<> pose(SO3<>(R), t);
+
+					map.AddFrame(new Frame(id, image_file, pose));
+
+					i++;
+				} else if (line.substr(0, kPointsHeader.size()) == kPointsHeader) {
+					getline(in, line);  // trash
+					reading_points = true;
+				}
+			}
 		}
 	}
 }

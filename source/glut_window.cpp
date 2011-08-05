@@ -224,10 +224,12 @@ namespace indoor_context {
 	}
 
 	void GlutWindow::CaptureFrameBuffer(ImageRGB<byte>& out) const {
-		CHECK(InGlutThread()) << "Must capture the frame buffer from inside the GLUT thread.";
+		CHECK(InGlutThread())
+			<< "Frame buffer can only be captured inside the GLUT thread.";
 		Flush();
 		ResizeImage(out, size_);
-		glReadPixels(0,0, size_.x, size_.y, GL_BGRA, GL_UNSIGNED_BYTE, out.GetImageBuffer());
+		glReadPixels(0, 0, size_.x, size_.y,
+								 GL_BGRA, GL_UNSIGNED_BYTE, out.GetImageBuffer());
 		ResetAlpha(out);  // the GL convention for alpha is different to ours
 		FlipVertical(out);  // the GL convention for top and bottom is different to ours
 	}

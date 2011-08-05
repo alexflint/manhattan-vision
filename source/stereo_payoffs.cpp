@@ -234,7 +234,7 @@ namespace indoor_context {
 		r_input = &r_image;
 		geometry = &geom;
 		ImageRef l_sample, r_sample;
-		Vec2I l_bounds = asToon(l_image.pc().image_size());
+		Vec2I l_bounds = l_image.pc().image_size();
 
 		// Ensure the mono images are available
 		l_image.BuildMono();

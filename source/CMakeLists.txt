@@ -83,18 +83,6 @@ ENDIF( USE_CUDA )
 #INCLUDE_DIRECTORIES(${libfreenect_INCLUDE_DIR})
 #LINK_DIRECTORIES(${libfreenect_LIBRARY_DIRS})
 
-# Eigen2 (only for kinect_transform)
-#INCLUDE_DIRECTORIES(${EIGEN3_INCLUDE_DIR})
-#LINK_DIRECTORIES(${EIGEN3_LIBRARY_DIRS})
-#LIST(APPEND LIBRARIES ${EIGEN3_LIBRARIES})
-
-# Yaml (only for kinect_transform)
-#FIND_PACKAGE(yaml-cpp)
-#SET(Yaml-cpp_LIBRARIES "/usr/local/lib/libyaml-cpp.so")
-#INCLUDE_DIRECTORIES(${EIGEN2_INCLUDE_DIR})
-#LINK_DIRECTORIES(${EIGEN2_LIBRARY_DIRS})
-#LIST(APPEND LIBRARIES ${EIGEN2_LIBRARIES})
-
 # Configure CPU profiling
 IF ( USE_CPU_PROFILER )
 	MESSAGE( STATUS "Linking CPU Profiler" )
@@ -157,7 +145,7 @@ SET( EXTERNAL_LIBRARIES
 	#${libfreenect_LIBRARIES}
 
 	# Only for stereotracks
-	${EIGEN3_LIBRARIES}
+	#${EIGEN3_LIBRARIES}
 
 	# Profiling libraries (empty unless USE_CPU_PROFILER / USE_TCMALLOC are true)
 	${CPU_PROFILER_LIBRARIES}
@@ -216,6 +204,7 @@ ADD_LIBRARY( core SHARED
 	fhsegmenter.cpp
 	filters.cpp
 	gaussian.cpp
+	histogram.cpp	
 	hw_convolver.cpp
 	kmeans.cpp 
 	progress_reporter.cpp
@@ -232,7 +221,11 @@ ADD_LIBRARY( core SHARED
 	colors.cpp
 	mean_shift.cpp
 	line_segment.cpp
-	
+	camera.cpp
+	ATANCamera.cpp
+
+	line_detector.cpp
+	guided_line_detector.cpp
 
 	worker.cpp
 	thread_pool.cpp
@@ -242,24 +235,18 @@ ADD_LIBRARY( core SHARED
 	numeric_utils.cpp
 	gl_utils.cpp
 	vector_utils.cpp
+	filesystem_utils.cpp
 
 	viewer3d.cpp
 	widget3d.cpp
+	texture_manager.cpp
+	glut_window.cpp
 	map_widgets.cpp
 	hotspot.cpp
 	invokation_serializer.cpp
 
 	canvas.cpp
-
-	line_detector.cpp
-	guided_line_detector.cpp
-	
-	camera.cpp
-	glut_window.cpp
 	floorplan_editor.cpp
-	histogram.cpp
-	
-	ATANCamera.cpp
 	
 	colored_points.cpp
 	read_ply.cpp
@@ -267,7 +254,6 @@ ADD_LIBRARY( core SHARED
 	simple_renderer.cpp
 	floorplan_renderer.cpp
 
-# Temporarily commented to remove dependency on libfreenect
 #	kinect_device.cpp
 #	kinect_transform.cpp
 
@@ -311,7 +297,6 @@ ADD_DEPENDENCIES( manhattan core )   # mostly for protobufs
 # BUILD EXECUTABLES
 ###############################################################################
 ADD_SUBDIRECTORY(progs)
-
 
 ###############################################################################
 # BUILD CUDA COMPONENTS

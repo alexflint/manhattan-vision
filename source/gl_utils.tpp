@@ -9,6 +9,7 @@
 
 #include <TooN/TooN.h>
 
+#include "gl_utils.h"
 #include "common_types.h"
 #include "image_utils.h"
 #include "event.tpp"
@@ -26,14 +27,9 @@
 #define GL_ATTRIB_SCOPE(attrib) if (indoor_context::scoped_attrib_pusher __x ## __LINE__ = attrib)
 #define GL_PRIMITIVE(mode) if (indoor_context::scoped_command __x ## __LINE__ = mode)
 
-#define glError() indoor_context::glErrorInternal(__FILE__, __LINE__);
-
 namespace indoor_context {
 	using boost::shared_ptr;
 	using boost::shared_array;
-
-	// Report GL errors
-	void glErrorInternal(const char* file, int line);
 
 	// Reports errors on construction and destruction. Convertable to a
 	// bool in order to let it be used in an IF statement to create a
@@ -151,12 +147,5 @@ VNL_GL_MAP(int, i, 4);
 	// Load a "bright color" into GL
 	inline void glBrightColor(int i) {
 		glColorP(BrightColors::Get(i));
-	}
-		
-	// Get current GL modelview matrix
-	toon::Matrix<4,4> GetGLModelView();
-	// Get current GL projection matrix
-	toon::Matrix<4,4> GetGLProjection();
-	// Get current viewport dimensions
-	toon::Vector<4> GetGLViewport();
+	}		
 }

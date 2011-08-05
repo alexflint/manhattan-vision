@@ -13,6 +13,7 @@
 #include "vanishing_points.h"
 #include "rotation_estimator.h"
 #include "camera.h"
+#include "geom_utils.h"
 
 #include "eigensystem2d.tpp"
 #include "range_utils.tpp"
@@ -73,7 +74,8 @@ namespace indoor_context {
 		Compute(segments, Bootstrap(segments));
 	}
 
-	void ManhattanFrameEstimator::Compute(vector<LineDetection>& segments, const SO3<>& init) {
+	void ManhattanFrameEstimator::Compute(vector<LineDetection>& segments,
+																				const SO3<>& init) {
 		TITLE("Computing vanishing points");
 
 		// Prepare for optimiziation
@@ -104,7 +106,8 @@ namespace indoor_context {
 
 	SO3<> ManhattanFrameEstimator::Bootstrap(const vector<LineDetection>& segments) {
 		CHECK_GE(segments.size(), *gvNumBootstrapClusters)
-			<< "Too few segments were provided to bootstrap the Manhattan frame estimator.";
+			<< "Too few segments were provided to bootstrap the "
+			<< "Manhattan frame estimator.";
 
 		// Run K-means on the line segment orientations
 		kmeans_owners.Resize(segments.size());
@@ -135,8 +138,9 @@ namespace indoor_context {
 
 		// Check that we have enough candidates to proceed
 		CHECK_GE(candidate_vpts.size(), 2)
-			<< "After clustering vanishing points and eliminating clusters with less than "
-			<< *gvMinSupport << " supporting lines, too few clusters were left for bootstrap.";
+			<< "After clustering vanishing points and eliminating"
+			<< " clusters with less than " << *gvMinSupport
+			<< " supporting lines, too few clusters were left for bootstrap.";
 
 		// Find the pair of vpts with minimal dot product
 		double mindp = INFINITY;
@@ -169,7 +173,6 @@ namespace indoor_context {
 	}
 
 
-
 	void ManhattanFrameEstimator::Prepare(vector<LineDetection>& segments) {
 		detections = &segments;
 
@@ -189,21 +192,22 @@ namespace indoor_context {
 
 	double ManhattanFrameEstimator::GetLogPosterior(const SO3<>& hypothesis) {
 		// We make the following approximation here:
-
 		// X = the observations (lines)
 		// xi = i-th line
 		// H = the hypothesis (i.e. a rotation)
 		// vj = j-th vanishing point (0<=j<3)
 		// A = the axis for each observed line
 		// ai = the axis for line i
-		// P(H|X) = 1/n P(X|H) P(H)
-		//        = a P(X|H)   { assume uniform prior over H }
+		// P(H|X) = 1/n P(X|H) P(H)  { n is arbitrary normalization }
+		//        = a P(X|H)         { assume uniform prior over H }
 		//        ~ sum_A P(X,A|H)   { marginalize over A }
-		//        ~ sum_A [ prod_i P(xi|v_ai) ]   { assume independence between observations }
+		//        ~ sum_A [ prod_i P(xi|v_ai) ]   
+		//                           { assume independence between observations }
 		// but since the only term in the sum above that is not close to
 		// zero is the one where each line is associated with its most
-		// likely vanishing point:
-		//        ~ prod_i P(xi, v_j*)    { where j* is the most likely axis for xi to belong to }
+		// likely vanishing point...
+		//        ~ prod_i P(xi, v_j*)    
+		//            { where j* is the most likely axis for xi to belong to }
 
 		double approx_log_posterior = 0;
 		for (int i = 0; i < detections->size(); i++) {
@@ -238,14 +242,38 @@ namespace indoor_context {
 	}
 
 	void ManhattanFrameEstimator::MStep() {
-		// Estimate vanishing points given current responsibilities
-		rot_est.Compute(line_eqns, asToon(resps), R);
+		/*vector<Vec3> line_eqns_new;
+		if (num_iters == 0) {
+			line_eqns_new = line_eqns;
+		} else {
+			line_eqns_new.resize(detections->size());
+			for (int i = 0; i < detections->size(); i++) {
+				const LineDetection& det = (*detections)[i];
+				Vec3 c = HMidpoint(det.seg.start, det.seg.end);
+				Vec3 eqn = c ^ det.seg.start;  // using det.end would work out the same
 
-		// Check for convergence, which is when
-		//  (1) no vanishing point is changed by more than gvExitThresh, and
-		//  (2) either of
-		//      (a) the rotation estimator converged
-		//      (b) there has been more than 10 iterations
+				int max_j = -1;
+				double max_resp = -INFINITY;
+				for (int j = 0; j < 3; j++) {  // yes, ignore the 
+					if (resps[i][j] > max_resp) {
+						max_resp = resps[i][j];
+						max_j = j;
+					}
+				}
+				Vec3 m = vpts[max_j] ^ c;
+				DREPORT(m, vpts[max_j], c);
+
+				double nrm = sqrt(m[0]*m[0] + m[1]*m[1]);
+				eqn /= nrm;
+				line_eqns_new[i] = eqn;
+			}
+			}*/
+
+		// Estimate vanishing points given current responsibilities
+		rot_est.Compute(line_eqns/*_new*/, asToon(resps), R);
+
+		// Check for convergence, which is when no vanishing point is
+		// changed by more than gvExitThresh, and
 		converged = true;//(rot_est.converged || num_iters >= 10);
 		for (int i = 0; i < 3; i++) {
 			const double change = 1.0 - abs(vpts[i] * col(rot_est.R,i));
@@ -289,7 +317,8 @@ namespace indoor_context {
 
 
 	// static
-	double ManhattanFrameEstimator::GetLogLik(const Vec3& vpt, const Vec3& line) {
+	double ManhattanFrameEstimator::GetLogLik(const Vec3& vpt,
+																						const Vec3& line) {
 		// TODO: make this more reasonable -- normalization etc
 		// Ideally do projected error at line end-points
 		const double& sigma = *gvErrorModelSigma;
@@ -317,14 +346,16 @@ namespace indoor_context {
 	Vec3 ManhattanFrameEstimator::FitIsctRansac(const vector<LineDetection>& segments,
 																							const Vector<>& weights) const {
 		// Generate cumulative weight vector
+		const double wsum_check = norm_1(weights);
 		const double wsum = sum(weights);
+		CHECK_EQ_TOL(wsum, wsum_check, 1e-8);
 		Vector<> wcum(weights.size());
 		wcum[0] = weights[0];
 		for (int i = 1; i < weights.size(); i++) {
 			wcum[i] = wcum[i-1] + weights[i];
 		}
 
-		// Iterate ransac
+		// Iterate RANSAC
 		const int num_iters = min(100, max(wsum, wsum*wsum / 5));
 		Vec3 max_isct;
 		float max_score = -1;

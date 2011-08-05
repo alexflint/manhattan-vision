@@ -134,7 +134,7 @@ void DiffFilter::ExpandBuffer(int w, int h) {
 	// temporary buffer and avoid the expensive reallocation.
 	if (temp.get() == NULL || temp->Cols() < w || temp->Rows() < h) {
 		if (temp.get() != NULL) {
-			DLOG << "Efficiency warning: Forced to reallocate temp image in DiffFilter\n";
+			DLOG << "Efficiency warning: Reallocating image in DiffFilter\n";
 		}
 		temp.reset(new MatF(h, w));
 	}
@@ -165,9 +165,10 @@ DiffFilter* GaborFunction::MakeSeperatedFilter() const {
 	// two seperable funcions, which is much faster than a full
 	// convolution:
 	//   gabor(x,y) = gauss2d(x, y) * cos(k * (x*cos(theta) + y*sin(theta) ))
-	//              = gauss2d(x, y) * cos(a*x + b*y)    where a=k*cos(theta), b=k*sin(theta)
+	//              = gauss2d(x, y) * cos(a*x + b*y)
+	//                                  { where a=k*cos(theta), b=k*sin(theta) }
 	//              = gauss1d(x)*gauss1d(y) * [cos(a*x)*cos(b*y) - sin(a*x)*sin(b*y)]
-	//              = gauss1d(x)*cos(a*x)*gauss1d(y)*cos(b*y) -
+	//              = gauss1d(x)*cos(a*x) * gauss1d(y)*cos(b*y) -
 	//                   gauss1d(x)*sin(a*x) * gauss1d(y)*sin(b*y)
 
 	struct SepFuncs {

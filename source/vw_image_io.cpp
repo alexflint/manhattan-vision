@@ -14,6 +14,7 @@
 // http://www.boost.org/doc/libs/1_38_0/libs/gil/doc/html/giltutorial.html#AppendixConventionSec
 
 namespace indoor_context {
+	using namespace toon;
 	using namespace boost::gil;
 
 	// Invert alpha channel in an RGB image
@@ -26,17 +27,32 @@ namespace indoor_context {
 		}
 	}
 
-	// Minimal mock of VW imageio routines
-	void ReadImage(const std::string& file, ImageRGB<byte>& image) {
-		CHECK_PRED1(fs::exists, file);
-
+	// Guess file format
+	bool IsJpegFilename(const string& file) {
 		// TODO: find a more reliable way to determine file format
 #if BOOST_VERSION >= 104400
 		string ext = fs::path(file).extension().string();
 #else
 		string ext = fs::path(file).extension();
 #endif
-		bool jpeg = (ext == ".jpg" || ext == ".JPG" || ext == ".jpeg" || ext == ".JPEG");
+		return (ext == ".jpg" || ext == ".JPG" || ext == ".jpeg" || ext == ".JPEG");
+	}
+
+	// Get image dimensions without reading image
+	Vec2I GetImageSize(const string& file) {
+		point2<ptrdiff_t> size;
+		if (IsJpegFilename(file)) {
+			size = jpeg_read_dimensions(file);
+		} else {
+			size = png_read_dimensions(file);
+		}
+		return makeVector(size.x, size.y);
+	}
+
+	// Minimal mock of VW imageio routines
+	void ReadImage(const std::string& file, ImageRGB<byte>& image) {
+		CHECK_PRED1(fs::exists, file);
+		bool jpeg = IsJpegFilename(file);
 
 		// Get size
 		point2<ptrdiff_t> size;
@@ -69,14 +85,20 @@ namespace indoor_context {
 																			 image.GetHeight(),
 																			 (const rgba8_pixel_t*)image.GetImageBuffer(),
 																			 image.GetWidth()*sizeof(PixelRGB<byte>));
-		// Here we use a hack to work around the fact that GIL uses 255=opaque but we use 0=opaque
+		// Here we use a hack to work around the fact that GIL uses
+		// 255=opaque but we use 0=opaque
 		InvertAlpha(const_cast<ImageRGB<byte>&>(image));
-		png_write_view(file, v);
+		if (IsJpegFilename(file)) {
+			CHECK(false) << "jpeg output not supported";
+			//jpeg_write_view(file, v);
+		} else {
+			png_write_view(file, v);
+		}
 		InvertAlpha(const_cast<ImageRGB<byte>&>(image));
 	}
 
  	void WriteImage(const std::string& file, const ImageMono<float>& image) {
-		// Temporary hack until we find out how to do this properly with gil
+		// Temporary hack until I find out how to do this properly with gil
 		ImageRGB<byte> canvas;
 		ImageConvert(image, canvas);
 		WriteImage(file, canvas);

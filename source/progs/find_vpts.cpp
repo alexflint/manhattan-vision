@@ -26,10 +26,10 @@ int main(int argc, char **argv) {
 	TIMED("Find vanishing points") vpts.Compute(image);
 
 	// Output vizualizations
-	WriteMatrixImageRescaled("out/magnitude_sqr.png",
-													 vpts.line_detector.canny.magnitude_sqr);
-	WriteMatrixImageRescaled("out/edges.png",
-													 vpts.line_detector.canny.edge_map);
+	//WriteMatrixImageRescaled("out/magnitude_sqr.png",
+	//												 vpts.line_detector.canny.magnitude_sqr);
+	//WriteMatrixImageRescaled("out/edges.png",
+	//												 vpts.line_detector.canny.edge_map);
 	vpts.OutputLineViz("out/linesegs.png");
 	vpts.OutputVanPointViz("out/vpts.png");
 

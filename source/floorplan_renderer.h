@@ -54,14 +54,26 @@ public:
 
 	// Retrieve quads for each wall in the model
 	const vector<Polygon<4> >& walls() const { return walls_; }
-	const vector<int>& wall_labels() const { return wall_labels_; }
+	const vector<int>& wall_orientations() const { return wall_orients_; }
+
+	// Get the index of the wall that projects to the given pixel
+	int GetWallIndexAt(const Vec2I& pixel) const;
+	// Get the wall that projects to the given pixel
+	Polygon<4> GetWallAt(const Vec2I& pixel) const;
+	// Get the axis of the normal vector for a pixel
+	int GetOrientationAt(const Vec2I& pixel) const;
+	// Get the 3D point that projects to the given pixel
+	Vec3 BackProject(const Vec2& pixel) const;
 
 	// Visualizations
 	void DrawOrientations(ImageRGB<byte>& canvas);
 private:
 	SimpleRenderer renderer_;
+	MatI orientations_;
 	vector<Polygon<4> > walls_;
-	vector<int> wall_labels_;
+	vector<int> wall_orients_;
+	double zfloor_;
+	double zceil_;
 };
 
 }  // namespace indoor_context

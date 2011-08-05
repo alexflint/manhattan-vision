@@ -25,7 +25,7 @@ namespace indoor_context {
 	// Represents a frame in a video sequence mapped by PTAM
 	class Frame {
 	public:
-		// The map that owns this keyframe
+		// The map that owns this frame
 		Map* map;
 		// Index of this frame within the map
 		int id;
@@ -42,19 +42,23 @@ namespace indoor_context {
 
 		// The landmarks that were observed in this frame
 		vector<Measurement> measurements;
-		// Output a vector of all points measured in this frame
-		void GetMeasuredPoints(vector<Vec3>& out) const;
 
-		Frame() : id(-1) { }
-		// Configure this keyframe with specified image file and pose
-		void Configure(Map* map,
-									 int id,
+		// Initialize empty
+		Frame();
+		// Initialize and configure
+		Frame(int id, const string& image_file, const toon::SE3<>& pose);
+		// Configure this frame with specified image file and pose
+		void Configure(int id,
 									 const string& image_file,
 									 const toon::SE3<>& pose);
+		// Link this frame to a map (only affects GetMeasuredPoints)
+		void SetMap(Map* map);
 		// Load the image
 		void LoadImage();
 		// Unload the image
 		void UnloadImage();
+		// Output a vector of all points measured in this frame
+		void GetMeasuredPoints(vector<Vec3>& out) const;
 	};
 
 	// Represents a map from PTAM

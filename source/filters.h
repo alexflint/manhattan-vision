@@ -112,7 +112,7 @@ public:
 			denom(2 * s * s),
 			nrm2d(denom * M_PI) {
 		nrm1d = sqrt(nrm2d);  // don't make this an initializer, the order
-		// is confusing
+		                      // is confusing
 	}
 	double operator()(double x) const;
 	double operator()(double x, double y) const;

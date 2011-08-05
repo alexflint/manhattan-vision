@@ -29,6 +29,10 @@ public:
 	// Get the depth buffer
 	const MatD& depthbuffer() const { return depthbuffer_; }
 	MatD& depthbuffer() { return depthbuffer_; }
+	// Get the camera
+	const toon::Matrix<3,4>& camera() const { return camera_; }
+	// Get the viewport
+	const Vec2I& viewport() const { return viewport_; }
 
 	// Configure the renderer with the given camera and viewport
 	void Configure(const PosedCamera& cam);
@@ -39,7 +43,8 @@ public:
 
 	// Render a triangle. Return true if at least one pixel was affected.
 	bool Render(const Vec2& p, const Vec2& q, const Vec2& r, int label);
-	// Render a triangle (homogeneous coords). Return true if at least one pixel was affected.
+	// Render a triangle (homogeneous coords). Return true if at least
+	// one pixel was affected.
 	bool Render(const Vec3& p, const Vec3& q, const Vec3& r, int label);
 	// Render an infinite plane z=z0. Internally we just use very large extents.
 	bool OldRenderInfinitePlane(double z0, int label);

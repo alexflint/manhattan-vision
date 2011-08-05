@@ -13,7 +13,7 @@ namespace indoor_context {
 	// directory containing list.txt.
 	void LoadBundlerMap(const string& bundle_dir, Map& map);
 
-	// Load a map from an XML file
+	// Load a map from a ptam-format XML file
 	// If all_frames is true then load all frames; otherwise load just
 	// the key frames.
 	void LoadXmlMap(const string& path,
@@ -27,4 +27,11 @@ namespace indoor_context {
 																 Map& map,
 																 proto::TruthedMap& gt_map,
 																 bool include_non_keyframes=false);
+
+	// Load a map as output in text format by voodoo
+	// Will look for lines of the form '#frameindex XXX' and pass the
+	// number XXX into the specified format
+	void LoadMapFromVoodooTextFile(const string& path,
+																 const string& image_pattern,
+																 Map& map);
 }

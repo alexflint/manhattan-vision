@@ -14,13 +14,24 @@
 namespace indoor_context {
 	using namespace toon;
 
-	void Frame::Configure(Map* m, int i, const string& im_file, const SE3<>& pose) {
-		CHECK(m != NULL);
-		CHECK(m->camera != NULL);
-		map = m;
+	Frame::Frame() : map(NULL), id(-1), lost(false), initializing(false) {
+	}
+
+	Frame::Frame(int id, const string& image_file, const SE3<>& pose)
+		: map(NULL), lost(false), initializing(false) {
+		Configure(id, image_file, pose);
+	}
+
+	void Frame::Configure(int i, const string& im_file, const SE3<>& pose) {
 		id = i;
 		image_file = im_file;
 		image.pc().SetPose(pose);
+	}
+
+	void Frame::SetMap(Map* m) {
+		CHECK(m != NULL);
+		CHECK(m->camera != NULL);
+		map = m;
 		image.pc().SetCamera(map->camera.get());
 	}
 
@@ -48,6 +59,8 @@ namespace indoor_context {
 
 	void Map::AddFrame(Frame* frame) {
 		frames.push_back(frame);
+		frame->SetMap(this);
+
 		CHECK(frames_by_id.find(frame->id) == frames_by_id.end())
 			<< "A frame with ID=" << frame->id << " already exists";
 		frames_by_id[frame->id] = frame;

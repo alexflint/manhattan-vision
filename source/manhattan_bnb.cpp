@@ -128,8 +128,8 @@ void MonocularManhattanBnb::TransferBuilding(const SE3<>& new_pose,
                                              double floor_z,
                                              MatI& orients) {
 	// Compute scaling (TODO: actually use this)
-	DiagonalMatrix<3> Mscale(makeVector(1.0*orients.Cols()/pc->image_size().x,
-																			1.0*orients.Rows()/pc->image_size().y,
+	DiagonalMatrix<3> Mscale(makeVector(1.0*orients.Cols()/pc->image_size()[0],
+																			1.0*orients.Rows()/pc->image_size()[1],
 																			1.0));
 
 	// Invert the pose
@@ -717,8 +717,8 @@ void ManhattanEvaluator::PredictOrientations(const ManhattanBuilding& bld,
 	CHECK_GT(orients.Cols(), 0);
 	orients.Fill(vert_axis);
 	Polygon<4> wall;
-	DiagonalMatrix<3> Mscale(makeVector(1.0*orients.Cols()/pc->image_size().x,
-																			1.0*orients.Rows()/pc->image_size().y,
+	DiagonalMatrix<3> Mscale(makeVector(1.0*orients.Cols()/pc->image_size()[0],
+																			1.0*orients.Rows()/pc->image_size()[1],
 																			1.0));
 	for (ManhattanBuilding::ConstCnrIt left_cnr = bld.cnrs.begin();
 			successor(left_cnr) != bld.cnrs.end();
@@ -741,7 +741,7 @@ void ManhattanEvaluator::PredictGridOrientations(const ManhattanBuilding& bld,
 }
 void ManhattanEvaluator::PredictImOrientations(const ManhattanBuilding& bld,
                                                MatI& orients) const {
-	orients.Resize(pc->image_size().y, pc->image_size().x);
+	orients.Resize(pc->image_size()[1], pc->image_size()[0]);
 	PredictOrientations(bld, orients);
 }
 
@@ -784,12 +784,12 @@ void ManhattanEvaluator::DrawPrediction(const ManhattanBuilding& bld,
 
 void ManhattanEvaluator::DrawOrientations(const MatI& orients,
                                           ImageRGB<byte>& canvas) {
-	ResizeImage(canvas, pc->image_size());
-	for (int y = 0; y < pc->image_size().y; y++) {
+	ResizeImage(canvas, asIR(pc->image_size()));
+	for (int y = 0; y < pc->ny(); y++) {
 		PixelRGB<byte>* row = canvas[y];
-		const int* orient_row = orients[y*orients.Rows()/pc->image_size().y];
-		for (int x = 0; x < pc->image_size().x; x++) {
-			int orient = orient_row[x*orients.Cols()/pc->image_size().x];
+		const int* orient_row = orients[y*orients.Rows()/pc->ny()];
+		for (int x = 0; x < pc->nx(); x++) {
+			int orient = orient_row[x*orients.Cols()/pc->nx()];
 			if (orient == -1) {
 				row[x] = PixelRGB<byte>(255,255,255);
 			} else {
@@ -937,7 +937,7 @@ void ManhattanBnbReconstructor::OutputSolutionOrients(const string& path) {
 void ManhattanBnbReconstructor::GetAuxOrients(const PosedCamera& aux,
                                               double zfloor,
                                               MatI& aux_orients) {
-	aux_orients.Resize(aux.image_size().y, aux.image_size().x);
+	aux_orients.Resize(aux.image_size()[1], aux.image_size()[0]);
 	bnb.TransferBuilding(aux.pose(), zfloor, aux_orients);
 }
 

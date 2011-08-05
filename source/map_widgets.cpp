@@ -28,18 +28,16 @@ namespace indoor_context {
 	FrameWidget::FrameWidget(const Frame& f, double ret_z)
 		: retina_z(ret_z),
 			frame(f),
-			//line_bloc(1.2, -5),
-			//guided_line_bloc(1.2, -5),
-			//line_state(0),  // no lines
-			//show_textons(false),
 			border_width(1.2),
 			border_color(127, 127, 127) {
-		//Add(line_bloc);
-		//Add(guided_line_bloc);
 	}
 
 	bool FrameWidget::HitTest(const Vec2& mouse) const {
-		return PointInQuad(pa,pb,pc,pd,mouse);
+		if (selectable()) {
+			return PointInQuad(pa,pb,pc,pd,mouse);
+		} else {
+			return false;
+		}
 	}
 
 	void FrameWidget::GLTransformToCameraCoords() const {
@@ -63,10 +61,12 @@ namespace indoor_context {
 			const Vec2& tr = frame.image.pc().retina_bounds().tr();
 			const Vec2& bl = frame.image.pc().retina_bounds().bl();
 			const Vec2& br = frame.image.pc().retina_bounds().br();
-			pa = viewer().ProjectToScreen(unproject(tl)*retina_z);
-			pb = viewer().ProjectToScreen(unproject(tr)*retina_z);
-			pc = viewer().ProjectToScreen(unproject(br)*retina_z);
-			pd = viewer().ProjectToScreen(unproject(bl)*retina_z);
+			if (selectable()) {
+				pa = viewer().ProjectToScreen(unproject(tl)*retina_z);
+				pb = viewer().ProjectToScreen(unproject(tr)*retina_z);
+				pc = viewer().ProjectToScreen(unproject(br)*retina_z);
+				pd = viewer().ProjectToScreen(unproject(bl)*retina_z);
+			}
 
 			// Draw the image
 			WITHOUT(GL_BLEND) WITH(GL_TEXTURE_2D) GL_PRIMITIVE(GL_QUADS) {
@@ -128,92 +128,20 @@ namespace indoor_context {
 	}
 
 	Vec3 FrameWidget::ImageToWorld(const Vec2& p) {
-		// Pixel Coordinates -> Homogeneous Pixel Coords -> Retina Plane (Z=1) Coordates
-		//  -> (Z = retina_z) Plane Coordinates -> World Coordaintes -> whew!
-		return frame.image.pc().pose_inverse() * (retina_z * atretina(frame.image.pc().ImToRet(unproject(p))));
+		// Pixel Coordinates -> Homogeneous Pixel Coords -> Retina Plane
+		// (Z=1) Coordates -> (Z = retina_z) Plane Coordinates -> World
+		// Coordaintes -> whew!
+		return frame.image.pc().pose_inverse() *
+			(retina_z * atretina(frame.image.pc().ImToRet(unproject(p))));
 	}
 
 	Vec3 FrameWidget::WorldToRetina(const Vec3& p) {
-		return frame.image.pc().pose_inverse() * (retina_z * atretina(frame.image.pc().pose() * p));
+		return frame.image.pc().pose_inverse() *
+			(retina_z * atretina(frame.image.pc().pose() * p));
 	}
-
-	/*
-
-	LineWidget& FrameWidget::AddLineInRetina(const Vec3& ret_a,
-		const Vec3& ret_b,
-		const float width,
-		const PixelRGB<byte>& color) {
-	  	LineWidget* w = new LineWidget(
-		  frame.image.pc().pose_inverse() * (retina_z * atretina(ret_a)),
-		  frame.image.pc().pose_inverse() * (retina_z * atretina(ret_b)),
-		width,
-		color);
-		AddOwned(w);
-		return *w;
-	}
-
-	void FrameWidget::Line_Click(int index, const string& label) {
-		DLOG << label;
-	}
-
-	void FrameWidget::ConfigureLineWidget(LineWidget& w,
-																				const LineDetection& det,
-																				int index,
-																				bool visible,
-																				bool add_events,
-																				const string& label) {
-		w.lineseg.start = ImagePtToWorld(project(det.seg.start));
-		w.lineseg.end = ImagePtToWorld(project(det.seg.end));
-		w.SetZorder(-1);
-		w.SetVisible(visible);
-		w.color = (det.axis == -1 ?
-							 Colors::black() : Colors::primary(det.axis));
-		if (add_events) {
-			w.Click.add(bind(&FrameWidget::Line_Click, this, index, label));
-		}
-	}
-
-	void FrameWidget::ConfigureLineWidgets() {
-		// Configure widgets for canny lines
-		bool persist = (line_widgets.size() == frame.line_detector.detections.size());
-		// This is not for efficiency, but so that we preserve event
-		// handlers associated with the lines segments from outside
-		if (!persist) {
-			line_widgets.clear();
-		}
-		COUNTED_FOREACH(int i, const LineDetection& det, frame.line_detector.detections) {
-			if (!persist) {
-				line_widgets.push_back(&line_bloc.AddNewMember());
-			}
-			string label = str(format("Canny line clicked: axis=%d, index=%d") % det.axis % i);
-			ConfigureLineWidget(*line_widgets[i], det, i, line_state==1, !persist, label);
-		}
-
-
-		// Configure widgets for guided lines
-		const vector<LineDetection>* dets = frame.guided_line_detector.detections;
-		// This is not for efficiency, but so that we preserve event
-		// handlers associated with the lines segments from outside
-		persist = guided_line_widgets.size() == dets[0].size()+dets[1].size()+dets[2].size();
-		if (!persist) {
-			guided_line_widgets.clear();
-		}
-		int i = 0;
-		for (int axis = 0; axis < 3; axis++) {
-			COUNTED_FOREACH(int j, const LineDetection& det, dets[axis]) {
-				if (!persist) {
-					guided_line_widgets.push_back(&guided_line_bloc.AddNewMember());
-				}
-				string label = str(format("Guided line clicked: axis=%d, index=%d") % axis % j);
-				ConfigureLineWidget(*guided_line_widgets[i], det, j, line_state==2, !persist, label);
-				i++;
-			}
-		}
-	}
-	*/
 
 	void FrameWidget::OnClick(int button, const Vec2& mouse) {
-		DLOG << "Frame " << frame.id << " clicked.\n  Image: " << frame.image_file;
+		DLOG << "Frame "<<frame.id<<" clicked.\n  Image: "<<frame.image_file;
 	}
 
 	void FrameWidget::OnDoubleClick(int button, const Vec2& mouse) {
@@ -277,7 +205,11 @@ namespace indoor_context {
 	}
 
 	bool PointCloudWidget::HitTest(const Vec2& mouse) const {
-		return GetPointAt(mouse) != -1;
+		if (selectable()) {
+			return GetPointAt(mouse) != -1;
+		} else {
+			return false;
+		}
 	}
 
 	void PointCloudWidget::OnClick(int button, const Vec2& mouse) {
@@ -299,11 +231,17 @@ namespace indoor_context {
 		// Setup child components
 		ground_plane = new GroundPlaneWidget();
 		AddOwned(ground_plane);
-		pts_widget = new PointCloudWidget(map->points);
-		pts_widget->SetSelectable(false);
-		AddOwned(pts_widget);
-		BOOST_FOREACH (const Frame& frame, map->frames) {
-			RegisterFrame(frame);
+		point_cloud_widget = new PointCloudWidget(map->points);
+		point_cloud_widget->SetSelectable(false);
+		AddOwned(point_cloud_widget);
+
+		int step = 1;
+		if (map->frames.size() > 100) {
+			DLOG << "Too many frames, sampling 100 of them for rendering";
+			step = ceili(1. * map->frames.size() / 100);
+		}
+		for (int i = 0; i < map->frames.size(); i += step) {
+			RegisterFrame(map->frames[i]);
 		}
 
 		// Bind keys
@@ -322,37 +260,23 @@ namespace indoor_context {
 	}
 
 	void MapWidget::BindKeys() {
-		viewer().window().KeyStroke('p').add(bind(&PointCloudWidget::ToggleVisible, ref(pts_widget)));
-		viewer().window().KeyStroke(',').add(bind(&MapWidget::ChangeRetinaPos, this, -1));
-		viewer().window().KeyStroke('.').add(bind(&MapWidget::ChangeRetinaPos, this, 1));
-		//viewer().window().KeyStroke('l').add(bind(&MapWidget::ToggleLines, this));
+		viewer().window().KeyStroke('p').add
+			(bind(&PointCloudWidget::ToggleVisible, ref(point_cloud_widget)));
+		viewer().window().KeyStroke(',').add
+			(bind(&MapWidget::ChangeRetinaPos, this, -1));
+		viewer().window().KeyStroke('.').add
+			(bind(&MapWidget::ChangeRetinaPos, this, 1));
 	}
 
 	void MapWidget::SetRetinaPos(double z) {
 		BOOST_FOREACH(FrameWidget* framewidget, frame_widgets) {
 			framewidget->retina_z = z;
-			/*if (framewidget->line_state != 0) {
-				framewidget->ConfigureLineWidgets();
-				}*/
 		}
 		Invalidate();
 	}
 
 	void MapWidget::ChangeRetinaPos(int delta) {
-		SetRetinaPos(frame_widgets[0]->retina_z * pow(*gvRetinaPosDelta, delta));
+		SetRetinaPos(frame_widgets[0]->retina_z *
+								 pow(*gvRetinaPosDelta, delta));
 	}
-
-	/*
-		void MapWidget::ToggleLines() {
-		// It could be that some keyframes have lines visible while others
-		// are not, but the most sensible thing to do here is to force
-		// them all to be the same.
-		int line_state = (frame_widgets[0]->line_state + 1)%3;
-		BOOST_FOREACH(FrameWidget* framewidget, frame_widgets) {
-		framewidget->line_state = line_state;
-		framewidget->ConfigureLineWidgets();
-		}
-		}
-	*/
-
 }

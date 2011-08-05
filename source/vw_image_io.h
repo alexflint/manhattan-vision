@@ -3,6 +3,9 @@
 #include "vw_image-fwd.h"
 
 namespace indoor_context {
+	// Get the size of an image without loading it
+	Vec2I GetImageSize(const string& file);
+
 	// Read image from a file
 	void ReadImage(const std::string& file, ImageRGB<byte>& image);
 

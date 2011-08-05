@@ -23,10 +23,10 @@ using boost::shared_ptr;
 class CameraBase {
 public:
 	// Recompute bounds. Calls the pure virtual ImToRet and RetToIm.
-	void SetImageSize(const ImageRef& image_size);
+	void SetImageSize(const Vec2I& image_size);
 
 	// Get the image size
-	inline const ImageRef& image_size() const { return image_size_; }
+	inline const Vec2I& image_size() const { return image_size_; }
 	// Get the image bounds (same info as image_size() but different format)
 	const Bounds2D<>& image_bounds() const { return image_bounds_; }
 	// Get the bounds of the image in retina coordinates
@@ -60,7 +60,7 @@ public:
 	static double GetMaxDeviation(const CameraBase& cam1,
 	                              const CameraBase& cam2);
 private:
-	ImageRef image_size_;
+	Vec2I image_size_;
 	Bounds2D<> image_bounds_;
 	Bounds2D<> retina_bounds_;
 };
@@ -71,8 +71,7 @@ private:
 class ATANCamera : public CameraBase {
 public:
 	// Construct a camera for images of a specified size with the given intrinsic parameters.
-	ATANCamera(const Vec5& camera_params, const Vec2& image_size);
-	ATANCamera(const Vec5& camera_params, const ImageRef& image_size);
+	ATANCamera(const Vec5& camera_params, const Vec2I& image_size);
 
 	// Transform retina -> image
 	Vec2 RetToIm(const Vec2& v) const;
@@ -103,7 +102,7 @@ public:
 	// Construct a linear camera for 0 by 0 images
 	LinearCamera();
 	// Construct a linear camera for images of a specified size
-	LinearCamera(const Mat3& m, const ImageRef& image_size);
+	LinearCamera(const Mat3& m, const Vec2I& image_size);
 
 	// Get the camera matrix
 	const Mat3& intrinsics() const { return m; }
@@ -146,11 +145,11 @@ public:
 	void SetCamera(const CameraBase* camera) { camera_ = camera; }
 
 	// Helpers to get size
-	int nx() const { return camera().image_size().x; }
-	int ny() const { return camera().image_size().y; }
+	int nx() const { return camera().image_size()[0]; }
+	int ny() const { return camera().image_size()[1]; }
 
 	// Get the image size
-	const ImageRef& image_size() const { return camera().image_size(); }
+	const Vec2I& image_size() const { return camera().image_size(); }
 	// Get the image bounds (same info as image_size() but different format)
 	const Bounds2D<>& image_bounds() const { return camera().image_bounds(); }
 	// Get the bounds of the image in retina coordinates

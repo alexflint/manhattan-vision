@@ -5,11 +5,11 @@
 
 #include "common_types.h"
 #include "map.h"
+#include "map.pb.h"
 #include "map_widgets.h"
 #include "glut_window.h"
 #include "viewer3d.h"
-
-#include "map.pb.h"
+#include "texture_manager.h"
 
 namespace indoor_context {
 	// Represents a state of the floorplan UI

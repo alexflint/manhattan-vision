@@ -26,7 +26,7 @@ namespace indoor_context {
 		occl_penalty = obj.occl_penalty;
 
 		Vec2I obj_size = matrix_size(obj.pixel_scores[0]);
-		bool image_coords = (obj_size == asToon(geom.camera->image_size()));
+		bool image_coords = (obj_size == geom.camera->image_size());
 		if (!image_coords) {
 			CHECK_EQ(obj_size, geometry.grid_size)
 				<< "Objective must be same size as either image or grid";

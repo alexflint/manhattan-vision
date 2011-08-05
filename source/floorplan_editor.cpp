@@ -26,7 +26,6 @@ namespace indoor_context {
 		SetUIState(UIState::INSERT);
 		
 		mapWidget.Configure(&map);
-		DREPORT(map.points.size());
 		mapWidget.PreRender.add(bind(&FloorPlanEditor::mapWidget_PreRender, this));
 
 		planView.viewOrtho = true;
@@ -50,7 +49,7 @@ namespace indoor_context {
 		sideView.Add(bind(&FloorPlanEditor::RenderSideView, this));
 
 		camView.SetPosition(ImageRef(planView.window().size().x+20, 0));
-		camView.Display.add(bind(&FloorPlanEditor::camView_Display, this));
+		camView.Display.add(bind(&FloorPlanEditor::RenderCamView, this));
 
 		freeView.window().SetTitle("Side View");
 		freeView.window().SetPosition(planView.window().size() + ImageRef(20,20));
@@ -62,9 +61,12 @@ namespace indoor_context {
 		freeView.window().KeyDown.add(bind(&FloorPlanEditor::anyView_KeyDown, this, _1));
 		camView.KeyDown.add(bind(&FloorPlanEditor::anyView_KeyDown, this, _1));
 
-		planView.window().SpecialKeyDown.add(bind(&FloorPlanEditor::anyView_SpecialKeyDown, this, _1));
-		sideView.window().SpecialKeyDown.add(bind(&FloorPlanEditor::anyView_SpecialKeyDown, this, _1));
-		camView.SpecialKeyDown.add(bind(&FloorPlanEditor::anyView_SpecialKeyDown, this, _1));
+		planView.window().SpecialKeyDown.add
+			(bind(&FloorPlanEditor::anyView_SpecialKeyDown, this, _1));
+		sideView.window().SpecialKeyDown.add
+			(bind(&FloorPlanEditor::anyView_SpecialKeyDown, this, _1));
+		camView.SpecialKeyDown.add
+			(bind(&FloorPlanEditor::anyView_SpecialKeyDown, this, _1));
 	}
 
 	void FloorPlanEditor::ResetInternal() {
@@ -299,36 +301,6 @@ namespace indoor_context {
 	}
 
 
-	void FloorPlanEditor::camView_Display() {
-		if (camViewState == ViewType::WIREFRAME) {
-			glClearColor(0,0,0,0);
-		} else {
-			glClearColor(0,0,1,0);
-		}
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		CHECK_LT(selectedFrameIndex_, map.frames.size())
-			<< "There are only " << map.frames.size() << " frames";
-		const Frame& frame = map.frames[selectedFrameIndex_];
-		ImageRef sz = frame.image.pc().image_size();
-		Vec2 tl = frame.image.pc().retina_bounds().tl();
-		Vec2 br = frame.image.pc().retina_bounds().br();
-
-		// Setup a projection matching that of the camera
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		double znear = 1e-2, zfar = 1e+2;
-		glFrustum(tl[0]*znear, br[0]*znear, tl[1]*znear, br[1]*znear, znear, zfar);
-
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
-		glScalef(1,-1,-1);  // look down the positive Z axis, and put origin at top left
-
-		RenderCamView();
-	}
-
-
-
 
 
 	void FloorPlanEditor::RenderFloorPlan(int viewType) {
@@ -404,36 +376,29 @@ namespace indoor_context {
 	}
 
 	void FloorPlanEditor::RenderCamView() {
+		if (camViewState == ViewType::WIREFRAME) {
+			glClearColor(0,0,0,0);
+		} else {
+			glClearColor(0,0,1,0);
+		}
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		CHECK_LT(selectedFrameIndex_, map.frames.size())
+			<< "There are only " << map.frames.size() << " frames";
+
+		// Get the frame
 		const Frame& frame = map.frames[selectedFrameIndex_];
 		if (!frame.image.loaded()) {
-			((Frame&)frame).LoadImage();
+			const_cast<Frame&>(frame).LoadImage();
 		}
 
-		// Draw the frame
+		// Draw the image
 		if (camViewState == ViewType::WIREFRAME) {
-			Vec2 tl = frame.image.pc().retina_bounds().tl();
-			Vec2 br = frame.image.pc().retina_bounds().br();
-			glColorP(Colors::white());
-			camTextures.Select(&frame.image);
-			WITHOUT(GL_BLEND) WITH(GL_TEXTURE_2D) GL_PRIMITIVE(GL_QUADS) {
-				glTexCoord2f(0, 0);
-				glVertex3f(tl[0], tl[1], 1);
-				glTexCoord2f(0, 1);
-				glVertex3f(tl[0], br[1], 1);
-				glTexCoord2f(1, 1);
-				glVertex3f(br[0], br[1], 1);
-				glTexCoord2f(1, 0);
-				glVertex3f(br[0], tl[1], 1);
-			}
+			RenderFullScreen(camTextures.LoadOrLookup(&frame.image));
 		}
 
-		// Transform to camera coords
-		Matrix<4> mv = Identity;
-		mv.slice<0,0,3,3>() = frame.image.pc().pose().get_rotation().get_matrix();
-		mv.slice<0,3,3,1>() = frame.image.pc().pose().get_translation().as_col();
-		TransformGL(mv);
-
-		// Draw the floorplan
+		// Configure for world coords and draw
+		ConfigureGLForCamera(frame.image.pc());
 		RenderFloorPlan(camViewState);
 	}
 

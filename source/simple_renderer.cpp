@@ -29,7 +29,7 @@ SimpleRenderer::SimpleRenderer(const toon::Matrix<3,4>& camera, Vec2I viewport) 
 }
 
 void SimpleRenderer::Configure(const PosedCamera& camera) {
-	Configure(camera.Linearize(), asToon(camera.image_size()));
+	Configure(camera.Linearize(), camera.image_size());
 }
 
 void SimpleRenderer::Configure(const toon::Matrix<3,4>& camera, Vec2I viewport) {

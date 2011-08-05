@@ -6,6 +6,7 @@
 #include "joint_payoffs.h"
 #include "manhattan_dp.h"
 #include "map.h"
+#include "map_io.h"
 #include "bld_helpers.h"
 #include "canvas.h"
 #include "manhattan_ground_truth.h"
@@ -76,12 +77,14 @@ int main(int argc, char **argv) {
 
 	if (!quiet) {
 		// Open the CSV file
-		fs::path stats_file = results_dir / fmt("performance_%s.csv", results_dir.filename());
-		stats_out.open(stats_file.string().c_str(), ios::app);
+		string stats_fname = fmt("performance_%s.csv", results_dir.filename());
+		fs::path stats_path = results_dir / stats_fname;
+		stats_out.open(stats_path.string().c_str(), ios::app);
 
 		// Write the parameters
-		fs::path params_file = results_dir / fmt("parameters_%s.csv", results_dir.filename());
-		ofstream params_out(params_file.string().c_str());
+		string params_fname = fmt("parameters_%s.csv", results_dir.filename());
+		fs::path params_path = results_dir / params_fname;
+		ofstream params_out(params_path.string().c_str());
 		GV3::print_var_list(params_out);
 		params_out.close();
 	}
@@ -89,12 +92,13 @@ int main(int argc, char **argv) {
 	// Load the map
 	Map map;
 	proto::TruthedMap gt_map;
-	map.LoadWithGroundTruth(GetMapPath(sequence), gt_map);
+	LoadXmlMapWithGroundTruth(GetMapPath(sequence), map, gt_map);
 
 	// Initialize the payoff generator
 	JointPayoffGen joint;
 	vector<int> stereo_offsets = ParseMultiRange<int>(*gvStereoOffsets);
-	vector<Vec3> point_cloud;  // must be outside scope as PointCloudPayoffs keeps a pointer
+	vector<Vec3> point_cloud;  // must be outside scope as
+														 // PointCloudPayoffs keeps a pointer
 
 	// Initialize statistics
 	double sum_acc = 0;
@@ -107,10 +111,11 @@ int main(int argc, char **argv) {
 		ScopedTimer t("Process frame");
 
 		// Get the frame
-		KeyFrame& frame = *map.KeyFrameById(frame_id);
+		Frame& frame = *map.GetFrameById(frame_id);
 		if (&frame == NULL) continue;
 		frame.LoadImage();
-		num_frames++;  // for computing average performance, in case one or more of the frames weren't found
+		num_frames++;  // for computing average performance, in case one
+									 // or more of the frames is missing
 
 		// Setup geometry
 		DPGeometryWithScale geom(frame.image.pc(),
@@ -124,7 +129,7 @@ int main(int argc, char **argv) {
 		// Get auxiliary frames
 		vector<const PosedImage*> aux_images;
 		COUNTED_FOREACH(int i, int offset, stereo_offsets) {
-			KeyFrame* aux_frame = map.KeyFrameById(frame_id+offset);
+			Frame* aux_frame = map.GetFrameById(frame_id+offset);
 			if (aux_frame != NULL) {
 				aux_frame->LoadImage();
 				aux_images.push_back(&aux_frame->image);
@@ -219,17 +224,22 @@ int main(int argc, char **argv) {
 			info_out << format("Net score: %|40t|%f\n") % soln.score;
 			info_out << format("  Penalties: %|40t|%f%%\n") % (100.0*penalties/gross_payoffs);
 			info_out << format("  Gross payoffs: %|40t|%f\n") % gross_payoffs;
-			info_out << format("    Mono payoffs: %|40t|%.1f%%\n") % (100*mono_payoffs/gross_payoffs);
-			info_out << format("    Stereo payoffs: %|40t|%.1f%%\n") % (100*stereo_payoffs/gross_payoffs);
-			info_out << format("    3D (agreement) payoffs: %|40t|%.1f%%\n") % (100.0*pt_agree_payoffs/gross_payoffs);
-			info_out << format("    3D (occlusion) payoffs: %|40t|%.1f%%\n") % (100.0*pt_occl_payoffs/gross_payoffs);
+			info_out << format("    Mono payoffs: %|40t|%.1f%%\n")
+				% (100*mono_payoffs/gross_payoffs);
+			info_out << format("    Stereo payoffs: %|40t|%.1f%%\n")
+				% (100*stereo_payoffs/gross_payoffs);
+			info_out << format("    3D (agreement) payoffs: %|40t|%.1f%%\n")
+				% (100.0*pt_agree_payoffs/gross_payoffs);
+			info_out << format("    3D (occlusion) payoffs: %|40t|%.1f%%\n")
+				% (100.0*pt_occl_payoffs/gross_payoffs);
 		}
 	}
 
 	// Note that if one or more frames weren't found then num_frames
 	// will not equal frame_ids.size()
-	double av_err = sum_err / num_frames;  // these are already multipled by 100
-	double av_labelling_err = 100. - sum_acc / num_frames;  // these are already multipled by 100
+  // *these are already multipled by 100!
+	double av_err = sum_err / num_frames;
+	double av_labelling_err = 100. - sum_acc / num_frames;
 	if (quiet) {
 		DLOG << av_err;
 	} else {

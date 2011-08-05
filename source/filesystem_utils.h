@@ -1,6 +1,13 @@
+#include "common_types.h"
+
+#include <wordexp.h>
+
+#include <boost/range/iterator_range.hpp>
 #include <boost/filesystem.hpp>
 
 namespace indoor_context {
+	typedef boost::iterator_range<fs::directory_iterator> dir_it;
+
 	// Convenience function to create a range representing the entries in a directory.
 	// Use with BOOST_FOREACH:
 	// 
@@ -8,8 +15,8 @@ namespace indoor_context {
 	// BOOST_FOREACH(const fs::path& entry, directory_contents(someDir)) {
 	//    ... do something with entry ...
 	// }
-	boost::iterator_range<fs::directory_iterator> directory_contents(const fs::path& path) {
-		return boost::iterator_range<fs::directory_iterator>(fs::directory_iterator(path),
-																												 fs::directory_iterator());
-	}
+	dir_it directory_contents(const fs::path& path);
+
+	// Expand environment variables and leading ~ in paths.
+	string expand_path(const string& path);
 }
