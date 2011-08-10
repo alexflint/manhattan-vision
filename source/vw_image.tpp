@@ -203,5 +203,4 @@ namespace indoor_context {
 	inline int matrix_height(const ImageRef& p) {
 		return p.y;
 	}
-
 }

@@ -2,17 +2,6 @@
 
 #include <iostream>
 
-/*#include <VW/Image/imagergb.h>
-#include <VW/Image/imagemono.h>
-#include <VW/Image/imagecopy.tpp>
-	using VW::ImageRef;
-	using VW::ImageBase;
-	using VW::ImageRGB;
-	using VW::ImageMono;
-	using VW::PixelRGB;
-	using VW::PixelMono;
-*/
-
 #include "common_types.h"
 
 namespace indoor_context {

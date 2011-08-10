@@ -5,10 +5,11 @@
 #include "common_types.h"
 #include "worker.h"
 
-#include "functional_types.tpp"
 #include "vw_image.tpp"
 
 namespace indoor_context {
+	using boost::bind;
+	using boost::ref;
 
 // Binary flag indicating whether or not to parallelize sobel convolutions
 lazyvar<int> gvParallelize("Sobel.Parallelize");

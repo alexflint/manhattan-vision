@@ -32,4 +32,3 @@ namespace indoor_context {
 #include "report.tpp" // defines DREPORT and friends
 #include "check.tpp"  // defines CHECK and friends
 #include "lazyvar.h"
-#include "initialized_ptr.tpp"

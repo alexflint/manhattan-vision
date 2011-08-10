@@ -9,6 +9,7 @@
 #include "image_bundle.h"
 
 #include "vw_image.tpp"
+#include "initialized_ptr.tpp"
 
 namespace indoor_context {
 	// Forward declarations

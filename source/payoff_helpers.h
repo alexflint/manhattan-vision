@@ -3,12 +3,10 @@
 #include <boost/ptr_container/ptr_vector.hpp>
 
 #include "common_types.h"
-#include "manhattan_dp.h"
+#include "dp_payoffs.h"
 #include "payoffs.pb.h"
 
 namespace indoor_context {
-	class JointPayoffGen;
-
 	// Represents mixing coefficients and complexity penalties for
 	// manhattan reconstruction.
 	class ManhattanHyperParameters {
@@ -22,7 +20,7 @@ namespace indoor_context {
 	// Currently un-used.
 	class PayoffFeatures {
 	public:
-		ptr_vector<DPPayoffs> features;
+		boost::ptr_vector<DPPayoffs> features;
 		vector<string> descriptions;
 	};
 
@@ -46,8 +44,11 @@ namespace indoor_context {
 	void UnpackMatrix(const proto::MatI& in, MatI& out);
 
 	// Pack payoff features into a protocol buffer
-	void PackFeatures(const JointPayoffGen& joint,
-										proto::FrameWithFeatures& data);
+	// ** moved to progs/compute_payoff_features.cpp to remove
+	// dependency on JointPayoffGen
+	/*void PackFeatures(const JointPayoffGen& joint,
+		proto::FrameWithFeatures& data);*/
+
 	// Unpack payoff features from a protocol buffer
 	void UnpackFeatures(const proto::FrameWithFeatures& data,
 											PayoffFeatures& features);

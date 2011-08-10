@@ -19,6 +19,20 @@
 #include "io_utils.tpp"
 #include "image_utils.tpp"
 
+	void PackFeatures(const JointPayoffGen& joint,
+										proto::FrameWithFeatures& data) {
+		DPPayoffs sum_stereo(matrix_size(joint.mono_gen.payoffs));
+		BOOST_FOREACH(const StereoPayoffGen& gen, joint.stereo_gens) {
+			sum_stereo.Add(gen.payoffs, 1. / joint.stereo_gens.size());
+		}
+
+		PackPayoffs(joint.mono_gen.payoffs, *data.add_features(), "mono");
+		PackPayoffs(sum_stereo, *data.add_features(), "stereo");
+		PackPayoffs(joint.point_cloud_gen.agreement_payoffs, *data.add_features(), "agreement");
+		PackPayoffs(joint.point_cloud_gen.occlusion_payoffs, *data.add_features(), "occlusion");
+	}
+
+
 lazyvar<string> gvStereoOffsets("JointDP.Stereo.AuxOffsets");
 
 int main(int argc, char **argv) {

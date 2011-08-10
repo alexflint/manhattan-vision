@@ -48,7 +48,6 @@ SET( PROGS
 
 	dp_optimization_wrapper
 	compute_payoff_features
-	compute_loglik
 
 	inspect_geometry
 	test_gt_walls
@@ -83,5 +82,17 @@ SET( PROGS
 
 FOREACH( PROG ${PROGS} )
 	ADD_EXECUTABLE( ${PROG} ${PROG}.cpp )
-	TARGET_LINK_LIBRARIES( ${PROG} core manhattan ${EXTERNAL_LIBRARIES} )
+	TARGET_LINK_LIBRARIES( ${PROG}
+		base
+		proto
+		manhattan
+		algorithms
+		likelihoods
+		visualization
+		tinyxml
+		${EXTERNAL_LIBRARIES} )
 ENDFOREACH( PROG )
+
+# Add this one separately to avoid dependencies
+ADD_EXECUTABLE( compute_loglik compute_loglik.cpp )
+TARGET_LINK_LIBRARIES( compute_loglik likelihoods base proto ${EXTERNAL_LIBRARIES} )

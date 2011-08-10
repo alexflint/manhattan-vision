@@ -7,9 +7,10 @@
 
 #include "numeric_utils.tpp"
 #include "image_utils.tpp"
-#include "functional_types.tpp"
 
 namespace indoor_context {
+	using boost::bind;
+	using boost::ref;
 
 lazyvar<string> gvDefaultParallelism("FilterBank.DefaultParallelism");
 

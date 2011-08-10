@@ -104,7 +104,8 @@ int main(int argc, char **argv) {
 		ftr_lik.reset(new LogitFeatureLikelihood(theta));
 	} else {
 		DLOG << "Using Gaussian feature likelihood";
-		GaussianFeatureLikelihood* ftr_likelihood = new GaussianFeatureLikelihood(theta);
+		GaussianFeatureLikelihood* ftr_likelihood =
+			new GaussianFeatureLikelihood(theta);
 		ftr_likelihood->enable_jacobian = kComputeAnalyticalGradients;
 		ftr_lik.reset(ftr_likelihood);
 	}
@@ -135,7 +136,8 @@ int main(int argc, char **argv) {
 		DLOG << format("%|5t|ANALYTIC %|30t|NUMERICAL %|55t|REL ERR\n");
 		for (int i = 0; i < J_loglik.size(); i++) {
 			double relerr = (J_loglik[i] - numerical_J_loglik[i]) / numerical_J_loglik[i];
-			DLOG << format("%2d) %|5t|%f %|30t|%f %|55t|%f%%\n") % i % J_loglik[i] % numerical_J_loglik[i] % (relerr*100);
+			DLOG << format("%2d) %|5t|%f %|30t|%f %|55t|%f%%\n")
+			  % i % J_loglik[i] % numerical_J_loglik[i] % (relerr*100);
 			}*/
 
 		for (int i = 0; i < numerical_J_loglik.size(); i++) {

@@ -1,15 +1,30 @@
-/*
- * math_utils.cpp
- *
- *  Created on: 2 Jun 2010
- *      Author: alexf
- */
-
 #include "numeric_utils.h"
+
 #include <boost/foreach.hpp>
+
 #include "common_types.h"
 
 namespace indoor_context {
+	// Constants for efficiency
+	static const double kSqrtTwoPi = sqrt(2*M_PI);
+	static const double kLogSqrtTwoPi = log(sqrt(2*M_PI));
+
+	double Gauss1D(double x, double m, double var) {
+		return exp(-(x-m)*(x-m)/(2*var)) / (sqrt(var)*kSqrtTwoPi);
+	}
+
+	/*double Gauss2D(const Vec2& x, const Vec2& m, double s) {
+		return exp(-0.5 * norm_sq(m-x) / s) / (2*M_PI*sqrt(s));
+		}*/
+
+	double LogGauss1D(double x, double m, double var) {
+		return FastLogGauss1D(x, m, var, log(var));
+	}
+
+	double FastLogGauss1D(double x, double m, double var, double log_var) {
+		return -(x-m)*(x-m)/(2*var) - log_var/2 - kLogSqrtTwoPi;
+	}
+
 	double LogSumExp(double y1, double y2) {
 		double m = max(y1, y2);
 		return log(exp(y1-m) + exp(y2-m)) + m;
@@ -52,5 +67,4 @@ namespace indoor_context {
 		NormalizeLogDistr(distr);
 		return distr.Apply(exp);
 	}
-
 }

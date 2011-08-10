@@ -22,25 +22,6 @@
 namespace indoor_context {
 	using boost::shared_array;
 
-	static const double kSqrtTwoPi = sqrt(2*M_PI);
-	static const double kLogSqrtTwoPi = log(sqrt(2*M_PI));
-
-	double Gauss1D(double x, double m, double var) {
-		return exp(-(x-m)*(x-m)/(2*var)) / (sqrt(var)*kSqrtTwoPi);
-	}
-
-	/*double Gauss2D(const Vec2& x, const Vec2& m, double s) {
-		return exp(-0.5 * norm_sq(m-x) / s) / (2*M_PI*sqrt(s));
-		}*/
-
-	double LogGauss1D(double x, double m, double var) {
-		return FastLogGauss1D(x, m, var, log(var));
-	}
-
-	double FastLogGauss1D(double x, double m, double var, double log_var) {
-		return -(x-m)*(x-m)/(2*var) - log_var/2 - kLogSqrtTwoPi;
-	}
-
 	double Gaussian::Evaluate(const VecD& x) const {
 		return GaussianEvaluator(*this).Evaluate(x);
 	}

@@ -22,26 +22,13 @@ FIND_PACKAGE( Boost 1.44.0
 	COMPONENTS date_time filesystem iostreams thread system program_options # python
 	REQUIRED )
 
-# Find required dependencies
-#FIND_PACKAGE( Eigen3 )
+# Find protocol buffers
 FIND_PACKAGE( Protobuf REQUIRED )
-# GL-related
-FIND_PACKAGE( OpenGL REQUIRED )
-FIND_PACKAGE( GLUT REQUIRED )
-# Cairo-related
-FIND_PACKAGE( Cairo REQUIRED )
-FIND_PACKAGE( Cairomm REQUIRED )
-FIND_PACKAGE( Freetype REQUIRED )
-FIND_PACKAGE( SigC++ REQUIRED )
-# Python-related
-FIND_PACKAGE( PythonLibs REQUIRED ) # Required by Boost.Python
-FIND_PACKAGE( ZLIB REQUIRED ) # Required by Python
-FIND_PACKAGE( Matlab )	# for mex stuff
 
 # Find lapack
 FIND_LIBRARY( LAPACK_LIBRARY liblapack.so )
 IF( NOT LAPACK_LIBRARY )
-	MESSAGE( FATAL_ERROR "Could not find LAPACK library" )
+	MESSAGE( FATAL_ERROR "Could not find LAPACK" )
 ENDIF()
 
 # Find VW
@@ -63,6 +50,21 @@ IF( NOT GVars3_INCLUDE_DIR )
 ENDIF( NOT GVars3_INCLUDE_DIR )
 MESSAGE( ${GVars3_INCLUDE_DIR} )
 
+# Cairo-related
+FIND_PACKAGE( Cairo )
+FIND_PACKAGE( Cairomm )
+FIND_PACKAGE( Freetype )
+FIND_PACKAGE( SigC++ )
+
+# GL-related
+FIND_PACKAGE( OpenGL )
+FIND_PACKAGE( GLUT )
+
+# Python-related
+FIND_PACKAGE( PythonLibs )
+FIND_PACKAGE( ZLIB )
+FIND_PACKAGE( Matlab )
+
 # Find CUDA if it's enabled
 IF( USE_CUDA )
 	SET( FIND_CUDA_DIR "${CMAKE_MODULE_PATH}/cuda" )
@@ -70,24 +72,11 @@ IF( USE_CUDA )
 	FIND_PACKAGE( Cuda )
 ENDIF( USE_CUDA )
 
-# Find graph cuts
-#SET( GraphCuts_INCLUDE_DIR /usr/local/include/graphcuts )
-#SET( GraphCuts_LIBRARIES -lgraphcuts )
-
-# Find Kinect driver
-# TODO: put these into FindFreenect.cmake
-# TODO: make these optional
-#SET(libfreenect_LIBRARIES "freenect")
-#SET(libfreenect_INCLUDE_DIR "/usr/local/include/libfreenect")
-#SET(libfreenect_LIBRARY_DIRS "/usr/local/lib/libfreenect")
-#INCLUDE_DIRECTORIES(${libfreenect_INCLUDE_DIR})
-#LINK_DIRECTORIES(${libfreenect_LIBRARY_DIRS})
-
 # Configure CPU profiling
 IF ( USE_CPU_PROFILER )
 	MESSAGE( STATUS "Linking CPU Profiler" )
   SET ( CPU_PROFILER_LIBRARIES -lprofiler )
-ENDIF (USE_CPU_PROFILER)
+ENDIF ( USE_CPU_PROFILER )
 
 # Configure tc-malloc
 IF ( USE_TCMALLOC )
@@ -97,37 +86,46 @@ ENDIF ( USE_TCMALLOC)
 
 # Include dirs
 INCLUDE_DIRECTORIES(
-	${VW_INCLUDE_DIR}
-	${TOON_INCLUDE_DIR}
-	${GVars3_INCLUDE_DIR}
-	${OPENGL_INCLUDE_DIR}
-	${GLUT_INCLUDE_DIR}
+	# Required for everything
 	${PROTOBUF_INCLUDE_DIR}
 	${Boost_INCLUDE_DIRS}
+	${GVars3_INCLUDE_DIR}
+	${TOON_INCLUDE_DIR}
+
+	# Required for algorithms library
+	${VW_INCLUDE_DIR}
+
+	# Required for visualization library
+	${OPENGL_INCLUDE_DIR}
+	${GLUT_INCLUDE_DIR}
+
+	# Required for visualization
 	${Cairo_INCLUDE_DIR}
 	${Cairomm_INCLUDE_DIR}
-	/usr/lib/cairomm-1.0/include   # Cairomm seem to need this in addition to above!
+	/usr/lib/cairomm-1.0/include   # Cairomm seems to need this in addition to above!
 	${Freetype_INCLUDE_DIRS}
 	${SigC++_INCLUDE_DIRS}
-	#${GraphCuts_INCLUDE_DIR}
+
+	# Required for Python wrapper
 	${PYTHON_INCLUDE_DIRS}
 	${ZLIB_INCLUDE_DIRS}
-	#${EIGEN3_INCLUDE_DIR}
 
-	${CMAKE_SOURCE_DIR} # because subdirs will need to find includes from this dir
-	${CMAKE_CURRENT_BINARY_DIR}	 # because protobufs will be generated here
+	# Local include dirs
+	${CMAKE_SOURCE_DIR}
+	${CMAKE_SOURCE_DIR}/base   # TODO: remove and put explicitly in all #includes
+	${CMAKE_SOURCE_DIR}/visualization   # TODO: remove and put explicitly in all #includes
+	${CMAKE_SOURCE_DIR}/tinyxml   # TODO: remove and put explicitly in all #includes
+	
+	# Include the binary dir because protobufs will be generated here
+	${CMAKE_CURRENT_BINARY_DIR}
 )
 
 # Setup linked libraries
 SET( EXTERNAL_LIBRARIES
-	${GVars3_LIBRARY}
+	# Required for everything
 	${LAPACK_LIBRARY}
 	${PROTOBUF_LIBRARY}
-	${GLUT_LIBRARIES}
-	${OPENGL_LIBRARIES}
-	${VW_LIBRARIES}
-	${Cairomm_LIBRARIES}
-	${SigC++_LIBRARIES}  # needed by cairo
+	${GVars3_LIBRARY}  # TODO: factor this out
 
 	# Enumerate specific libs to avoid linking Boost.Python to the core code
 	${Boost_system_LIBRARY_RELEASE}
@@ -137,17 +135,20 @@ SET( EXTERNAL_LIBRARIES
 	${Boost_thread_LIBRARY}
 	${Boost_program_options_LIBRARY}
 
+	# Required for algorithms library
+	${VW_LIBRARIES}
+
+	# Required for visualization library
+	${GLUT_LIBRARIES}
+	${OPENGL_LIBRARIES}
+	${Cairomm_LIBRARIES}
+	${SigC++_LIBRARIES}  # needed by cairo
+
 	# for GIL
 	-ljpeg
 	-lpng
 
-	#${GraphCuts_LIBRARIES}
-	#${libfreenect_LIBRARIES}
-
-	# Only for stereotracks
-	#${EIGEN3_LIBRARIES}
-
-	# Profiling libraries (empty unless USE_CPU_PROFILER / USE_TCMALLOC are true)
+	# Profiling libraries
 	${CPU_PROFILER_LIBRARIES}
 	${TCMALLOC_LIBRARY}
 )
@@ -179,26 +180,88 @@ SET( PROTOS
 
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${PROTOS})
 
+ADD_LIBRARY( proto SHARED
+	${PROTO_SRCS}
+)
+
 ###############################################################################
 # BUILD CORE LIBRARY
+# This library has minimal dependencies on external libraries.
 ###############################################################################
-ADD_LIBRARY( core SHARED 
-	tinyxml.cpp
-	tinystr.cpp
-	tinyxmlerror.cpp
-	tinyxmlparser.cpp
+ADD_LIBRARY( base SHARED 
+	# Logging macros and convenience framework
+	base/log.cpp
+	base/check.cpp
+	base/report.cpp
+	base/streamable.cpp
+	base/vararg_utils.cpp
+	base/progress_reporter.cpp
 
-	${PROTO_SRCS}
+	# Parallelism
+	base/worker.cpp
+	base/thread_pool.cpp	
 
+	# Miscellaneous utilities
+	base/timer.cpp
+	base/numeric_utils.cpp
+	base/vector_utils.cpp
+)	
+
+###############################################################################
+# BUILD TINYXML LIBRARY
+# Used for reading PTAM maps from XML
+###############################################################################
+ADD_LIBRARY( tinyxml SHARED 
+	tinyxml/tinyxml.cpp
+	tinyxml/tinystr.cpp
+	tinyxml/tinyxmlerror.cpp
+	tinyxml/tinyxmlparser.cpp
+)
+
+###############################################################################
+# BUILD LIKELIHOODS LIBRARY
+# Has minimal dependencies to allow it to be easily used for black blox 
+# optimization
+###############################################################################
+ADD_LIBRARY( likelihoods SHARED
+	dp_payoffs.cpp
+	payoff_helpers.cpp
+	likelihoods.cpp
+)
+
+ADD_DEPENDENCIES( likelihoods base proto )
+
+###############################################################################
+# BUILD CORE LIBRARY
+# This library contains most of the generic image processing machinery
+# and many algorithmic implementations.
+###############################################################################
+ADD_LIBRARY( algorithms SHARED 
+
+	# Simple data structures
+	colors.cpp
+	camera.cpp
+	ATANCamera.cpp
+	line_segment.cpp
+
+	# Image data structures
+	vw_image.cpp
+	vw_image_io.cpp
+	image_bundle.cpp
+
+	# Map data structures
+	map.cpp
+	map_io.cpp
+
+	# Miscellaneous utilities
 	netlib_sanity_test.cpp
+	vars.cpp
+	geom_utils.cpp
+	image_utils.cpp
+	filesystem_utils.cpp
+	clipping.cpp
 
-	log.cpp
-	check.cpp
-	timer.cpp
-	vararg_utils.cpp
-	streamable.cpp
-	report.cpp
-
+	# Image processing and algorithms
 	canny.cpp
 	fast_sobel.cpp
 	fhsegmenter.cpp
@@ -207,66 +270,53 @@ ADD_LIBRARY( core SHARED
 	histogram.cpp	
 	hw_convolver.cpp
 	kmeans.cpp 
-	progress_reporter.cpp
 	union_find.cpp
 	vanishing_points.cpp
-	image_bundle.cpp
 	textons.cpp
-	clipping.cpp
 	line_sweeper.cpp
 	rotation_estimator.cpp
-	map.cpp
-	map_io.cpp
-	vars.cpp
-	colors.cpp
 	mean_shift.cpp
-	line_segment.cpp
-	camera.cpp
-	ATANCamera.cpp
-
 	line_detector.cpp
 	guided_line_detector.cpp
-
-	worker.cpp
-	thread_pool.cpp
+	gaussian_pyramid.cpp
 	
-	geom_utils.cpp
-	image_utils.cpp
-	numeric_utils.cpp
-	gl_utils.cpp
-	vector_utils.cpp
-	filesystem_utils.cpp
-
-	viewer3d.cpp
-	widget3d.cpp
-	texture_manager.cpp
-	glut_window.cpp
-	map_widgets.cpp
-	hotspot.cpp
-	invokation_serializer.cpp
-
-	canvas.cpp
-	floorplan_editor.cpp
-	
-	colored_points.cpp
-	read_ply.cpp
-	
+	# Simple custom rendering pipeline
 	simple_renderer.cpp
 	floorplan_renderer.cpp
 
+	# 2D drawing
+	canvas.cpp
+
 #	kinect_device.cpp
 #	kinect_transform.cpp
-
-	vw_image.cpp
-	vw_image_io.cpp
 )
 
+ADD_DEPENDENCIES( algorithms base tinyxml proto )
+
+###############################################################################
+# BUILD LIKELIHOODS LIBRARY
+# No other libraries depend on this
+###############################################################################
+ADD_LIBRARY( visualization SHARED
+	visualization/gl_utils.cpp
+	visualization/viewer3d.cpp
+	visualization/widget3d.cpp
+	visualization/texture_manager.cpp
+	visualization/glut_window.cpp
+	visualization/map_widgets.cpp
+	visualization/hotspot.cpp
+	visualization/invokation_serializer.cpp
+	visualization/colored_points.cpp
+	visualization/read_ply.cpp
+	visualization/floorplan_editor.cpp
+)
+
+ADD_DEPENDENCIES( visualization algorithms base )
 
 ###############################################################################
 # BUILD MANHATTAN LIBRARY
 ###############################################################################
 ADD_LIBRARY( manhattan SHARED
-	dp_payoffs.cpp
 	manhattan_dp.cpp
 	manhattan_ground_truth.cpp
 
@@ -276,10 +326,6 @@ ADD_LIBRARY( manhattan SHARED
 	stereo_payoffs.cpp
 	point_cloud_payoffs.cpp
 	joint_payoffs.cpp
-	payoff_helpers.cpp
-	likelihoods.cpp
-
-	manhattan_bnb.cpp
 
 	line_sweep_features.cpp
 	building_features.cpp
@@ -288,10 +334,10 @@ ADD_LIBRARY( manhattan SHARED
 	svm_light_wrappers.cpp
 	svm_helpers.cpp
 
-	gaussian_pyramid.cpp  # TODO: move to core
+	manhattan_bnb.cpp
 )
 
-ADD_DEPENDENCIES( manhattan core )   # mostly for protobufs
+ADD_DEPENDENCIES( manhattan algorithms base likelihoods proto )
 
 ###############################################################################
 # BUILD EXECUTABLES
@@ -333,12 +379,6 @@ IF ( PYTHON_FOUND )
 		${PYTHON_EXPOSED_FILES} 
 		)
 
-	#TARGET_LINK_LIBRARIES( ... 
-	# ${Boost_LIBRARIES}
-	# ${PYTHON_LIBRARIES}
-	# ${ZLIB_LIBRARIES}
-	#)
-
 ENDIF ( PYTHON_FOUND )
 
 
@@ -349,13 +389,13 @@ IF ( MATLAB_FOUND )
     # Here we do some strange contortions due to mex/matlab setup:
     #    1. Build a normal static library called foo.mex.a for each foo.mex.cpp
     #    2. Build a MEX library (foo.mexa64, for example) and link it to (1)
-    #    3. Build a normal executable and it it to (1)
+    #    3. Build a normal executable and link it it to (1)
     # This gives us a normal executable and a MEX binary that both provide access
     # to the same underlying code.
     #
     # The reason for all these contortions is that we want to have libcore.so
     # containing the logic without needing to link it to Matlab libraries or
-    # include mex.h, and whateverwe compile with the "mex" program that comes
+    # include mex.h, and whatever we compile with the "mex" program that comes
     # with matlab can't reference all our core logic because then we would have
     # to find a way to get mex to recognize all our CMake includes and linkages.
     # So we introduce a third piece that bridges the two: these are the .mex.cpp
@@ -385,7 +425,7 @@ IF ( MATLAB_FOUND )
     )
     
     # The list of common libraries that they get linked to
-    SET ( INTERNAL_MATLAB_LIBRARIES core matutils )
+    SET ( INTERNAL_MATLAB_LIBRARIES algorithms matutils )
     
     # Create the matlab targets
     FOREACH( MEX_OUTPUT ${MEX_OUTPUTS} )
@@ -396,7 +436,7 @@ IF ( MATLAB_FOUND )
         
         # Build target as a static library
         ADD_LIBRARY( ${BRIDGE_LIBRARY} STATIC ${BRIDGE_SOURCE} )
-        TARGET_LINK_LIBRARIES( ${BRIDGE_LIBRARY} core ${MATLAB_LIBRARIES} )
+        TARGET_LINK_LIBRARIES( ${BRIDGE_LIBRARY} algorithms ${MATLAB_LIBRARIES} )
     		
         # Build the matlab entry point to it
 				#    	ADD_CUSTOM_COMMAND(
@@ -405,7 +445,7 @@ IF ( MATLAB_FOUND )
     			COMMAND mex -g -output ${MEX_OUTPUT}
     			${CMAKE_CURRENT_SOURCE_DIR}/${MEX_STUB_SOURCE}
     			${CMAKE_CURRENT_BINARY_DIR}/lib${BRIDGE_LIBRARY}.a
-    			${CMAKE_CURRENT_BINARY_DIR}/libcore.so
+    			${CMAKE_CURRENT_BINARY_DIR}/libalgorithms.so
     			${CMAKE_CURRENT_BINARY_DIR}/libmatutils.a
     			${EXTERNAL_LIBRARIES}
     			DEPENDS ${MEX_STUB_SOURCE} ${BRIDGE_LIBRARY} ${INTERNAL_MATLAB_LIBRARIES}

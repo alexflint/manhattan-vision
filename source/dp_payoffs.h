@@ -67,7 +67,8 @@ namespace indoor_context {
 
 		// Add a payoff matrix weighted by a constant
 		void Add(const DPPayoffs& other, double weight=1.0);
-		// Add a payoff matrix to both wall_scores[0] and wall_scores[1], multiplied by a constant.
+		// Add a payoff matrix to both wall_scores[0] and wall_scores[1],
+		// multiplied by a constant.
 		void Add(const MatF& delta, double weight=1.0);
 	private:
 		// Disallow copy constructor (use CopyTo explicitly instead)
