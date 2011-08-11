@@ -1,0 +1,4 @@
+shift_offset: 1090
+projector_depth_baseline: 0.075
+depth_rgb_rotation: [ 1, 0, 0, 0, 1, 0, 0, 0, 1 ]
+depth_rgb_translation: [ -0.0254, -0.00013, 0.00218 ]

@@ -1,0 +1,13 @@
+function weights = make_weights(pixel_weights, wall_weights, ...
+                                wall_penalty,  occlusion_penalty)
+
+check size(pixel_weights, 1) == 3;
+check prod(size(wall_weights))==0 || size(wall_weights, 1) == 2;
+check isscalar(wall_penalty);
+check isscalar(occlusion_penalty);
+
+weights = struct('pixel_weights', pixel_weights, ...
+                 'wall_weights', wall_weights, ...
+                 'wall_penalty', wall_penalty, ...
+                 'occlusion_penalty', occlusion_penalty);
+

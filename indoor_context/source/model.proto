@@ -1,0 +1,13 @@
+package indoor_context.proto;
+
+import "vector.proto";
+
+message Polyline {
+	repeated Vec2 vertices = 1;
+}
+
+message Model {
+	required double zfloor = 1;
+	required double zceil = 2;
+	repeated Polyline segments = 3;
+}
