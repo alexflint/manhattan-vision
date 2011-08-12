@@ -2,38 +2,74 @@ PROJECT( IndoorContext )
 SET( CMAKE_BUILD_TYPE RelWithDebInfo )
 CMAKE_MINIMUM_REQUIRED( VERSION 2.8 )
 
-# Eclipse settings
 # Set the message length to help Eclipse parse compiler messages
 SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmessage-length=0" )
 
-# Set the local version first
+# Setup the path to find modules to prefer local modules
 SET( CMAKE_MODULE_PATH
 	${CMAKE_SOURCE_DIR}/../cmake_modules
 	${CMAKE_ROOT}/Modules )
 
+###############################################################################
+# CUSTOM VARIABLES
+###############################################################################
+
+# The variable controlling the 'light' version
+SET( LIGHT ON CACHE BOOL "Whether to build with minimal dependencies" )
+
+###############################################################################
+# LOCAL SOURCE PATHS
+###############################################################################
+
+# TODO: put these inside the #includes explicitly
+INCLUDE_DIRECTORIES(
+	${CMAKE_SOURCE_DIR}
+	${CMAKE_SOURCE_DIR}/base
+	${CMAKE_SOURCE_DIR}/visualization
+	${CMAKE_SOURCE_DIR}/tinyxml
+)
+	
+# Include the binary dir because protobufs will be generated here
+INCLUDE_DIRECTORIES( ${CMAKE_CURRENT_BINARY_DIR} )
 
 ###############################################################################
 # FIND DEPENDENCIES
 ###############################################################################
+
+# Find libpng
+FIND_PACKAGE( PNG REQUIRED )
+INCLUDE_DIRECTORIES( ${PNG_INCLUDE_DIR } )
+LIST( APPEND EXTERNAL_LIBRARIES ${PNG_LIBRARIES} )
+
+# Find libjpeg
+FIND_PACKAGE( JPEG REQUIRED )
+INCLUDE_DIRECTORIES( ${JPEG_INCLUDE_DIR } )
+LIST( APPEND EXTERNAL_LIBRARIES ${JPEG_LIBRARIES} )
+
+# Find LAPACK
+FIND_PACKAGE( LAPACK REQUIRED )
+INCLUDE_DIRECTORIES( ${LAPACK_INCLUDE_DIR } )
+LIST( APPEND EXTERNAL_LIBRARIES ${LAPACK_LIBRARIES} )
+
+# Find protocol buffers
+FIND_PACKAGE( Protobuf REQUIRED )
+INCLUDE_DIRECTORIES( ${PROTOBUF_INCLUDE_DIR} )
+LIST( APPEND EXTERNAL_LIBRARIES ${PROTOBUF_LIBRARIES} )
 
 # Find Boost
 SET( Boost_FIND_QUIETLY OFF )
 FIND_PACKAGE( Boost 1.44.0
 	COMPONENTS date_time filesystem iostreams thread system program_options # python
 	REQUIRED )
-
-# Find protocol buffers
-FIND_PACKAGE( Protobuf REQUIRED )
-
-# Find lapack
-FIND_LIBRARY( LAPACK_LIBRARY liblapack.so )
-IF( NOT LAPACK_LIBRARY )
-	MESSAGE( FATAL_ERROR "Could not find LAPACK" )
-ENDIF()
-
-# Find VW
-SET( VW_USE_LIBS VNL )
-FIND_PACKAGE( VW REQUIRED )
+LIST(APPEND EXTERNAL_LIBRARIES 
+	${Boost_system_LIBRARY_RELEASE}
+	${Boost_date_time_LIBRARY}
+	${Boost_filesystem_LIBRARY}
+	${Boost_iostreams_LIBRARY}
+	${Boost_thread_LIBRARY}
+	${Boost_program_options_LIBRARY}
+)
+ADD_DEFINITIONS( "-DBOOST_FILESYSTEM_VERSION=3" )
 
 # Find TooN
 FIND_PATH( TOON_INCLUDE_DIR TooN.h
@@ -41,6 +77,7 @@ FIND_PATH( TOON_INCLUDE_DIR TooN.h
 IF( NOT TOON_INCLUDE_DIR )
 	MESSAGE( FATAL_ERROR "Could not find TooN include directory." )
 ENDIF( NOT TOON_INCLUDE_DIR )
+INCLUDE_DIRECTORIES( ${TOON_INCLUDE_DIR} )
 
 # Find GVars3
 FIND_PATH( GVars3_INCLUDE_DIR gvars3/gvars3.h )
@@ -48,118 +85,77 @@ FIND_LIBRARY( GVars3_LIBRARY libGVars3.so )
 IF( NOT GVars3_INCLUDE_DIR )
   MESSAGE( FATAL_ERROR "Could not find GVars3 include directory.")
 ENDIF( NOT GVars3_INCLUDE_DIR )
-MESSAGE( ${GVars3_INCLUDE_DIR} )
+INCLUDE_DIRECTORIES( ${GVars3_INCLUDE_DIR} )
+LIST( APPEND EXTERNAL_LIBRARIES ${GVars3_LIBRARY} )
 
-# Cairo-related
-FIND_PACKAGE( Cairo )
-FIND_PACKAGE( Cairomm )
-FIND_PACKAGE( Freetype )
-FIND_PACKAGE( SigC++ )
+# Find VW
+SET( VW_USE_LIBS VNL )
+FIND_PACKAGE( VW REQUIRED )
+INCLUDE_DIRECTORIES( ${VW_INCLUDE_DIR} )
+LIST( APPEND EXTERNAL_LIBRARIES ${VW_LIBRARY} )
 
-# GL-related
-FIND_PACKAGE( OpenGL )
-FIND_PACKAGE( GLUT )
+# Find optional packages
+IF( NOT ${LIGHT} )
 
-# Python-related
-FIND_PACKAGE( PythonLibs )
-FIND_PACKAGE( ZLIB )
-FIND_PACKAGE( Matlab )
+	# Cairo and friends
+	FIND_PACKAGE( Cairo REQUIRED )
+	INCLUDE_DIRECTORIES( ${Cairo_INCLUDE_DIR} )
+	LIST( APPEND EXTERNAL_LIBRARIES ${Cairo_LIBRARIES} )
 
-# Find CUDA if it's enabled
-IF( USE_CUDA )
-	SET( FIND_CUDA_DIR "${CMAKE_MODULE_PATH}/cuda" )
-	LIST( APPEND CMAKE_MODULE_PATH ${FIND_CUDA_DIR} )
-	FIND_PACKAGE( Cuda )
-ENDIF( USE_CUDA )
+	FIND_PACKAGE( Cairomm REQUIRED )
+	INCLUDE_DIRECTORIES( ${Cairomm_INCLUDE_DIR} /usr/lib/cairomm-1.0/include )
+	LIST( APPEND EXTERNAL_LIBRARIES ${Cairomm_LIBRARIES} )
 
-# Configure CPU profiling
-IF ( USE_CPU_PROFILER )
-	MESSAGE( STATUS "Linking CPU Profiler" )
-  SET ( CPU_PROFILER_LIBRARIES -lprofiler )
-ENDIF ( USE_CPU_PROFILER )
+	FIND_PACKAGE( Freetype REQUIRED )
+	INCLUDE_DIRECTORIES( ${Freetype_INCLUDE_DIRS} )
+	LIST( APPEND EXTERNAL_LIBRARIES ${Freetype_LIBRARIES} )
 
-# Configure tc-malloc
-IF ( USE_TCMALLOC )
-	MESSAGE( STATUS "Linking tcmalloc" )
-	SET( TCMALLOC_LIBRARY -ltcmalloc )
-ENDIF ( USE_TCMALLOC)
+	FIND_PACKAGE( SigC++ REQUIRED )
+	INCLUDE_DIRECTORIES( ${SigC++_INCLUDE_DIRS} )
+	LIST( APPEND EXTERNAL_LIBRARIES ${SigC++_LIBRARIES} )
 
-# Include dirs
-INCLUDE_DIRECTORIES(
-	# Required for everything
-	${PROTOBUF_INCLUDE_DIR}
-	${Boost_INCLUDE_DIRS}
-	${GVars3_INCLUDE_DIR}
-	${TOON_INCLUDE_DIR}
+	# OpenGL and friends
+	FIND_PACKAGE( OpenGL REQUIRED )
+	INCLUDE_DIRECTORIES( ${OPENGL_INCLUDE_DIR} )
+	LIST( APPEND EXTERNAL_LIBRARIES ${GLUT_LIBRARIES} )
 
-	# Required for algorithms library
-	${VW_INCLUDE_DIR}
+	FIND_PACKAGE( GLUT REQUIRED )
+	INCLUDE_DIRECTORIES( ${GLUT_INCLUDE_DIR} )
+	LIST( APPEND EXTERNAL_LIBRARIES ${OPENGL_LIBRARIES} )
 
-	# Required for visualization library
-	${OPENGL_INCLUDE_DIR}
-	${GLUT_INCLUDE_DIR}
+	# Python stuff
+	FIND_PACKAGE( PythonLibs )
+	INCLUDE_DIRECTORIES( ${PYTHON_INCLUDE_DIRS} )
+	FIND_PACKAGE( ZLIB )
+	INCLUDE_DIRECTORIES( ${ZLIB_INCLUDE_DIRS} )
 
-	# Required for visualization
-	${Cairo_INCLUDE_DIR}
-	${Cairomm_INCLUDE_DIR}
-	/usr/lib/cairomm-1.0/include   # Cairomm seems to need this in addition to above!
-	${Freetype_INCLUDE_DIRS}
-	${SigC++_INCLUDE_DIRS}
+	# Python-related
+	FIND_PACKAGE( Matlab )
 
-	# Required for Python wrapper
-	${PYTHON_INCLUDE_DIRS}
-	${ZLIB_INCLUDE_DIRS}
-
-	# Local include dirs
-	${CMAKE_SOURCE_DIR}
-	${CMAKE_SOURCE_DIR}/base   # TODO: remove and put explicitly in all #includes
-	${CMAKE_SOURCE_DIR}/visualization   # TODO: remove and put explicitly in all #includes
-	${CMAKE_SOURCE_DIR}/tinyxml   # TODO: remove and put explicitly in all #includes
+	# Find CUDA if it's enabled
+	IF( USE_CUDA )
+		SET( FIND_CUDA_DIR "${CMAKE_MODULE_PATH}/cuda" )
+		LIST( APPEND CMAKE_MODULE_PATH ${FIND_CUDA_DIR} )
+		FIND_PACKAGE( Cuda )
+	ENDIF( USE_CUDA )
 	
-	# Include the binary dir because protobufs will be generated here
-	${CMAKE_CURRENT_BINARY_DIR}
-)
+	# Configure CPU profiling
+	IF ( USE_CPU_PROFILER )
+		MESSAGE( STATUS "Linking with CPU profiler" )
+		LIST( APPEND EXTERNAL_LIBRARIES -lprofiler )
+	ENDIF ( USE_CPU_PROFILER )
+	
+	# Configure tc-malloc
+	IF ( USE_TCMALLOC )
+		MESSAGE( STATUS "Linking with tcmalloc" )
+		LIST( APPEND EXTERNAL_LIBRARIES -ltcmalloc )
+	ENDIF ( USE_TCMALLOC)
+ENDIF()
 
-# Setup linked libraries
-SET( EXTERNAL_LIBRARIES
-	# Required for everything
-	${LAPACK_LIBRARY}
-	${PROTOBUF_LIBRARY}
-	${GVars3_LIBRARY}  # TODO: factor this out
 
-	# Enumerate specific libs to avoid linking Boost.Python to the core code
-	${Boost_system_LIBRARY_RELEASE}
-	${Boost_date_time_LIBRARY}
-	${Boost_filesystem_LIBRARY}
-	${Boost_iostreams_LIBRARY}
-	${Boost_thread_LIBRARY}
-	${Boost_program_options_LIBRARY}
-
-	# Required for algorithms library
-	${VW_LIBRARIES}
-
-	# Required for visualization library
-	${GLUT_LIBRARIES}
-	${OPENGL_LIBRARIES}
-	${Cairomm_LIBRARIES}
-	${SigC++_LIBRARIES}  # needed by cairo
-
-	# for GIL
-	-ljpeg
-	-lpng
-
-	# Profiling libraries
-	${CPU_PROFILER_LIBRARIES}
-	${TCMALLOC_LIBRARY}
-)
-
-# Use boost_filesystem version 3
-ADD_DEFINITIONS( "-DBOOST_FILESYSTEM_VERSION=3" )
-
-# If in release mode then compile Eigen without bounds checking
+# If in release mode then compile without bounds checking (TooN, Eigen, etc)
 IF (CMAKE_BUILD_TYPE STREQUAL "Release" OR
 		CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-	MESSAGE(STATUS "Eigen bounds checking is off.")
 	ADD_DEFINITIONS( -DNDEBUG )
 ENDIF()
 

@@ -90,7 +90,8 @@ FOREACH( PROG ${PROGS} )
 		likelihoods
 		visualization
 		tinyxml
-		${EXTERNAL_LIBRARIES} )
+		${EXTERNAL_LIBRARIES}
+	)
 ENDFOREACH( PROG )
 
 # Add this one separately to avoid dependencies
