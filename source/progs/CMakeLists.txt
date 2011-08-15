@@ -96,4 +96,9 @@ ENDFOREACH( PROG )
 
 # Add this one separately to avoid dependencies
 ADD_EXECUTABLE( compute_loglik compute_loglik.cpp )
-TARGET_LINK_LIBRARIES( compute_loglik likelihoods base proto ${EXTERNAL_LIBRARIES} )
+TARGET_LINK_LIBRARIES( compute_loglik
+	likelihoods
+	base
+	proto
+	${EXTERNAL_LIBRARIES}
+)
