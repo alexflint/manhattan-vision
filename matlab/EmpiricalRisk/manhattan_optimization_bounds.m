@@ -2,54 +2,40 @@ function [x0 lower_bound upper_bound] = manhattan_optimization_bounds()
 
 %
 % Note: lower bounds must all be >= 0 as we use a logarithmic
-% parameterization
+% parametrization
 %
 
-<<<<<<< .mine
 init_occlusion_penalty = .8;
-=======
-init_corner_penalty = 1;
-min_corner_penalty = 1e-3;
-max_corner_penalty = 1e+3;
-
-init_occlusion_penalty = 1;
->>>>>>> .r112
 min_occlusion_penalty = 1e-3;
 max_occlusion_penalty = 1e+3;
 
-<<<<<<< .mine
 init_mono_weight = .0001;
 min_mono_weight = 1e-5;
-=======
-init_mono_weight = .00001;
-min_mono_weight = 1e-7;
->>>>>>> .r112
 max_mono_weight = 1;
 
-<<<<<<< .mine
 init_stereo_weight = .5;
-=======
-init_stereo_weight = .2;
->>>>>>> .r112
 min_stereo_weight = 1e-3;
 max_stereo_weight = 1e+3;
 
-<<<<<<< .mine
 init_agreement_weight = 10;
-=======
-init_agreement_weight = 2;
->>>>>>> .r112
 min_agreement_weight = 1e-3;
 max_agreement_weight = 1e+3;
 
-<<<<<<< .mine
 init_occlusion_weight = 1;
-=======
-init_occlusion_weight = .8;
->>>>>>> .r112
 min_occlusion_weight = 1e-3;
 max_occlusion_weight = 1e+3;
  
+% r112 ...
+%init_occlusion_penalty = 1;
+%init_mono_weight = .00001;
+%min_mono_weight = 1e-7;
+%init_stereo_weight = .2;
+%init_agreement_weight = 2;
+%init_occlusion_weight = .8;
+%init_corner_penalty = 1;
+%min_corner_penalty = 1e-3;
+%max_corner_penalty = 1e+3;
+
 x0 = [ init_corner_penalty ...
        init_occlusion_penalty ...
        init_mono_weight ...
