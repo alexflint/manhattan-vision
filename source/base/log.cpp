@@ -56,7 +56,6 @@ public:
 	bool put(Sink& dest, int c)  {
 		if (c == SpecialLogTokens::kEndToken) {
 			if (*last == SpecialLogTokens::kNewline) {
-				//*last = SpecialLogTokens::kNullToken;
 				return true;
 			} else {
 				*last = SpecialLogTokens::kNewline;
@@ -147,21 +146,18 @@ scoped_ptr<ios::filtering_ostream> log_stream;
 // Set the sink for the log stream
 template <typename Sink>
 void SetLogSinkImpl(const Sink& sink) {
-	//static AutoNewlineFilter newline_filter;
-	//static IndentFilter indent_filter;
 	// TODO: only reset the stream on first creation, use filtering_ostream::pop() thereafter
+	// Note: filtering_stream copies its argument so temp objs are fine
 	log_stream.reset(new ios::filtering_ostream);
-	log_stream->push(AutoNewlineFilter()); // filtering_stream copies its argument so temp objs are fine
-	log_stream->push(IndentFilter()); // filtering_stream copies its argument so temp objs are fine
-	log_stream->push(sink); // filtering_stream copies its argument so it's fine to pass a reference
+	log_stream->push(AutoNewlineFilter());
+	log_stream->push(IndentFilter());
+	log_stream->push(sink);
 }
 
 // This function is not exposed in log.tpp for efficient compilation
 ios::filtering_ostream& GetLogStreamImpl() {
-	//static AutoNewlineFilter newline_filter;
-	//static IndentFilter indent_filter;
 	if (log_stream.get() == NULL) {
-		SetLogSinkImpl(ios::file_descriptor_sink(kLogFileNo/*, ios::never_close_handle*/));
+		SetLogSinkImpl(ios::file_descriptor_sink(kLogFileNo, false));///*, ios::never_close_handle*/));
 	}
 	return *log_stream;
 }

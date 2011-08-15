@@ -11,9 +11,7 @@
 	NS::Report(NS::ParseVarargExprs(#__VA_ARGS__),			\
 						 NS::Streamable::NewVector(__VA_ARGS__))
 
-// Not all expressions can be captured 
-
-// Report a variable name and its value
+// Report expressions and their values
 #define DREPORT(...)									      					\
 	DLOG << EXPR(__VA_ARGS__)
 

@@ -7,7 +7,8 @@
 namespace indoor_context {
 	Report::Report(vector<string>* exprs, Streamable::vector* vals)
 		: exprs_(exprs), vals_(vals) {
-		CHECK_EQ(exprs->size(), vals->Size()) << "Inside the Report class, which is inside the logging framework!";
+		CHECK_EQ(exprs->size(), vals->Size())
+			<< "Inside the logging framework!";
 	}
 
 	ostream& operator<<(ostream& o, const Report& report) {

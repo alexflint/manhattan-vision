@@ -93,24 +93,13 @@
 #define cout_N cout
 #define cerr_N cerr
 
-// Report a variable name and value
-#define DREPORT_S(x, s)													\
-	{																							\
-		s ## _N << #x << ": ";											\
-		int __xlen = strlen(#x)+2;									\
-		NS::LogManager::IncreaseIndent(__xlen);			\
-		s << (x) << endl;														\
-		NS::LogManager::DecreaseIndent(__xlen);			\
-	}
-
-// Represents a generic boost::iostreams character sink with a virtual
-// write() method.
-class GenericCharSink {
-public:
-	virtual std::streamsize write(const char* s, std::streamsize n) = 0;
-};
-
 namespace indoor_context {
+	// Represents a generic boost::iostreams character sink with a virtual
+	// write() method.
+	class GenericCharSink {
+	public:
+		virtual std::streamsize write(const char* s, std::streamsize n) = 0;
+	};
 
 	// Represents global log state
 	class LogManager {
@@ -154,7 +143,7 @@ namespace indoor_context {
 		// destructor. To have the log output of a code block indented, use
 		// the INDENT macro to declare a stack-allocated ScopedIndenter
 		// instance, eg:
-		// for (..something..) {
+		// for (...) {
 		//   INDENT;
 		//   some_other_stuff();
 		//   DLOG << "the value of x is " << x << endl;
@@ -202,129 +191,5 @@ namespace indoor_context {
 			// So that we can be used inside an IF block for the DLOG macro
 			operator bool() const { return true; }
 		};
-
-		/*
-		// Report an expression and its value
-		template <typename T>
-		static void ReportExpr(const T& val, const string& expr) {
-			DLOG_N << expr << ": ";
-			LogManager::IncreaseIndent(expr.length()+2);
-			DLOG << val << endl;
-			LogManager::DecreaseIndent(expr.length()+2);
-		}
-
-		// Report several expressions
-		template <typename A>
-		static void ReportExprs(const A& a, const vector<string>& exprs) {
-		ReportExpr(a, exprs[0]);
-		}
-
-		// Report several expressions
-		template <typename A, typename B>
-		static void ReportExprs(const A& a,
-		const B& b,
-		const vector<string>& exprs) {
-		ReportExpr(a, exprs[0]);
-		ReportExpr(b, exprs[1]);
-		}
-
-		// Report several expressions
-		template <typename A, typename B, typename C>
-		static void ReportExprs(const A& a,
-		const B& b,
-		const C& c,
-		const vector<string>& exprs) {
-		ReportExpr(a, exprs[0]);
-		ReportExpr(b, exprs[1]);
-		ReportExpr(c, exprs[2]);
-		}
-
-		// Report several expressions
-		template <typename A, typename B, typename C, typename D>
-		static void ReportExprs(const A& a,
-		const B& b,
-		const C& c,
-		const D& d,
-		const vector<string>& exprs) {
-		ReportExpr(a, exprs[0]);
-		ReportExpr(b, exprs[1]);
-		ReportExpr(c, exprs[2]);
-		ReportExpr(d, exprs[3]);
-		}
-
-		// Report several expressions
-		template <typename A, typename B, typename C, typename D, typename E>
-		static void ReportExprs(const A& a,
-		const B& b,
-		const C& c,
-		const D& d,
-		const E& e,
-		const vector<string>& exprs) {
-		ReportExpr(a, exprs[0]);
-		ReportExpr(b, exprs[1]);
-		ReportExpr(c, exprs[2]);
-		ReportExpr(d, exprs[3]);
-		ReportExpr(e, exprs[4]);
-		}
-
-		// Report several expressions
-		template <typename A, typename B, typename C, typename D, typename E, typename F>
-		static void ReportExprs(const A& a,
-		const B& b,
-		const C& c,
-		const D& d,
-		const E& e,
-		const F& f,
-		const vector<string>& exprs) {
-		ReportExpr(a, exprs[0]);
-		ReportExpr(b, exprs[1]);
-		ReportExpr(c, exprs[2]);
-		ReportExpr(d, exprs[3]);
-		ReportExpr(e, exprs[4]);
-		ReportExpr(f, exprs[5]);
-		}
-
-		// Report several expressions
-		template <typename A, typename B, typename C, typename D, typename E, typename F, typename G>
-		static void ReportExprs(const A& a,
-		const B& b,
-		const C& c,
-		const D& d,
-		const E& e,
-		const F& f,
-		const G& g,
-		const vector<string>& exprs) {
-		ReportExpr(a, exprs[0]);
-		ReportExpr(b, exprs[1]);
-		ReportExpr(c, exprs[2]);
-		ReportExpr(d, exprs[3]);
-		ReportExpr(e, exprs[4]);
-		ReportExpr(f, exprs[5]);
-		ReportExpr(g, exprs[6]);
-		}
-
-
-		// Report several expressions
-		template <typename A, typename B, typename C, typename D,
-		typename E, typename F, typename G, typename H>
-		static void ReportExprs(const A& a,
-		const B& b,
-		const C& c,
-		const D& d,
-		const E& e,
-		const F& f,
-		const G& g,
-		const H& h,
-		const vector<string>& exprs) {
-		ReportExpr(a, exprs[0]);
-		ReportExpr(b, exprs[1]);
-		ReportExpr(c, exprs[2]);
-		ReportExpr(d, exprs[3]);
-		ReportExpr(e, exprs[4]);
-		ReportExpr(f, exprs[5]);
-		ReportExpr(g, exprs[6]);
-		ReportExpr(h, exprs[7]);
-		}*/
 	};
-
 }  // namespace indoor_context
