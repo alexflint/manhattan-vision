@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <algorithm>
 
+#include <boost/version.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
@@ -157,7 +158,11 @@ void SetLogSinkImpl(const Sink& sink) {
 // This function is not exposed in log.tpp for efficient compilation
 ios::filtering_ostream& GetLogStreamImpl() {
 	if (log_stream.get() == NULL) {
-		SetLogSinkImpl(ios::file_descriptor_sink(kLogFileNo, false));///*, ios::never_close_handle*/));
+#if BOOST_VERSION >= 104400
+		SetLogSinkImpl(ios::file_descriptor_sink(kLogFileNo, ios::never_close_handle));
+#else
+		SetLogSinkImpl(ios::file_descriptor_sink(kLogFileNo, false));
+#endif
 	}
 	return *log_stream;
 }
