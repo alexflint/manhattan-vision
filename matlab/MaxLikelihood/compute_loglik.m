@@ -10,7 +10,7 @@ if (nargin < 3)
     end
 end
 
-executable_dir = '~/Code/indoor_context/build/';
+executable_dir = get_executable_dir()
 executable_name = './compute_loglik_wrapper.sh';
 
 if (mod(length(params)-2, 4) ~= 0)
