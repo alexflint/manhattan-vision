@@ -103,8 +103,9 @@ namespace indoor_context {
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	GaussianFeatureLikelihood::GaussianFeatureLikelihood(const Vector<>& th)
-		: theta(th), J_loglik(th.size()), enable_jacobian(true) {
+	GaussianFeatureLikelihood::GaussianFeatureLikelihood(const Vector<>& th,
+																											 bool enable_jac)
+		: theta(th), J_loglik(th.size()), enable_jacobian(enable_jac) {
 		Configure(th);
 	}
 

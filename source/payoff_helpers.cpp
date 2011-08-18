@@ -56,7 +56,7 @@ namespace indoor_context {
 
 	void PackPayoffs(const DPPayoffs& payoffs,
 									 proto::PayoffFeature& data,
-									 const string& description="") {
+									 const string& description) {
 		PackMatrix(payoffs.wall_scores[0], *data.mutable_left());
 		PackMatrix(payoffs.wall_scores[1], *data.mutable_right());
 		if (!description.empty()) {
@@ -66,7 +66,7 @@ namespace indoor_context {
 
 	void PackPayoffs(const MatF& payoffs,
 									 proto::PayoffFeature& data,
-									 const string& description="") {
+									 const string& description) {
 		PackMatrix(payoffs, *data.mutable_left());
 		if (!description.empty()) {
 			data.set_description(description);

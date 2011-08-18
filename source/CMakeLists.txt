@@ -121,11 +121,11 @@ IF( NOT ${LIGHT} )
 	# OpenGL and friends
 	FIND_PACKAGE( OpenGL REQUIRED )
 	INCLUDE_DIRECTORIES( ${OPENGL_INCLUDE_DIR} )
-	LIST( APPEND EXTERNAL_LIBRARIES ${GLUT_LIBRARIES} )
+	LIST( APPEND EXTERNAL_LIBRARIES ${OPENGL_LIBRARIES} )
 
 	FIND_PACKAGE( GLUT REQUIRED )
 	INCLUDE_DIRECTORIES( ${GLUT_INCLUDE_DIR} )
-	LIST( APPEND EXTERNAL_LIBRARIES ${OPENGL_LIBRARIES} )
+	LIST( APPEND EXTERNAL_LIBRARIES ${GLUT_LIBRARIES} )
 
 	# Python stuff
 	FIND_PACKAGE( PythonLibs )
@@ -201,6 +201,9 @@ ADD_LIBRARY( base SHARED
 	base/worker.cpp
 	base/thread_pool.cpp	
 
+	# Configuration
+	base/vars.cpp
+
 	# Miscellaneous utilities
 	base/timer.cpp
 	base/numeric_utils.cpp
@@ -237,7 +240,6 @@ ADD_DEPENDENCIES( likelihoods base proto )
 # and many algorithmic implementations.
 ###############################################################################
 ADD_LIBRARY( algorithms SHARED 
-
 	# Simple data structures
 	colors.cpp
 	camera.cpp
@@ -255,7 +257,6 @@ ADD_LIBRARY( algorithms SHARED
 
 	# Miscellaneous utilities
 	netlib_sanity_test.cpp
-	vars.cpp
 	geom_utils.cpp
 	image_utils.cpp
 	filesystem_utils.cpp

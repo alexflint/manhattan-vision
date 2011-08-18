@@ -43,6 +43,18 @@ namespace indoor_context {
 	// Unpack a VNL matrix from a protocol buffer
 	void UnpackMatrix(const proto::MatI& in, MatI& out);
 
+	// Pack payoffs into a protocol buffer
+	void PackPayoffs(const DPPayoffs& payoffs,
+									 proto::PayoffFeature& data,
+									 const string& description="");
+	void PackPayoffs(const MatF& payoffs,
+									 proto::PayoffFeature& data,
+									 const string& description="");
+
+	// Unpack payoffs from a protocol buffer
+	void UnpackPayoffs(const proto::PayoffFeature& data,
+										 DPPayoffs& payoffs);
+
 	// Pack payoff features into a protocol buffer
 	// ** moved to progs/compute_payoff_features.cpp to remove
 	// dependency on JointPayoffGen

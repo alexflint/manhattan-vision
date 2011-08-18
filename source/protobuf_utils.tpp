@@ -9,7 +9,7 @@ namespace indoor_context {
 	// Write a protocol buffer to a file
 	template <typename Proto>
 	void WriteProto(const string& path, const Proto& p) {
-		ofstream s(path);
+		ofstream s(path.c_str());
 		CHECK(p.SerializeToOstream(&s)) << "Failed to write protocol buffer to " << path;
 	}
 

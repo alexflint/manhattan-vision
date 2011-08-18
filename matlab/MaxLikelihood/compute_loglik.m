@@ -47,5 +47,5 @@ if (nargout > 1)
 else
     [ loglik ] = run_executable(cmd, executable_dir);
 end
-    
+
 end

@@ -62,7 +62,8 @@ namespace indoor_context {
 	// Computes a mixture-of-Gaussians likelihood
 	class GaussianFeatureLikelihood : public FeatureLikelihood {
 	public:
-		GaussianFeatureLikelihood(const toon::Vector<>& theta);
+		GaussianFeatureLikelihood(const toon::Vector<>& theta,
+															bool enable_jacobian);
 		// Reset internal state
 		void Configure(const toon::Vector<>& theta);
 		// Process a training instance

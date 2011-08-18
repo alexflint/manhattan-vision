@@ -40,7 +40,8 @@ double EvaluateFeatureLogLik(FeatureLikelihood& likelihood,
 
 ///////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
-	//InitVars(argc, argv);
+	// InitVars is part of base. We need because of the vars in dp_payoffs.cpp
+	InitVars(argc, argv);
 
 	// Declare the supported options.
 	po::options_description desc("Allowed options");
@@ -88,11 +89,8 @@ int main(int argc, char **argv) {
 	CHECK_GE(params.occlusion_penalty, 1e-18)
 		<< "Penalties mut be positive (since constant in geometric series must be < 1)";
 
-	bool grad = opts.count("with_gradient") > 0;
-	double delta = opts["delta"].as<double>();
-
 	// TODO: finish implementing analytic gradients
-	bool kComputeAnalyticalGradients = false;
+	bool kEnableAnalyticalGradients = false;
 
 	// Initialize likelihood functions
 	Vec2 lambda = makeVector(params.corner_penalty, params.occlusion_penalty);
@@ -104,10 +102,8 @@ int main(int argc, char **argv) {
 		ftr_lik.reset(new LogitFeatureLikelihood(theta));
 	} else {
 		DLOG << "Using Gaussian feature likelihood";
-		GaussianFeatureLikelihood* ftr_likelihood =
-			new GaussianFeatureLikelihood(theta);
-		ftr_likelihood->enable_jacobian = kComputeAnalyticalGradients;
-		ftr_lik.reset(ftr_likelihood);
+		ftr_lik.reset(new GaussianFeatureLikelihood
+									(theta, kEnableAnalyticalGradients));
 	}
 
 	// Prepare functions (for convenience with numerical gradientJacobians)
@@ -125,8 +121,9 @@ int main(int argc, char **argv) {
 	format fmt("%.18e ");
 	DLOG << fmt % loglik;
 
-	if (grad) {
+	if (opts.count("with_gradient") > 0) {
 		LogManager::Disable();
+		double delta = opts["delta"].as<double>();
 		Vec2 J_model_loglik = NumericalJacobian(model_loglik_func, lambda, delta);
 		Vector<> J_ftr_loglik = NumericalJacobian(ftr_loglik_func, theta, delta);
 		Vector<> numerical_J_loglik = concat(J_model_loglik, J_ftr_loglik);
