@@ -31,9 +31,10 @@ namespace indoor_context {
 	}
 
 	void ModelLikelihood::Process(const proto::FrameWithFeatures& instance) {
-		CHECK_GT(norm(lambda), 0.) << "Compute called before initializing parameters";
+		CHECK_GT(norm(lambda), 0.)
+			<< "Compute called before initializing parameters";
 
-		// Compute model log-likelihood: 
+		// Compute model log-likelihood:
 		double n1 = instance.num_walls();
 		double n2 = instance.num_occlusions();
 		double log_top = -lambda[0]*n1 + -lambda[1]*n2;
@@ -54,7 +55,16 @@ namespace indoor_context {
 		J_loglik += J_model_loglik;
 	}
 
-	/////////////////////////////////////////////////////////////////////////////////
+	void ModelLikelihood::PopulatePayoffs(DPPayoffs& payoffs) {
+		double exp1 = exp(-lambda[0]);
+		double exp2 = exp(-lambda[1]);
+		double exp12 = exp(-lambda[0]-lambda[1]);
+		double bottom = 1. - exp1 - exp2 + exp12;
+		payoffs.wall_penalty = lambda[0] / bottom;
+		payoffs.occl_penalty = lambda[1] / bottom;
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
 	LogitFeatureLikelihood::LogitFeatureLikelihood(const Vector<>& th)
 		: J_loglik(th.size()), theta(th) {
 		Configure(th);
@@ -102,7 +112,7 @@ namespace indoor_context {
 		J_loglik += J_ftr_loglik;
 	}
 
-	/////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////
 	GaussianFeatureLikelihood::GaussianFeatureLikelihood(const Vector<>& th,
 																											 bool enable_jac)
 		: theta(th), J_loglik(th.size()), enable_jacobian(enable_jac) {
@@ -118,7 +128,8 @@ namespace indoor_context {
 
 	void GaussianFeatureLikelihood::Process(const proto::FrameWithFeatures& instance) {
 		CHECK(instance.features_size() != 0)
-			<< "Features were omitted in this dataset. Re-generate with --store_features.";
+			<< "Features were omitted in this dataset. "
+			<< "Re-generate with --store_features.";
 
 		// Unpack path
 		MatI mpath, morients;
@@ -148,7 +159,7 @@ namespace indoor_context {
 		Vector<> frame_J_loglik(theta.size());
 		frame_J_loglik = Zeros;
 		for (int k = 0; k < nf; k++) {
-			CHECK_INTERVAL(fg_priors[k], 1e-17, 1.);
+			CHECK_INTERVAL(fg_priors[k], 1e-17, 1.-1e-17);
 			double fg_logprior = log(fg_priors[k]);
 			double bg_logprior = log(1. - fg_priors[k]);
 			double log_noise_var = log(noise_vars[k]);
@@ -158,7 +169,8 @@ namespace indoor_context {
 			for (int y = 0; y < ny; y++) {
 				//if (y != 478) continue;  // debug only
 				double py = 1.* y / ny;
-				const float* feature_row[] = { po.wall_scores[0][y], po.wall_scores[1][y] };
+				const float* feature_row[] = { po.wall_scores[0][y],
+																			 po.wall_scores[1][y] };
 				for (int x = 0; x < nx; x++) {
 					//if (x != 155) continue;
 					double f = feature_row[ orients[x] ][ x ];
@@ -166,8 +178,14 @@ namespace indoor_context {
 					double ppath = 1. * path[x] / ny;
 					double f_ampl = Gauss1D(py, ppath, fall_offs[k]);
 					double f_mean = ideal_fs[k] * f_ampl;
-					double fg_loglik = FastLogGauss1D(f, f_mean, noise_vars[k], log_noise_var);
-					double bg_loglik = FastLogGauss1D(f, kBgMean, kBgVariance, log_bg_var);
+					double fg_loglik = FastLogGauss1D(f,
+																						f_mean,
+																						noise_vars[k],
+																						log_noise_var);
+					double bg_loglik = FastLogGauss1D(f,
+																						kBgMean,
+																						kBgVariance,
+																						log_bg_var);
 					double fg_logpost = fg_logprior + fg_loglik;
 					double bg_logpost = bg_logprior + bg_loglik;
 					double logjoint = LogSumExp(fg_logpost, bg_logpost);
@@ -178,7 +196,9 @@ namespace indoor_context {
 						// Compute gradient w.r.t. ideal feature
 						//double ideal_grad = noise_recip * (f-f_mean) * ampl;
 						//DREPORT(f, noise_recip, f-f_mean, ampl, ideal_grad);
-						double top = (fg_priors[k] * (f-f_mean) / noise_vars[k]) * exp(fg_logpost) * f_ampl;
+						double top =
+							(fg_priors[k] * (f-f_mean) / noise_vars[k])
+							* exp(fg_logpost) * f_ampl;
 						double ideal_grad = top / exp(logjoint);
 						frame_J_loglik[k] += ideal_grad;
 						//DREPORT(ideal_grad);
@@ -188,7 +208,9 @@ namespace indoor_context {
 						frame_J_loglik[nf+k] += noise_recip * (f-f_mean) * f_mean * y_dev;
 
 						// Compute gradient w.r.t. noise variance
-						double f_dev = (f-f_mean)*(f-f_mean) / (noise_vars[k]*noise_vars[k]*2);
+						double f_dev =
+							(f-f_mean)*(f-f_mean)
+							/ (noise_vars[k]*noise_vars[k]*2);
 						double term1 = -.5*noise_recip + f_dev;
 						double term2_log_top = bg_logprior + bg_loglik - fg_loglik;
 						double term2_log_bottom = LogSumExp(fg_logprior, term2_log_top);
@@ -197,17 +219,77 @@ namespace indoor_context {
 
 						// Compute jacobian w.r.t. fg_priors
 						double log_top = 1. - exp(bg_loglik - fg_loglik);
-						double log_bottom = LogSumExp(fg_logprior, bg_logprior + bg_loglik - fg_loglik);
+						double log_bottom = LogSumExp(fg_logprior,
+																					bg_logprior + bg_loglik - fg_loglik);
 						double fg_grad = exp(log_top - log_bottom);
 						frame_J_loglik[nf*3+k] += fg_grad;
 					}
-
-					//break;  // debug
 				}
-				//break;  // debug
 			}
 		}
 		loglik += frame_loglik;
 		J_loglik += frame_J_loglik;
+	}
+
+	void GaussianFeatureLikelihood::ComputePayoffs(const proto::FrameWithFeatures& instance,
+																								 DPPayoffs& payoffs) const {
+		CHECK(instance.features_size() != 0)
+			<< "Features were omitted in this dataset. Re-generate with --store_features.";
+
+		// Unpack features
+		UnpackFeatures(instance, features);
+		const int nf = features.features.size();
+		const int nx = features.features[0].nx();
+		const int ny = features.features[0].ny();
+
+		// Upack components of theta
+		CHECK_EQ(theta.size(), nf*4);
+		Vector<> ideal_fs = theta.slice(0, nf);
+		Vector<> fall_offs = theta.slice(nf, nf);
+		Vector<> noise_vars = theta.slice(nf*2, nf);
+		Vector<> fg_priors = theta.slice(nf*3, nf);
+
+		// Initialize payoffs
+		payoffs.Resize(makeVector(nx, ny));
+
+		// Precompute constants
+		double log_bg_var = log(kBgVariance);
+		double sqr_bg_var = kBgVariance*kBgVariance;
+
+		// Accumulate the log likelihood
+		double frame_loglik = 0;
+		Vector<> frame_J_loglik(theta.size());
+		frame_J_loglik = Zeros;
+		for (int k = 0; k < nf; k++) {
+			CHECK_INTERVAL(fg_priors[k], 1e-17, 1.-1e-17);
+			double fg_logprior = log(fg_priors[k]);
+			double bg_logprior = log(1. - fg_priors[k]);
+			double log_noise_var = log(noise_vars[k]);
+			double noise_recip = 1. / noise_vars[k];
+
+			for (int orient = 0; orient < 2; orient++) {
+				for (int yy = 0; yy < ny; yy++) {
+					const DPPayoffs& ftr = features.features[k];
+					for (int y = 0; y < ny; y++) {
+						double py = 1.* y / ny;
+						const float* feature_row = ftr.wall_scores[orient][y];
+						for (int x = 0; x < nx; x++) {
+							double f = feature_row[x];
+							double ppath = 1. * yy / ny;
+							double f_ampl = Gauss1D(py, ppath, fall_offs[k]);
+							double f_mean = ideal_fs[k] * f_ampl;
+							double fg_loglik = FastLogGauss1D(f, f_mean,
+																								noise_vars[k], log_noise_var);
+							double bg_loglik = FastLogGauss1D(f, kBgMean,
+																								kBgVariance, log_bg_var);
+							double fg_logpost = fg_logprior + fg_loglik;
+							double bg_logpost = bg_logprior + bg_loglik;
+							double logjoint = LogSumExp(fg_logpost, bg_logpost);
+							payoffs.wall_scores[orient][yy][x] += logjoint;
+						}
+					}
+				}
+			}
+		}
 	}
 }

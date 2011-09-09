@@ -14,9 +14,6 @@
 #include "log.tpp"
 #include "matrix_traits.tpp"  // for CHECK_SAME_SIZE etc, generates no extra includes
 
-// Turn a C++ expression into "expr: <value-of-expr>\n"
-//#define EXPR_STR(x) NS::AssertionManager::GetExprStr(#x,x)
-
 // The basic assertion
 //    Usage: CHECK(myVariable.someBooleanFunc(foo)) << "the function failed for args " << foo;
 #define CHECK(x)																												\
@@ -59,9 +56,6 @@
 	CHECK((i) >= (a) && (i) <= (b)) << EXPR(i,a,b)
 
 // Check that i is a valid index into the specified range.
-//    vector<int> x(numberOfItems);
-//    int i;
-//    cin >> i;
 // Any container compatible with Boost.Range can be used.
 #define CHECK_INDEX(i,range)										\
 	CHECK_INTERVAL(i, 0, size(range)-1);
@@ -108,25 +102,6 @@ namespace indoor_context {
 		static void SetExceptionMode() { ErrorMode(kErrorModeThrow); }
 		// CHECK* calls will exit on failure
 		static void SetExitMode() { ErrorMode(kErrorModeExit); }
-
-		// Simple heuristic to guess whether a given string represents a
-		// literal C++ expression
-		//static bool IsLiteral(const string& expr);
-
-		// Report a failed check
-		/*template <typename T>
-		static string GetExprStr(const string& expr, const T& val) {
-			// Constructing a format object is expensive so avoid constructing
-			// one on each invokation.
-			if (IsLiteral(expr)) {
-				return "";
-			} else {
-				// Use stringstream here rather than boost::format to avoid long compilation
-				stringstream ss;
-				ss << "  " << expr << " = " << val << endl;
-				return ss.str();
-			}
-			}*/
 	};
 
 	// Represents an object that either exits or throws an exception on destruction

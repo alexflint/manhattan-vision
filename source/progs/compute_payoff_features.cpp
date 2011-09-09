@@ -45,8 +45,8 @@ int main(int argc, char **argv) {
     ("help", "produce help message")
     ("sequence", po::value<vector<string> >()->required(), "name of training sequence")
 		("frame_stride", po::value<int>()->default_value(1), "number of frames to skip between evaluations")
-		("store_features", "if 1, store all features in the output file")
-		("output", po::value<string>()->required(), "output file for features")
+		("output", po::value<string>()->required(), "output filename")
+		("store_features", "store all features in the output file")
 		;
 
 	// Parse options
@@ -63,6 +63,8 @@ int main(int argc, char **argv) {
     return 1;
 	}
 
+	AssertionManager::SetExceptionMode();
+
 	// Deal with params
 	vector<string> sequences = opts["sequence"].as<vector<string> >();
 	CHECK(!sequences.empty()) << "You must specify at least one sequence with --sequence=<name>";
@@ -73,7 +75,7 @@ int main(int argc, char **argv) {
 	fs::path features_file = opts["output"].as<string>();
 	CHECK_PRED1(fs::exists, features_file.parent_path());
 
-	bool store_features = opts.count("store_features");
+	bool store_features = opts.count("store_features")>0;
 
 	vector<int> stereo_offsets = ParseMultiRange<int>(*gvStereoOffsets);
 
@@ -91,7 +93,8 @@ int main(int argc, char **argv) {
 		TITLE("Processing " << sequences[i]);
 		LoadXmlMapWithGroundTruth(GetMapPath(sequences[i]), maps[i], gt_maps[i]);
 
-		for (int j = 0; j < maps[i].frames.size(); j += frame_stride) {
+		// start from frame 1 to avoid grayscale frame 0
+		for (int j = 1; j < maps[i].frames.size(); j += frame_stride) {
 			Frame& frame = maps[i].frames[j];
 			frame.LoadImage();
 			num_frames++;
@@ -99,73 +102,85 @@ int main(int argc, char **argv) {
 			TITLE("Processing frame " << frame.id);
 
 			// Setup geometry
-			DPGeometryWithScale geometry(frame.image.pc(),
-																	 gt_maps[i].floorplan().zfloor(),
-																	 gt_maps[i].floorplan().zceil());
-			int nx = geometry.grid_size[0];
-			int ny = geometry.grid_size[1];
+			try {
+				DPGeometryWithScale geometry(frame.image.pc(),
+																		 gt_maps[i].floorplan().zfloor(),
+																		 gt_maps[i].floorplan().zceil());
+				int nx = geometry.grid_size[0];
 
-			// Load point cloud
-			point_cloud.clear();
-			frame.GetMeasuredPoints(point_cloud);
+				// Load point cloud
+				point_cloud.clear();
+				frame.GetMeasuredPoints(point_cloud);
 
-			// Load auxiliary frames
-			vector<const PosedImage*> aux_images;
-			vector<int> aux_ids;
-			BOOST_FOREACH(int offset, stereo_offsets) {
-				Frame* aux_frame = frame.map->GetFrameById(frame.id+offset);
-				if (aux_frame != NULL) {
-					aux_frame->LoadImage();
-					aux_images.push_back(&aux_frame->image);
-					aux_ids.push_back(frame.id+offset);
+				// Load auxiliary frames
+				vector<const PosedImage*> aux_images;
+				vector<int> aux_ids;
+				BOOST_FOREACH(int offset, stereo_offsets) {
+					Frame* aux_frame = frame.map->GetFrameById(frame.id+offset);
+					if (aux_frame != NULL) {
+						aux_frame->LoadImage();
+						aux_images.push_back(&aux_frame->image);
+						aux_ids.push_back(frame.id+offset);
+					}
 				}
-			}
 
-			// Compute payoffs
-			joint.Compute(frame.image, geometry, point_cloud, aux_images);
-			DPPayoffs sum_stereo(geometry.grid_size);
-			BOOST_FOREACH(const StereoPayoffGen& gen, joint.stereo_gens) {
-				sum_stereo.Add(gen.payoffs, 1. / joint.stereo_gens.size());
-			}
+				// Compute payoffs
+				joint.Compute(frame.image, geometry, point_cloud, aux_images);
+				DPPayoffs sum_stereo(geometry.grid_size);
+				BOOST_FOREACH(const StereoPayoffGen& gen, joint.stereo_gens) {
+					sum_stereo.Add(gen.payoffs, 1. / joint.stereo_gens.size());
+				}
 
-			// Get ground truth path
-			VecI path(nx, 0);
-			VecI orients(nx, 0);
-			gt.Compute(gt_maps[i].floorplan(), frame.image.pc());
-			gt.ComputePath(geometry, path, orients);
+				// Get ground truth path
+				VecI path(nx, 0);
+				VecI orients(nx, 0);
+				gt.Compute(gt_maps[i].floorplan(), frame.image.pc());
+				gt.ComputePath(geometry, path, orients);
 
-			// Trace features along path
-			MatF path_ftrs(4, nx);
-			for (int x = 0; x < nx; x++) {
-				path_ftrs[0][x] = joint.mono_gen.payoffs.wall_scores[ orients[x] ][ path[x] ][ x ];
-				path_ftrs[1][x] = sum_stereo.wall_scores[ orients[x] ][ path[x] ][ x ];
-				path_ftrs[2][x] = joint.point_cloud_gen.agreement_payoffs[ path[x] ][ x ];
-				path_ftrs[3][x] = joint.point_cloud_gen.occlusion_payoffs[ path[x] ][ x ];
-			}
+				// Trace features along path
+				MatF path_ftrs(4, nx);
+				for (int x = 0; x < nx; x++) {
+					path_ftrs[0][x] = joint.mono_gen.payoffs.wall_scores[ orients[x] ][ path[x] ][ x ];
+					path_ftrs[1][x] = sum_stereo.wall_scores[ orients[x] ][ path[x] ][ x ];
+					path_ftrs[2][x] = joint.point_cloud_gen.agreement_payoffs[ path[x] ][ x ];
+					path_ftrs[3][x] = joint.point_cloud_gen.occlusion_payoffs[ path[x] ][ x ];
+				}
 			
-			// Add an entry to the protocol buffer
-			proto::FrameWithFeatures& framedata = *featureset.add_frames();
-			framedata.set_sequence(sequences[i]);
-			framedata.set_frame_id(frame.id);
-			framedata.set_num_walls(gt.num_walls());
-			framedata.set_num_occlusions(gt.num_occlusions());
+				// This try...catch block is so that if an error occurs while
+				// packing protocol buffers we exit completely (to avoid
+				// inconsistent feature data).
+				try {
+					// Add an entry to the protocol buffer
+					proto::FrameWithFeatures& framedata = *featureset.add_frames();
+					framedata.set_sequence(sequences[i]);
+					framedata.set_frame_id(frame.id);
+					framedata.set_num_walls(gt.num_walls());
+					framedata.set_num_occlusions(gt.num_occlusions());
 
-			Matrix<-1,-1,int> mpath = asToon(path).as_col();
-			PackMatrix(asVNL(mpath), *framedata.mutable_path());
-			Matrix<-1,-1,int> morients = asToon(orients).as_col();
-			PackMatrix(asVNL(morients), *framedata.mutable_orients());
+					Matrix<-1,-1,int> mpath = asToon(path).as_col();
+					PackMatrix(asVNL(mpath), *framedata.mutable_path());
+					Matrix<-1,-1,int> morients = asToon(orients).as_col();
+					PackMatrix(asVNL(morients), *framedata.mutable_orients());
 
-			PackMatrix(path_ftrs, *framedata.mutable_path_features());
+					PackMatrix(path_ftrs, *framedata.mutable_path_features());
 
-			if (store_features) {
-				PackFeatures(joint, framedata);
+					if (store_features) {
+						PackFeatures(joint, framedata);
+					}
+				} catch (const AssertionFailedException& ex) {
+					DLOG << "Assertion failed while packing features:";
+					INDENTED DLOG << ex.what();
+					exit(-1);
+				}
+			} catch (const AssertionFailedException& ex) {
+				DLOG << "Assertion failed while processing, frame ignored:";
+				INDENTED DLOG << ex.what();
 			}
 		}
 	}
 
 	// Store payoffs
-	TIMED("Serializing") WriteProto(features_file.string(), featureset);
-
+	WriteProto(features_file.string(), featureset);
 	DLOG << "Processed " << num_frames << " frames in " << timer;
 
 	return 0;

@@ -20,6 +20,10 @@ namespace indoor_context {
 		double log_likelihood() const { return loglik; }
 		// Returns the jacobian of the *log* likelihood
 		const Vec2& jacobian() const { return J_loglik; }
+
+		// Populate the penalty terms of a payoff function
+		void PopulatePayoffs(DPPayoffs& payoffs);
+
 	private:
 		Vec2 lambda;
 		double loglik;
@@ -63,7 +67,7 @@ namespace indoor_context {
 	class GaussianFeatureLikelihood : public FeatureLikelihood {
 	public:
 		GaussianFeatureLikelihood(const toon::Vector<>& theta,
-															bool enable_jacobian);
+															bool enable_jacobian=true);
 		// Reset internal state
 		void Configure(const toon::Vector<>& theta);
 		// Process a training instance
@@ -74,10 +78,14 @@ namespace indoor_context {
 		const toon::Vector<>& jacobian() const { return J_loglik; }
 		// whether to compute jacobians
 		bool enable_jacobian;
+
+		// Compute payoffs
+		void ComputePayoffs(const proto::FrameWithFeatures& instance,
+												DPPayoffs& payoffs) const;
 	private:
 		toon::Vector<> theta;
 		double loglik;
 		toon::Vector<> J_loglik;
-		PayoffFeatures features;  // internal buffer only
+		mutable PayoffFeatures features;  // internal buffer only
 	};
 }

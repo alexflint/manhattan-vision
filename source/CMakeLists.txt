@@ -107,7 +107,7 @@ IF( NOT ${LIGHT} )
 	LIST( APPEND EXTERNAL_LIBRARIES ${Cairo_LIBRARIES} )
 
 	FIND_PACKAGE( Cairomm REQUIRED )
-	INCLUDE_DIRECTORIES( ${Cairomm_INCLUDE_DIR} /usr/lib/cairomm-1.0/include )
+	INCLUDE_DIRECTORIES( ${Cairomm_INCLUDE_DIRS} /usr/lib/cairomm-1.0/include )
 	LIST( APPEND EXTERNAL_LIBRARIES ${Cairomm_LIBRARIES} )
 
 	FIND_PACKAGE( Freetype REQUIRED )
@@ -194,7 +194,6 @@ ADD_LIBRARY( base SHARED
 	base/check.cpp
 	base/report.cpp
 	base/streamable.cpp
-	base/vararg_utils.cpp
 	base/progress_reporter.cpp
 
 	# Parallelism
@@ -230,6 +229,7 @@ ADD_LIBRARY( likelihoods SHARED
 	dp_payoffs.cpp
 	payoff_helpers.cpp
 	likelihoods.cpp
+	likelihood_helpers.cpp
 )
 
 ADD_DEPENDENCIES( likelihoods base proto )

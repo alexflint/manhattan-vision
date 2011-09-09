@@ -45,6 +45,7 @@ SET( PROGS
 	kinect_dp
 	estimate_floorplan
 	generate_video
+	maximize_loglik
 
 	dp_optimization_wrapper
 	compute_payoff_features

@@ -9,7 +9,7 @@
 
 namespace indoor_context {
 	static const long US_PER_MS = 1000;
-	static const long US_PER_SEC = US_PER_MS * 1000;
+	static const long US_PER_SEC = 1000 * US_PER_MS;
 	static const long US_PER_MIN = 60 * US_PER_SEC;
 
 	Timer::Timer() {
