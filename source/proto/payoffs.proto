@@ -1,23 +1,18 @@
+// Storate for training data suitable for max-likelihood training with
+// GPs
+
 package indoor_context.proto;
 
 import "vector.proto";
-
-message MatF {
-	required int32 rows = 1;
-	required int32 cols = 2;
-	repeated float entries = 3;
-}
-
-message MatI {
-	required int32 rows = 1;
-	required int32 cols = 2;
-	repeated int32 entries = 3;
-}
 
 message PayoffFeature {
 	required MatF left = 5;
 	optional MatF right = 6;  // if omitted then right==left implicitly
 	optional string description = 10;  // human-readable description of this feature set
+}
+
+message PayoffFeatureSet {
+	repeated PayoffFeature features = 1;
 }
 
 message FrameWithFeatures {
@@ -31,9 +26,9 @@ message FrameWithFeatures {
 	required int32 num_walls = 21;
 	required int32 num_occlusions = 22;
 
-	repeated PayoffFeature features = 30;  // might have zero elements
+	required PayoffFeatureSet featureset = 30;
 }
 
-message PayoffFeatureSet {
+message SequenceWithFeatures {
 	repeated FrameWithFeatures frames = 1;
 }

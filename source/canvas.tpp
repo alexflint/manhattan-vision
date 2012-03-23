@@ -4,7 +4,6 @@
 
 #include <boost/range.hpp>
 
-#include <cairommconfig.h>
 #include <cairomm/context.h>
 #include <cairomm/surface.h>
 

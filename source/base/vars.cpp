@@ -1,13 +1,21 @@
+#include <stdlib.h>
+
 #include "vars.h"
 #include "common_types.h"
 
 namespace indoor_context {
+	static const string kConfigFileEnv = "MANHATTAN_CONFIG";
 	static const string kDefaultConfigFile = "config/common.cfg";
 
 	string config_file;
 
 	void InitVars() {
-		InitVars(kDefaultConfigFile);
+		const char* env = getenv(kConfigFileEnv.c_str());
+		if (env == NULL) {
+			InitVars(kDefaultConfigFile);
+		} else {
+			InitVars(env);
+		}
 	}
 
 	void InitVars(const string& file) {

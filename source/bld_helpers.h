@@ -2,6 +2,7 @@
 
 #include "common_types.h"
 #include "vw_image-fwd.h"
+#include "line_segment.h"
 
 namespace indoor_context {
 	class ManhattanReconstruction;
@@ -15,14 +16,10 @@ namespace indoor_context {
 	class TruthedFrame;
 	}
 
-	// Get the path to the truthed_map.pro file for a sequence, or die
-	// if the sequence is not found.
-	string GetMapPath(const string& sequence_name);
-
 	// Get the number of agreeing pixels
 	int ComputeAgreement(const MatI& a, const MatI& b);
 	// Get percentage of agreeing pixels
-	double ComputeAgreementPct(const MatI& a, const MatI& n);
+	double ComputeAgreementFrac(const MatI& a, const MatI& n);
 
 	// Downsample the orientation map to the specified size
 	void DownsampleOrients(const MatI& in, MatI& out, const Vec2I& size);
@@ -35,6 +32,13 @@ namespace indoor_context {
 
 	// Get the floor->ceiling homology
 	Mat3 GetFloorCeilHomology(const PosedCamera& pc, const proto::FloorPlan& fp);
+
+	// Convert a set of line segments to the path representation
+	void SegmentsToPathUnclamped(const vector<LineSegment>& segments,
+															 const vector<int>& segment_orients,
+															 const DPGeometry& geometry,
+															 VecI& path,
+															 VecI& orients);
 
 	// Draw an array of dots to visualize the given payoffs
 	void DrawPayoffs(Canvas& canvas,

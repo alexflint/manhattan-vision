@@ -338,7 +338,6 @@ void GuidedLineDetector::ComputeSegments() {
 						if (len >= kMinSegLength) {
 							LineDetection det(unproject(pix[j0].pos), unproject(pix[j-1].pos));
 							det.axis = i;
-							det.confidence = j-j0;
 							for (int k = j0; k < j; k++) {
 								det.pixels->push_back(round_pos(pix[k].pos));
 							}

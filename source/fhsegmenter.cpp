@@ -3,7 +3,7 @@
 #include <ext/numeric>
 #include <stack>
 
-#include <parallel/algo.h>
+//#include <parallel/algo.h>
 
 #include <boost/range.hpp>
 #include <boost/thread.hpp>

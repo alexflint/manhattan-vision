@@ -20,8 +20,8 @@ public:
 	// representations of the same image, hence they are marked mutable
 	mutable ImageF mono;
 	mutable bool monodirty;  // RGB has been modified since M was built
-	mutable unsigned gl_texture_id;  // texture name if this image has been loaded
-	mutable bool texdirty;
+	//mutable unsigned gl_texture_id;  // texture name if this image has been loaded
+	//mutable bool texdirty;
 	// Initialize empty
 	ImageBundle();
 	// Initialize from an image file
@@ -52,11 +52,11 @@ public:
 	// generate a new one if id=-1). For multi-window applications
 	// the texture can only be used in the window it was loaded
 	// for. Consider using Viewer3D::LoadTexture.
-	unsigned LoadGLTexture(unsigned texId=-1) const;
+	//unsigned LoadGLTexture(unsigned texId=-1) const;
 	// Bind this image as the current texture. This may involve loading
 	// the texture into memory if it has not already been loaded. Only
 	// use this in single window applications.
-	void BindGLTexture() const;
+	//void BindGLTexture() const;
 	// Set the dirty flag so that future invokations of Build* will
 	// re-build the respective image
 	void Invalidate();

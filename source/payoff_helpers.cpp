@@ -1,62 +1,43 @@
 #include "payoff_helpers.h"
 
-#include <boost/filesystem/operations.hpp>
-
 #include "common_types.h"
+#include "protobuf_utils.h"
+
 #include "io_utils.tpp"
+#include "counted_foreach.tpp"
 
 namespace indoor_context {
 	void PackMatrix(const MatF& in, proto::MatF& out) {
 		out.set_rows(in.Rows());
 		out.set_cols(in.Cols());
-		out.clear_entries();
-		for (int y = 0; y < in.Rows(); y++) {
-			const float* row = in[y];
-			for (int x = 0; x < in.Cols(); x++) {
-				out.add_entries(row[x]);
-			}
-		}
+		int nbytes = in.Rows() * in.Cols() * sizeof(float);
+		out.set_data(reinterpret_cast<const void*>(in.DataBlock()), nbytes);
 	}
 
 	void PackMatrix(const MatI& in, proto::MatI& out) {
 		out.set_rows(in.Rows());
 		out.set_cols(in.Cols());
-		out.clear_entries();
-		for (int y = 0; y < in.Rows(); y++) {
-			const int* row = in[y];
-			for (int x = 0; x < in.Cols(); x++) {
-				out.add_entries(row[x]);
-			}
-		}
+		int nbytes = in.Rows() * in.Cols() * sizeof(int);
+		out.set_data(reinterpret_cast<const void*>(in.DataBlock()), nbytes);
 	}
 
 	void UnpackMatrix(const proto::MatF& in, MatF& out) {
-		CHECK_EQ(in.entries_size(), in.rows()*in.cols());
+		int nnbytes = in.rows() * in.cols() * sizeof(float);
+		CHECK_EQ(in.data().size(), nnbytes);
 		out.Resize(in.rows(), in.cols());
-		int i = 0;
-		for (int y = 0; y < in.rows(); y++) {
-			float* row = out[y];
-			for (int x = 0; x < in.cols(); x++) {
-				row[x] = in.entries(i++);
-			}
-		}
+		out.CopyIn(reinterpret_cast<const float*>(in.data().data()));
 	}
 
 	void UnpackMatrix(const proto::MatI& in, MatI& out) {
-		CHECK_EQ(in.entries_size(), in.rows()*in.cols());
+		int nnbytes = in.rows() * in.cols() * sizeof(int);
+		CHECK_EQ(in.data().size(), nnbytes);
 		out.Resize(in.rows(), in.cols());
-		int i = 0;
-		for (int y = 0; y < in.rows(); y++) {
-			int* row = out[y];
-			for (int x = 0; x < in.cols(); x++) {
-				row[x] = in.entries(i++);
-			}
-		}
+		out.CopyIn(reinterpret_cast<const int*>(in.data().data()));
 	}
 
 	void PackPayoffs(const DPPayoffs& payoffs,
-									 proto::PayoffFeature& data,
-									 const string& description) {
+									 const string& description,
+									 proto::PayoffFeature& data) {
 		PackMatrix(payoffs.wall_scores[0], *data.mutable_left());
 		PackMatrix(payoffs.wall_scores[1], *data.mutable_right());
 		if (!description.empty()) {
@@ -65,8 +46,8 @@ namespace indoor_context {
 	}
 
 	void PackPayoffs(const MatF& payoffs,
-									 proto::PayoffFeature& data,
-									 const string& description) {
+									 const string& description,
+									 proto::PayoffFeature& data) {
 		PackMatrix(payoffs, *data.mutable_left());
 		if (!description.empty()) {
 			data.set_description(description);
@@ -83,34 +64,77 @@ namespace indoor_context {
 		}
 	}
 
-	// PackFeatures moved to progs/compute_payoff_features.cpp to remove
-	// dependency on JointPayoffGen
+	void PackFeatures(const PayoffFeatures& fset,
+										proto::PayoffFeatureSet& data) {
+		data.clear_features();
+		CHECK_EQ(fset.features.size(), fset.descriptions.size());
+		COUNTED_FOREACH(int i, const DPPayoffs& ftr, fset.features) {
+			PackPayoffs(ftr, fset.descriptions[i], *data.add_features());
+		}
+	}
 
-	void UnpackFeatures(const proto::FrameWithFeatures& data,
-											PayoffFeatures& feature_stack) {
-		feature_stack.features.resize(data.features_size());
-		feature_stack.descriptions.resize(data.features_size());
+	void UnpackFeatures(const proto::PayoffFeatureSet& data,
+											PayoffFeatures& fset) {
+		fset.features.resize(data.features_size());
+		fset.descriptions.resize(data.features_size());
 		for (int i = 0; i < data.features_size(); i++) {
-			UnpackPayoffs(data.features(i), feature_stack.features[i]);
+			UnpackPayoffs(data.features(i), fset.features[i]);
 			if (data.features(i).has_description()) {
-				feature_stack.descriptions[i] = data.features(i).description();
+				fset.descriptions[i] = data.features(i).description();
 			}
 		}
 	}
 
-	void CompilePayoffs(const PayoffFeatures& features,
-											const ManhattanHyperParameters& params,
-											DPPayoffs& payoffs) {
+	void WriteFeatures(const string& path, const PayoffFeatures& fset) {
+		proto::PayoffFeatureSet p;
+		PackFeatures(fset, p);
+		WriteProto(path, p);
+	}
+		
+	void ReadFeatures(const string& path, PayoffFeatures& fset) {
+		proto::PayoffFeatureSet p;
+		ReadLargeProto(path, p);
+		UnpackFeatures(p, fset);
+	}
+
+	ManhattanHyperParameters::ManhattanHyperParameters(const VecF& w,
+																										 float c,
+																										 float o)
+		: weights(w), corner_penalty(c), occlusion_penalty(o) {
+	}
+
+	void PayoffFeatures::Clear() {
+		features.clear();
+		descriptions.clear();
+	}
+
+	void PayoffFeatures::AddCopy(const DPPayoffs& x, const string& description) {
+		CHECK_EQ(features.size(), descriptions.size());
+		features.push_back(new DPPayoffs);
+		x.CopyTo(features.back());
+		descriptions.push_back(description);
+	}
+
+	void PayoffFeatures::AddCopy(const MatF& x, const string& description) {
+		CHECK_EQ(features.size(), descriptions.size());
+		features.push_back(new DPPayoffs);
+		features.back().wall_scores[0] = x;
+		features.back().wall_scores[1] = x;
+		descriptions.push_back(description);
+	}
+
+	void PayoffFeatures::Compile(const ManhattanHyperParameters& params,
+															 DPPayoffs& payoffs) const {
 		// Copy penalties
 		payoffs.wall_penalty = params.corner_penalty;
 		payoffs.occl_penalty = params.occlusion_penalty;
 
-		// Mix payoffs
-		CHECK(!features.features.empty());
-		CHECK_EQ(params.weights.Size(), features.features.size());
-		payoffs.Resize(matrix_size(features.features[0]));
+		// Sum features
+		CHECK(!features.empty());
+		CHECK_EQ(params.weights.Size(), features.size());
+		payoffs.Resize(matrix_size(features[0]));
 		for (int i = 0; i < params.weights.size(); i++) {
-			payoffs.Add(features.features[i], params.weights[i]);
+			payoffs.Add(features[i], params.weights[i]);
 		}
-	}
+	}		
 }

@@ -44,9 +44,9 @@ public:
 	void Render(const proto::Model& model);
 	void RenderWall(const Vec2& u, const Vec2& v, double zfloor, double zceil);
 
-	// Retrieve pixel-wise orientations
-	MatI& orientations() { return renderer_.framebuffer(); }
-	const MatI& orientations() const { return renderer_.framebuffer(); }
+	// Retrieve pixel-wise orientation labels:
+	MatI& orientations() { return orientations_; }
+	const MatI& orientations() const { return orientations_; }
 
 	// Retrieve pixel-wise depth
 	MatD& depthmap() { return renderer_.depthbuffer(); }

@@ -1,7 +1,8 @@
+#pragma once
+
 #include <boost/ptr_container/ptr_vector.hpp>
 
 #include "common_types.h"
-#include "camera.h"
 #include "filters.h"
 #include "guided_line_detector.h"
 #include "line_sweeper.h"
@@ -9,6 +10,8 @@
 #include "integral_image.tpp"
 
 namespace indoor_context {
+	class PosedImage;
+
 	// Accumulates features in a local neighbourhood and for neighbours
 	class AccumulatedFeatures {
 	public:
@@ -16,12 +19,12 @@ namespace indoor_context {
 		IntegralImage<float> integ;
 		boost::ptr_vector<MatF> results;
 		void Prepare(const MatF& input);
-		void Compute(int radius);
-		void Compute(const MatF& input, int radius);
+		void Compute(int radius, bool include_nbrs=true);
+		void Compute(const MatF& input, int radius, bool include_nbrs=true);
 	};
 
 	// Generates a range of features
-	class BuildingFeatures {
+	class PhotometricFeatures {
 	public:
 		const PosedImage* input;
 
@@ -51,9 +54,9 @@ namespace indoor_context {
 		boost::ptr_vector<MatF> gt_features;
 
 		// Initialize empty
-		BuildingFeatures();
+		PhotometricFeatures();
 		// Initialize with the given feature set (see Configure() below)
-		BuildingFeatures(const string& config);
+		PhotometricFeatures(const string& config);
 
 		// Configure the features with a string describing the feature set
 		// Example feature set:
@@ -65,8 +68,9 @@ namespace indoor_context {
 		// Return true if the given component was active in the config string
 		bool IsActive(const string& component);
 
-		// Compute features. If ground truth is not provided then the
-		// feature set must not include "gt".
+		// Compute features. If ground truth is NULL then the feature set
+		// must not include "gt".
+		void Compute(const PosedImage& image);
 		void Compute(const PosedImage& image, const MatI* gt_orients);
 	};
 }

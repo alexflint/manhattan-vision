@@ -44,4 +44,17 @@ namespace indoor_context {
 	// ensuring that they sum to 1. Uses LogSumExp for numerical
 	// stability.
 	VecD LogLikelihoodToDistr(const VecD& ys);
+
+	// Compute the digamma function (gamma function divided by its derivative)
+	float FastDigamma (float x);
+
+	// Compute the following sum involving a harmonic series
+	//    sum_{x=x0}^{x1} 1. / (a*x + b)
+	//
+	// The sum bounds are inclusive, the result is a very close approximation of:
+	//    float hsum = 0.;
+	//    for (int x = x0; x <= x1; x++) {
+	//      hsum += 1. / (a*x+b);
+	//    }
+	float FastHarmonicSum(float a, float b, float x0, float x1);
 }  // namespace indoor_context

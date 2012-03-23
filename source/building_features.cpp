@@ -15,13 +15,12 @@
 
 namespace indoor_context {
 
-	lazyvar<string> gvDefaultFeatureSet("BuildingFeatures.DefaultSet");
-	lazyvar<int> gvGaborScales("BuildingFeatures.GaborScales");
-	lazyvar<int> gvGaborOrientations("BuildingFeatures.GaborOrientations");
+	lazyvar<string> gvDefaultFeatureSet("PhotometricFeatures.DefaultSet");
+	lazyvar<int> gvGaborScales("PhotometricFeatures.GaborScales");
+	lazyvar<int> gvGaborOrientations("PhotometricFeatures.GaborOrientations");
 
-	lazyvar<int> gvFirstWindowForSweeps("BuildingFeatures.FirstWindowForSweeps");
-	lazyvar<int> gvNumScalesForSweeps("BuildingFeatures.NumScalesForSweeps");
-
+	lazyvar<int> gvFirstWindowForSweeps("PhotometricFeatures.FirstWindowForSweeps");
+	lazyvar<int> gvNumScalesForSweeps("PhotometricFeatures.NumScalesForSweeps");
 
 	void AccumulatedFeatures::Prepare(const MatF& input) {
 		size = matrix_size(input);
@@ -29,16 +28,19 @@ namespace indoor_context {
 		integ.Compute(input);
 	}
 
-	void AccumulatedFeatures::Compute(const MatF& input, int radius) {
+	void AccumulatedFeatures::Compute(const MatF& input, int radius, bool nbrs) {
 		Prepare(input);
-		Compute(radius);
+		Compute(radius, nbrs);
 	}
 
-	void AccumulatedFeatures::Compute(int r) {
-		CHECK_GT(integ.m_int.Rows(), 0) << "AccumulatedFeatures::Prepare() must be called before Compute()";
+	void AccumulatedFeatures::Compute(int r, bool nbrs) {
+		CHECK_GT(integ.m_int.Rows(), 0)
+			<< "AccumulatedFeatures::Prepare() must be called before Compute()";
+
+		int n = nbrs ? 5 : 1;
 
 		int k = results.size();
-		results.resize(results.size()+5);
+		results.resize(results.size()+n);
 
 		// Acumulate features in local neighbourhoods
 		Vec2I tl, br;
@@ -57,29 +59,31 @@ namespace indoor_context {
 		k++;
 
 		// Compute neighbour features
-		for (int t = -1; t <= 1; t += 2) {
-			// Horizontal shift
-			results[k].Resize(size[1], size[0]);
-			ShiftVert(accumulated, results[k], roundi(t*r));
-			k++;
+		if (nbrs) {
+			for (int t = -1; t <= 1; t += 2) {
+				// Horizontal shift
+				results[k].Resize(size[1], size[0]);
+				ShiftVert(accumulated, results[k], roundi(t*r));
+				k++;
 
-			// Vertical shift
-			results[k].Resize(size[1], size[0]);
-			ShiftHoriz(accumulated, results[k], roundi(t*r));
-			k++;
+				// Vertical shift
+				results[k].Resize(size[1], size[0]);
+				ShiftHoriz(accumulated, results[k], roundi(t*r));
+				k++;
+			}
 		}
 	}
 
 
 
-	BuildingFeatures::BuildingFeatures() {
+	PhotometricFeatures::PhotometricFeatures() {
 	}
 
-	BuildingFeatures::BuildingFeatures(const string& config) {
+	PhotometricFeatures::PhotometricFeatures(const string& config) {
 		Configure(config);
 	}
 
-	void BuildingFeatures::Configure(const string& config) {
+	void PhotometricFeatures::Configure(const string& config) {
 		components.clear();
 
 		string feature_set;
@@ -96,6 +100,7 @@ namespace indoor_context {
 		normal.insert("gabor");
 		normal.insert("sweeps");
 		normal.insert("accum_sweeps");
+		normal.insert("nbr_sweeps");
 
 		// Build the set of "special" components
 		set<string> special;
@@ -155,11 +160,15 @@ namespace indoor_context {
 		gabor.Configure(*gvGaborScales, *gvGaborOrientations);
 	}
 
-	bool BuildingFeatures::IsActive(const string& component) {
+	bool PhotometricFeatures::IsActive(const string& component) {
 		return components.find(component) != components.end();
 	}
 
-	void BuildingFeatures::Compute(const PosedImage& image, const MatI* gt_orients) {
+	void PhotometricFeatures::Compute(const PosedImage& image) {
+		Compute(image, NULL);
+	}
+
+	void PhotometricFeatures::Compute(const PosedImage& image, const MatI* gt_orients) {
 		input = &image;
 		features.clear();  // these are only pointers so no harm in clearing
 		feature_strings.clear();
@@ -228,8 +237,10 @@ namespace indoor_context {
 		//
 		if (IsActive("gabor")) {
 			int div = 1<<gabor.num_scales;
-			CHECK_EQ(image.nx() % div, 0) << "Image dimensions must be exactly divisible by 2^num_scales";
-			CHECK_EQ(image.ny() % div, 0) << "Image dimensions must be exactly divisible by 2^num_scales";
+			CHECK_EQ(image.nx() % div, 0)
+				<< "Image dimensions must be exactly divisible by 2^num_scales";
+			CHECK_EQ(image.ny() % div, 0)
+				<< "Image dimensions must be exactly divisible by 2^num_scales";
 
 			gabor.Run(m);
 			gabor_features.resize(gabor.responses.size());
@@ -240,7 +251,7 @@ namespace indoor_context {
 				features.push_back(&gabor_features[i]);
 
 				int orient_index = i/gabor.num_scales;
-				float orient = orient_index*180.0/gabor.num_orients;  // conversion to degrees from MakeGaborFilters in filters.cpp
+				float orient = orient_index*180.0/gabor.num_orients;  // convert to degrees
 				int scale = 1<<(i%gabor.num_orients);
 				feature_strings.push_back(fmt("Gabor orient=%.1f scale=%dx", orient, scale));
 			}
@@ -252,6 +263,8 @@ namespace indoor_context {
 		//
 		CHECK(!IsActive("accum_sweeps") || IsActive("sweeps"))
 			<< "If 'accum_sweeps' is selected then 'sweeps' must also be.";
+		CHECK(!IsActive("nbr_sweeps") || IsActive("accum_sweeps"))
+			<< "If 'nbr_sweeps' is selected then 'accum_sweeps' must also be.";
 
 		if (IsActive("sweeps")) {
 			line_detector.Compute(image);
@@ -273,6 +286,9 @@ namespace indoor_context {
 			}
 
 			if (IsActive("accum_sweeps")) {
+				bool include_nbrs = IsActive("nbr_sweeps");
+				string namepat = "Accumulated sweeps (orientation %d, radius %d, centre)";
+				string namepatnbr = "Accumulated sweeps (orientation %d, radius %d, nbr %d)";
 				int base_radius = *gvFirstWindowForSweeps;
 				int num_scales = *gvNumScalesForSweeps;
 				for (int i = 0; i < 3; i++) {
@@ -280,10 +296,12 @@ namespace indoor_context {
 					int radius = 1;
 					for (int j = 0; j < num_scales; j++) {
 						radius *= base_radius;
-						accum[i].Compute(radius);
-						feature_strings.push_back(fmt("Accumulated sweeps (orientation %d, radius %d, centre)", i, radius));
-						for (int k = 0; k < 4; k++) {
-							feature_strings.push_back(fmt("Accumulated sweeps (orientation %d, radius %d, neighbour %d)", i, radius, k));
+						accum[i].Compute(radius, include_nbrs);
+						feature_strings.push_back(fmt(namepat, i, radius));
+						if (include_nbrs) {
+							for (int k = 0; k < 4; k++) {
+								feature_strings.push_back(fmt(namepatnbr, i, radius, k));
+							}
 						}
 					}
 					BOOST_FOREACH(const MatF& m, accum[i].results) {
@@ -301,7 +319,8 @@ namespace indoor_context {
 		if (IsActive("gt")) {
 			DLOG << "Warning: adding GROUND TRUTH to features";
 			CHECK_NOT_NULL(gt_orients)
-				<< "'gt' was requested in the feature set but no ground truth provided to BuildingFeatures::Configure()";
+				<< "'gt' was requested in the feature set "
+				<< "but no ground truth provided to PhotometricFeatures::Configure()";
 			CHECK_SAME_SIZE(*gt_orients, image);
 			gt_features.resize(3);
 			for (int i = 0; i < 3; i++) {

@@ -8,12 +8,12 @@
 #include "vector_utils.tpp"
 
 namespace indoor_context {
+	using namespace toon;
 
 	// TODO: compute these by simple average over training set
 	static const double kBgMean = 5;
 	static const double kBgVariance = 5;
 
-	using namespace toon;
 	////////////////////////////////////////////////////////////////////
 	ModelLikelihood::ModelLikelihood() {
 		Configure(Zeros);
@@ -56,12 +56,12 @@ namespace indoor_context {
 	}
 
 	void ModelLikelihood::PopulatePayoffs(DPPayoffs& payoffs) {
-		double exp1 = exp(-lambda[0]);
+		/*double exp1 = exp(-lambda[0]);
 		double exp2 = exp(-lambda[1]);
 		double exp12 = exp(-lambda[0]-lambda[1]);
-		double bottom = 1. - exp1 - exp2 + exp12;
-		payoffs.wall_penalty = lambda[0] / bottom;
-		payoffs.occl_penalty = lambda[1] / bottom;
+		double bottom = 1. - exp1 - exp2 + exp12;*/
+		payoffs.wall_penalty = -log(lambda[0]);
+		payoffs.occl_penalty = -log(lambda[1]);
 	}
 
 	//////////////////////////////////////////////////////////////////////////////
@@ -127,7 +127,7 @@ namespace indoor_context {
 	}
 
 	void GaussianFeatureLikelihood::Process(const proto::FrameWithFeatures& instance) {
-		CHECK(instance.features_size() != 0)
+		CHECK(instance.featureset().features_size() != 0)
 			<< "Features were omitted in this dataset. "
 			<< "Re-generate with --store_features.";
 
@@ -139,7 +139,7 @@ namespace indoor_context {
 		Vector<-1,int> orients = asToon(morients).T()[0];
 
 		// Unpack features
-		UnpackFeatures(instance, features);
+		UnpackFeatures(instance.featureset(), features);
 		const int nf = features.features.size();
 		const int nx = features.features[0].nx();
 		const int ny = features.features[0].ny();
@@ -233,11 +233,11 @@ namespace indoor_context {
 
 	void GaussianFeatureLikelihood::ComputePayoffs(const proto::FrameWithFeatures& instance,
 																								 DPPayoffs& payoffs) const {
-		CHECK(instance.features_size() != 0)
+		CHECK(instance.featureset().features_size() != 0)
 			<< "Features were omitted in this dataset. Re-generate with --store_features.";
 
 		// Unpack features
-		UnpackFeatures(instance, features);
+		UnpackFeatures(instance.featureset(), features);
 		const int nf = features.features.size();
 		const int nx = features.features[0].nx();
 		const int ny = features.features[0].ny();
@@ -256,11 +256,12 @@ namespace indoor_context {
 		double log_bg_var = log(kBgVariance);
 		double sqr_bg_var = kBgVariance*kBgVariance;
 
-		// Accumulate the log likelihood
+		// Compute the marginal log likelihoods
 		double frame_loglik = 0;
 		Vector<> frame_J_loglik(theta.size());
 		frame_J_loglik = Zeros;
 		for (int k = 0; k < nf; k++) {
+			DLOG << "Processing feature " << k << " of " << nf;
 			CHECK_INTERVAL(fg_priors[k], 1e-17, 1.-1e-17);
 			double fg_logprior = log(fg_priors[k]);
 			double bg_logprior = log(1. - fg_priors[k]);
@@ -273,6 +274,7 @@ namespace indoor_context {
 					for (int y = 0; y < ny; y++) {
 						double py = 1.* y / ny;
 						const float* feature_row = ftr.wall_scores[orient][y];
+						float* outrow = payoffs.wall_scores[orient][yy];
 						for (int x = 0; x < nx; x++) {
 							double f = feature_row[x];
 							double ppath = 1. * yy / ny;
@@ -285,7 +287,7 @@ namespace indoor_context {
 							double fg_logpost = fg_logprior + fg_loglik;
 							double bg_logpost = bg_logprior + bg_loglik;
 							double logjoint = LogSumExp(fg_logpost, bg_logpost);
-							payoffs.wall_scores[orient][yy][x] += logjoint;
+							outrow[x] += logjoint;
 						}
 					}
 				}

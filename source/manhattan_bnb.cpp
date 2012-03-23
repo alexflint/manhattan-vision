@@ -877,7 +877,7 @@ void ManhattanBnbReconstructor::Compute(const PosedImage& image) {
 }
 
 double ManhattanBnbReconstructor::GetAccuracy(const MatI& gt_orients) {
-	return ComputeAgreementPct(bnb.soln_orients, gt_orients);
+	return ComputeAgreementFrac(bnb.soln_orients, gt_orients);
 }
 
 double ManhattanBnbReconstructor::GetAccuracy(const ManhattanGroundTruth& gt) {

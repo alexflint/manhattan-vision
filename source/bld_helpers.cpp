@@ -18,22 +18,12 @@
 #include "dp_payoffs.h"
 
 #include "vw_image.tpp"
+#include "io_utils.tpp"
 #include "image_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
 	using namespace toon;
-
-	lazyvar<string> gvSequencesDir("Sequences.DataDir");
-	lazyvar<string> gvMapPath("Sequences.MapPath");
-
-	string GetMapPath(const string& sequence_name) {
-		fs::path file = fs::path(*gvSequencesDir) / sequence_name / *gvMapPath;
-		CHECK_PRED1(fs::exists, file)
-			<< "Couldn't find map for sequence: "<<sequence_name<<"\nPath: "<<file;
-		return file.string();
-	}
-
 
 	void DownsampleOrients(const MatI& in, MatI& out, const Vec2I& res) {
 		MatI votes[3];
@@ -72,8 +62,8 @@ namespace indoor_context {
 		DownsampleOrients(in, out, makeVector(in.Cols()/k, in.Rows()/k));
 	}
 
-	double ComputeAgreementPct(const MatI& a, const MatI& b) {
-		return 1.0*ComputeAgreement(a, b) / (a.Rows()*a.Cols());
+	double ComputeAgreementFrac(const MatI& a, const MatI& b) {
+		return 1.*ComputeAgreement(a, b) / (a.Rows()*a.Cols());
 	}
 
 	int ComputeAgreement(const MatI& a, const MatI& b) {
@@ -114,7 +104,33 @@ namespace indoor_context {
 		return GetManhattanHomology(pc, zfloor, zceil);
 	}
 
+	void SegmentsToPathUnclamped(const vector<LineSegment>& segs,
+															 const vector<int>& seg_orients,
+															 const DPGeometry& geometry,
+															 VecI& path,
+															 VecI& orients) {
+		int nx = geometry.grid_size[0];
+		int ny = geometry.grid_size[1];
+		path.Resize(nx, -1);
+		orients.Resize(nx, -1);
 
+		// Compute the path
+		for (int i = 0; i < segs.size(); i++) {
+			// for lines we apply H^-T (inverse of transpose)
+			Vec3 grid_eqn = geometry.gridToImage.T() * segs[i].eqn();
+			float x0 = geometry.ImageToGrid(segs[i].start)[0];
+			float x1 = geometry.ImageToGrid(segs[i].end)[0];
+			if (x0 > x1) {
+				swap(x0, x1);
+			}
+			for (int x = max(0,floori(x0)); x <= min(nx-1,ceili(x1)); x++) {
+				Vec3 isct = grid_eqn ^ makeVector(1., 0, -x);
+				// This get messy near the edge of line segments that don't meet perfectly
+				path[x] = roundi(project(isct)[1]);
+				orients[x] = seg_orients[i];
+			}
+		}
+	}
 
 
 	void DrawPayoffs(Canvas& canvas,
@@ -130,9 +146,8 @@ namespace indoor_context {
 			}
 		}
 
-		static const double kDotSize = 1.0;
 		for (int i = 0; i < 2; i++) {
-			Vec2 tdot = makeVector(kDotSize*i*1.5, 0);
+			Vec2 tdot = makeVector(i*1.5, 0);
 			for (int y = 0; y < payoffs.wall_scores[i].Rows(); y++) {
 				const float* row = payoffs.wall_scores[i][y];
 				for (int x = 0; x < payoffs.wall_scores[i].Cols(); x++) {
@@ -142,7 +157,7 @@ namespace indoor_context {
 																	(i == 0 ? v*255 : 0),
 																	0);
 						Vec2 p = project(geom.GridToImage(makeVector(x,y)));
-						canvas.DrawDot(p+tdot, kDotSize, color);
+						canvas.DrawDot(p+tdot, 1., color);
 					}
 				}
 			}

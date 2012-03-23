@@ -1,0 +1,247 @@
+Furukawa comparison
+Indep vpts
+Python wrappers
+
+
+visualize
+histogram over errors
+
+errors for each sequence, for each method, in a table
+
+error versus # iterations, for several sequences
+
+basin of attraction
+
+
+EQUATIONS NEED TO ACCOUNT FOR CAMERA INTRINSICS
+
+
+
+lab_kitchen1
+  Mean error (algebraic) = 0.53344
+  Mean error (points) = 0.591368
+  Mean error (single image) = 0.0371326
+  Mean error (geometric) = 0.0186002
+
+lab_foyer1
+  Mean error (algebraic) = 0.720514
+  Mean error (points) = 0.770346
+  Mean error (single image) = 0.54413
+  Mean error (geometric) = 0.38936
+
+lab_foyer2
+  Mean error (algebraic) = 0.811162
+  Mean error (points) = 0.755861
+  Mean error (single image) = 0.070412
+  Mean error (geometric) = 0.0212477
+
+exeter_bursary
+  Mean error (algebraic) = 0.504243
+  Mean error (points) = 0.531453
+  Mean error (single image) = 0.0674266
+  Mean error (geometric) = 0.0299738
+
+lab_ground1
+  Mean error (algebraic) = 0.906299
+  Mean error (points) = 0.678521
+  Mean error (single image) = 0.551703
+  Mean error (geometric) = 0.660157
+
+lab_atrium2
+  Mean error (algebraic) = 0.840389
+  Mean error (points) = 0.997981
+  Mean error (single image) = 0.311715
+  Mean error (geometric) = 0.159641
+
+exeter_mcr1
+  Mean error (algebraic) = 0.562708
+  Mean error (points) = 0.555535
+  Mean error (single image) = 0.0616306
+  Mean error (geometric) = 0.0360071
+
+som_corr1
+  Mean error (algebraic) = 0.580972
+  Mean error (points) = 0.775914
+  Mean error (single image) = 0.197019
+  Mean error (geometric) = 0.207556
+
+
+
+
+
+Many of these files are duplicated in ~/Code/test/, but the newer versions are in this dir
+
+path.py: Basic utilities for extracting features from an HMM-like matrix, computing loss, etc
+
+mmhmm.py is for training HMMs with a uniform transition function
+
+Latest is diagonal.py, which is for HMM training when paths are restricted to diagonal directions
+
+Next we'll test training of models in the diagonal class
+
+The training data for a 
+
+Basic training of HMM model:
+***
+$ ./svm_python_learn --m mmhmm -c 1 foo.input foo.model
+***
+
+ARGH SVMPYTHONG PARAMETERS ARE VERY SENSITIVE. --m needs two dashes but -c needs one, and incorrect parameters will be silently ignored :(
+
+For HMM training, the optimal weight vector should look like
+  [ positive, negative, zero, zero ]
+
+Plan to get to training manhattan DP
+{done} - train diagonal model 
+- train diagonal plus transitions
+- compute payoff matrices and GT, train the diagonal model on them?
+- train a simplified model that moves towards vanishing points?
+- train on simpler "real world" data - a complex shortest path problem perhaps?
+- look at performance and time versus [nstates, ntimesteps, ftrlen]?
+
+Interesting - there are some strange examples where svmstruct cannot learn because the most-violated-constraint never reveals interesting structure in the problem. For example:
+- feature vector is [1] for the correct state on the first timestep only and [0] for all others
+- all correct paths simple start at this state and go straight
+- there are also features that count the number of timesteps on which a path goes straight
+- the path for the most-violated-constraint will also be a straight line because the losses are all straight
+- so the true and most-violated features will both always max out the component corresponding to "this path goes straight"
+- so svmstruct will never learn to penalise paths that don't go straight, even though this feature does in fact perfectly separate true paths from untrue ones
+
+This example suggests that the loss should be small(ish) relative to the data terms
+
+*** this effect goes away for C>1.4 or C<0.9 !!  (this is the C parameter that is the trade-off in the SVM formulation, a la the -c argument)
+
+We can't expect the thing to learn to find the correct path when only the first element is labelled! The viterbi algorithm is deterministic after all...
+
+I'm satisfied with learning transition models... it learns my confounding data, which can only be classified correctly by learning the transition
+  need c >= 100
+
+Parameters that might need to be tuned:
+  C (SVM tradeoff param)
+  magnitude of loss
+  size of image
+  number of training examples
+
+Build protos:
+$ cd ~/Code/indoor_context/build
+...$ protoc -I ../source ../source/*.proto --python_out=python_protos/
+$ protoc -I ../source ../source/*.proto --python_out=python_protos
+
+Generate training data:
+$ lap progs/export_training_data --sequence=lab_kitchen1 --frame_stride=20 --output=./data.pro --export_width=48
+
+Import in python
+> sys.path.append('/home/alex/Code/indoor_context/build/python_protos/')
+> import training_pb2
+
+Read in python:
+> f = open('/home/alex/Code/indoor_context/build/data.pro', 'rb')
+> x.ParseFromString(f.read())
+> f.close()
+
+Now I have the data in python
+
+Cleaning data: normalze and centralize
+
+Visualize training results
+More data
+*Quantify* impact of num examples / loss magnitude / etc
+
+Run manhattan test script:
+$ lap MANHATTAN_CONFIG=~/Code/indoor_context/config/common.cfg PYTHONPATH=~/Code/indoor_context/build ipython -pylab test_manhattan.py
+
+Not sure how to condition loss terms - going with Height/10
+
+To implement
+  Instance::GetFrameId
+  Instance::GetSequenceName
+  DPSolution::GetPath
+  ComputeFeatureFor
+  params.Get{Weights,CornerPenalty,OcclusionPenalty}
+  
+The re-using ManhattanDP is causing problems - I wonder whether svm-struct internal caching will conflict with this...
+
+Note to self: svm-python ONLY goes to default module if there is *no* --m argument (e.g.  if '-m' used in place of '--m')
+
+Train manhattan model
+$ lap MANHATTAN_CONFIG=~/Code/indoor_context/config/common.cfg PYTHONPATH=~/Code/indoor_context/build ./svm_python_learn --m mm_manhattan -c 1 lab_kitchen1:10:10:11 out.model
+
+Woohoo, it's learning!
+
+Next:
+  4. cache features in proto
+  5. load multiple sequences
+  3. more realistic loss functions
+  1. better performance stats
+  2. better visualization
+  chase down most-violated-constraint bug
+
+Parameters to explore:
+  Number of aux frames
+  Spacing of aux frames
+  SVM tradeoff C
+  
+Test reporting stuff:
+$ lap MANHATTAN_CONFIG=~/Code/indoor_context/config/common.cfg PYTHONPATH=~/Code/indoor_context/build python test_reporting.py
+
+The DP implementation was forcing the solution to terminate below the horizon! I fixed that and a bunch of most-violated errors from svmstruct have gone away... hopefully that'll improve results significantly
+... hmm there are still some
+
+The results are looking a *lot* better! Surprisingly better... suggesting that giving the system some difficult and/or inconsistent cases is very harmful
+
+
+Still to do:
+  [done] 1. more realistic loss functions
+  [done] 2. load multiple sequences
+  [done] 3. holdout set
+  4. more features (incl. line segments, dist-to-horizon)
+  [done] 5. output all images at very end
+
+  [done] 5. plot convergence versus iteration #
+  6. cache features in proto
+  7. Explore parameters (as above)
+*store parameters on each run!*
+
+
+Losses should be one-per-orientation!
+
+$ alias ic='lap MANHATTAN_CONFIG=~/Code/indoor_context/config/common.cfg PYTHONPATH=~/Code/indoor_context/build'
+
+$ alias icpy='lap MANHATTAN_CONFIG=~/Code/indoor_context/config/common.cfg PYTHONPATH=~/Code/indoor_context/build python'
+
+Argh dealing with such a complicated problem is tricky! It turns out that the ground truth is not actually in the hypothesis space since the ground truth can include walls that leave the grid. This means that the most-violated-constraint can actually have negative margin, which is out of the ordinary for the following reason: the most violated constraint defines a constraint of the form
+    <w,y*> - <w,y+> >= loss(y*,y+)
+where y* is the ground truth and 
+    y+ = argmax_y <w,y> + loss(y*,y)
+Now if y+ = y* in the above constraint then we get <w,0> >= 0, a null constraint. So if the ground truth were in the hypothesis space then we could never have
+  <w,y*> - <w,y+> - loss(y*,y+) < 0
+since we could always replace whatever y+ we found with y* and get a null constraint (one with zero slack), contradicting y+ as the argmax defined above. But when the ground truth is *not* in the hypothesis space we have no such guarantee, so we can get a constraint with negative slack.
+
+One way to fix this is to change the ground truth so that it's in the hypothesis space, then compute loss with respect to this new y*. But this distorts the "true loss", which really ought to be measured in the original hypothesis space.
+
+The above does not in fact fix the problem. Something else happens when the active set has non-zero slack (i.e. there is no separating hyperplane). I found that using the option "-w 4" works well since then svm-struct caches constraints, which seems to partially fix the problem. It's not ideal though...
+
+$ ic ./svm_python_learn -w 4 --m mm_manhattan -c 1 foo out.model
+
+Profile:
+LD_PRELOAD=/usr/lib/liblapack.so:/usr/lib/libprofiler.so CPUPROFILE=blah.prof progs/test_loadsave
+
+Commands for results in the paper:
+--------
+$ ic python plotting/compute_sequence_performance.py experiments/feb21_labellingloss_allfeatures_4offsets/holdout_performance.pickled
+$ ic python plotting/compute_sequence_performance.py experiments/feb21_depthloss_allfeatures_4offsets/holdout_results.pickled
+$ ic python plotting/compute_sequence_performance.py experiments/feb22_iccvparams/holdout_performance.pickled
+
+Commands for plots in the paper:
+-------
+$ ic python plotting/comparative_scatter.py experiments/feb21_depthloss_allfeatures_4offsets/holdout_results.pickled experiments/feb21_labellingloss_allfeatures_4offsets/holdout_performance.pickled
+
+$ ic python plotting/psi_evolution.py experiments/feb21_labellingloss_allfeatures_4offsets/training_performance.pickled
+
+Commands for plots in additional material:
+---------
+$ py plotting/psi_evolution.py
+$ py plotting/generate_perf_table.py
+$ py plotting/assemble_frames.py
+
+

@@ -34,7 +34,7 @@ namespace indoor_context {
 
 	void LineDetection::DrawPixels(ImageRGB<byte>& canvas,
 																 const PixelRGB<byte>& color,
-																 const toon::Vector<2> offs,
+																 const Vec2 offs,
 																 int thickness) const {
 		BOOST_FOREACH(const ImageRef& p, *pixels) {
 			DrawSpot(canvas, makeVector(p.x,p.y)+offs, color, thickness);
@@ -96,13 +96,11 @@ namespace indoor_context {
 				comp_queue.push(p);
 				seen[p.y][p.x] = 1;
 
-				curseg.confidence = 0;
 				curseg.pixels->clear();
 			
 				while (!comp_queue.empty()) {
 					const ImageRef& p = comp_queue.front();
 					curseg.pixels->push_back(p);
-					curseg.confidence += sqrt(canny.magnitude_sqr[p.y][p.x]);
 					comp_queue.pop();
 				
 					for (int yy = max(p.y-1, 0); yy <= min(p.y+1, ny-1); yy++) {
@@ -135,7 +133,7 @@ namespace indoor_context {
 		//
 		INDENTED BOOST_FOREACH(LineDetection& det, detections) {
 			// Compute centroids
-			Vector<2> mean = Zeros;
+			Vec2 mean = Zeros;
 			BOOST_FOREACH(const ImageRef& p, *det.pixels) {
 				mean[0] += p.x;
 				mean[1] += p.y;
@@ -153,7 +151,7 @@ namespace indoor_context {
 			}
 
 			// Compose the matrix and get eigenvals
-			toon::Matrix<2> M;
+			Matrix<2> M;
 			M[0][0] = sum_xx;
 			M[0][1] = sum_xy;
 			M[1][0] = sum_xy;
@@ -161,13 +159,12 @@ namespace indoor_context {
 			EigenSystem2D<double> decomp(M);
 
 			// Compute line parameters
-			det.confidence = decomp.eigval_large / decomp.eigval_small;
-			Vector<2> direction = decomp.eigvec_large;
+			Vec2 direction = decomp.eigvec_large;
 
 			// Determine line endpoints
 			double projmin = INFINITY, projmax = -INFINITY;
 			BOOST_FOREACH(const ImageRef& p, *det.pixels) {
-				const toon::Vector<2> cur = makeVector(p.x, p.y);
+				const Vec2 cur = makeVector(p.x, p.y);
 				const double proj = (cur-mean) * direction;
 				if (proj < projmin) {
 					det.seg.start = unproject(cur);
@@ -190,7 +187,7 @@ namespace indoor_context {
 
 	void CannyLineDetector::Draw(ImageRGB<byte>& canvas,
 															 const VecI& grouping,
-															 const toon::Vector<2> offs) const {
+															 const Vec2 offs) const {
 		// Determine colors for the segments
 		vector<PixelRGB<byte> > colors;
 		for (int i = 0; i < detections.size(); i++) {
@@ -210,7 +207,7 @@ namespace indoor_context {
 
 	void CannyLineDetector::Draw(ImageRGB<byte>& canvas,
 															 const vector<PixelRGB<byte> > colors,
-															 const toon::Vector<2> offs) const {
+															 const Vec2 offs) const {
 		for (int i = 0; i < detections.size(); i++) {
 			detections[i].DrawPixels(canvas, colors[i], offs);
 		}

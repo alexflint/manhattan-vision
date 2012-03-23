@@ -1,0 +1,30 @@
+package indoor_context.proto;
+
+import "vector.proto";
+import "payoffs.proto";
+
+// A frame with features and a ground truth reconstruction
+message ExampleFrame {
+	required string sequence = 1;  // name of the sequence
+	required int32 frame_id = 2;   // ID of frame in sequence
+	optional string image_path = 3;  // eek, embed the image here!
+
+	repeated PayoffFeature features = 30;  // might have zero elements
+
+	required MatI gt_orients = 10;  // column vector
+	required MatI gt_path = 11;     // column vector
+	required int32 gt_num_walls = 21;
+	required int32 gt_num_occlusions = 22;
+
+	required MatF manhattan_homology = 40;  // floor->ceiling, always 3x3
+	required float horizon_row = 41;        // in grid coordinates
+	required float left_vpt_col = 42;        // in grid coordinates
+	required float right_vpt_col = 43;        // in grid coordinates
+	required MatF image_to_grid = 45;  // always 3x3
+}
+
+// A set of examples for learning
+message ExampleSet {
+	repeated ExampleFrame examples = 1;
+	optional string note = 10;
+}

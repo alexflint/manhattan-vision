@@ -12,7 +12,10 @@
 #include "camera.h"
 #include "simple_renderer.h"
 #include "geom_utils.h"
+#include "protobuf_utils.h"
 
+#include "image_utils.tpp"
+#include "format_utils.tpp"
 #include "image_utils.tpp"
 #include "vector_utils.tpp"
 #include "io_utils.tpp"
@@ -72,7 +75,6 @@ namespace indoor_context {
 				wall.verts[3] = concat(u, fp.zfloor());
 
 				// Label surfaces by their index. Will translate to orientations later.
-				// Add 10 to avoid confusion with kVerticalAxis
 				renderer_.Render(wall.verts[0], wall.verts[1], wall.verts[2], walls_.size());
 				renderer_.Render(wall.verts[0], wall.verts[2], wall.verts[3], walls_.size());
 

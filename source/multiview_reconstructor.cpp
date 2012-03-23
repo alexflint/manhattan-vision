@@ -24,7 +24,7 @@ namespace indoor_context {
 		zfloor = zf;
 		zceil = zc;
 		base_payoff_gen.Configure(obj, base_geom);
-		base_payoff_gen.GetPayoffs(base_payoffs); // for visualization only
+		base_payoff_gen.ComputePayoffs(base_payoffs); // for visualization only
 		aux_views.clear();
 	}
 
@@ -35,7 +35,7 @@ namespace indoor_context {
 		AuxiliaryView* view = new AuxiliaryView;
 		view->geom = aux_geom;
 		view->payoff_gen.Configure(obj, aux_geom);
-		view->payoff_gen.GetPayoffs(view->payoffs); // for visualization only
+		view->payoff_gen.ComputePayoffs(view->payoffs); // for visualization only
 	
 		view->image_hfloor = GetHomographyVia(*base_geom.camera,
 																					*aux_geom.camera,

@@ -3,6 +3,8 @@
 
 #include <GL/glut.h>
 
+#include "texture_manager.h"
+
 namespace indoor_context {
 	using namespace toon;
 
@@ -52,7 +54,7 @@ namespace indoor_context {
 	}
 
 	void RenderFullScreen(const ImageBundle& image) {
-		RenderFullScreen(image.LoadGLTexture());
+		RenderFullScreen(TextureManager::LoadTexture(image));
 	}
 
 	void RenderFullScreen(GLuint texture_id) {

@@ -9,6 +9,7 @@ namespace indoor_context {
 	namespace proto { class FloorPlan; }
 	class PosedCamera;
 	class DPGeometry;
+	class DPGeometryWithScale;
 
 	// Compute ground truth orientations in a frame from a ground truth
 	// floorplan and camera. Also counts the number of walls and occlusions.
@@ -27,8 +28,8 @@ namespace indoor_context {
 		int nocclusions;
 		// Vertices of the floor/wall boundary in image coordinates, as
 		// start,end pairs.
-		vector<LineSeg> floor_segments;
-		vector<LineSeg> ceil_segments;
+		vector<LineSegment> floor_segments;
+		vector<LineSegment> ceil_segments;
 		// Orientation of the vertices above
 		vector<int> segment_orients;
 
@@ -57,14 +58,48 @@ namespace indoor_context {
 		// Get the ceiling plane z positions
 		double zceil() const;
 
+		// Compute the floor and ceiling paths
+		void ComputePathPairUnclamped(const DPGeometry& geometry,
+																	VecI& ceil_path,
+																	VecI& floor_path) const;
+
 		// Compute path+orients representation of the solution
-		void ComputePath(const DPGeometry& geometry, VecI& path, VecI& orients);
+		// Return value is in grid coordinates
+		// Orients are labelled according to opposite vpt (like orientations)
+		void ComputePathAndOrients(const DPGeometry& geometry,
+															 VecI& path,
+															 VecI& orients) const;
+
+		// As above but axes are labelled according to associated vpt
+		void ComputePathAndAxes(const DPGeometry& geometry,
+														VecI& path,
+														VecI& axes) const;
+
+		// Compute loss terms using L1 distance
+		// Returned losses are in grid coordinates
+		void ComputeL1LossTerms(const DPGeometry& geometry,
+														MatF& loss_terms) const;
+
+		// Compute loss terms for labelling error. Correctiosn are applied
+		// so that losses correspond to error in image coordinates, though
+		// the losses are returned in grid coordinates. That is, if you
+		// evaluate a particular hypothesis on this loss matrix then the
+		// outcome will equal the loss if you had compared that hypothesis
+		// in image coordinates with the ground truth, also in image
+		// coordinates.
+		void ComputeLabellingLossTerms(const DPGeometry& geometry,
+																	 MatF& loss_terms) const;
+
+		// Compute loss terms for mean relative reprojection error
+		// Returned losses are in grid coordinates
+		void ComputeDepthLossTerms(const DPGeometryWithScale& geometry,
+															 MatF& loss_terms) const;
 
 		// Visualizations
-		void DrawOrientations(ImageRGB<byte>& canvas, float alpha=1.0);
-		void DrawDepthMap(ImageRGB<byte>& canvas);
+		void DrawOrientations(ImageRGB<byte>& canvas, float alpha=1.0) const;
+		void DrawDepthMap(ImageRGB<byte>& canvas) const;
 		void OutputOrientations(const ImageRGB<byte>& bg,
-														const string& filename);
-		void OutputDepthMap(const string& filename);
+														const string& filename) const;
+		void OutputDepthMap(const string& filename) const;
 	};
 }

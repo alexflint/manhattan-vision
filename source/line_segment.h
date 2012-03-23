@@ -11,19 +11,22 @@
 
 namespace indoor_context {
 	// Represents a 2D line segment in homogeneous coordinates
-	class LineSeg {
+	class LineSegment {
 	public:
 		Vec3 start, end;
 
 		// Constructors
-		inline LineSeg() : start(toon::Zeros), end(toon::Zeros) { }
-		inline LineSeg(const Vec3& a, const Vec3& b) : start(a), end(b) { }
+		inline LineSegment() : start(toon::Zeros), end(toon::Zeros) { }
+		inline LineSegment(const Vec3& a, const Vec3& b) : start(a), end(b) { }
 		// Get the homogeneous line equation
 		inline Vec3 eqn() const { return start^end;	}
-		// Get the midpoint (in the Euclidean sense)
+		// Get the (Euclidean) midpoint
 		Vec3 midpoint() const;
 		// Transform start and end point by a homography. This does no
 		// clipping: for 3D transforms see clipping.h.
-		LineSeg Transform(const Mat3& h) const;
+		LineSegment Transform(const Mat3& h) const;
 	};
+
+	// Backwards compatibility
+	typedef LineSegment LineSeg;
 }  // namespace indoor_context

@@ -7,8 +7,34 @@
 #include "integral_image.tpp"
 
 namespace indoor_context {
-	// Computes payoffs from per-pixel orientation estimates
-	class MonocularPayoffGen {
+	class DPObjective;
+
+	//////////////////////////////////////////////////////////////////
+	// Computes payoffs from per-pixel features
+	class FeaturePayoffGen {
+	public:
+		DPGeometry geom;
+		IntegralColImage<float> integ_feature;
+		DPPayoffs vpayoffs[2];  // feature sums for vertical intervals
+		DPPayoffs hpayoffs;  // feature sums for floor/ceiling intervals
+		MatF grid_buffer;
+
+		// Initialize empty
+		FeaturePayoffGen() { }
+		// Compute payoffs
+		void Compute(const MatF& feature, const DPGeometry& geom);
+		// Return true iff not yet configured
+		bool Empty() const;
+		// Get payoff for building a wall at a point in grid coordinates.
+		// grid_pt can be outside the grid bounds, clamping will be applied appropriately
+		double GetVertSum(int x, int y) const;
+		double GetHorizSum(int x, int y) const;
+	};
+
+
+	//////////////////////////////////////////////////////////////////
+	// Computes payoffs from per-pixel labellings
+	class ObjectivePayoffGen {
 	public:
 		DPGeometry geom;
 		IntegralColImage<float> integ_scores[3];
@@ -16,9 +42,9 @@ namespace indoor_context {
 		DPPayoffs payoffs;  // payoffs are stored here when Compute() is called
 
 		// Initialize empty
-		MonocularPayoffGen() { }
+		ObjectivePayoffGen() { }
 		// Initialize and compute
-		MonocularPayoffGen(const DPObjective& obj, const DPGeometry& geom);
+		ObjectivePayoffGen(const DPObjective& obj, const DPGeometry& geom);
 		// Transform a DPObjective to a DPPayoff, storing the result in
 		// this->payoffs. Equivalent to calling Configure(obj, geom) then
 		// GetPayoffs(this->payoffs).
@@ -33,6 +59,6 @@ namespace indoor_context {
 		// grid_pt can be outside the grid bounds, clamping will be applied appropriately
 		double GetWallScore(const Vec2& grid_pt, int orient) const;
 		// Resize the matrix to the size of the grid and fill it with all payoffs
-		void GetPayoffs(DPPayoffs& payoffs) const;
+		void ComputePayoffs(DPPayoffs& payoffs) const;
 	};
 }

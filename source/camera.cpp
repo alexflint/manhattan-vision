@@ -138,6 +138,10 @@ namespace indoor_context {
 		invpose_ = pose.inverse();
 	}
 
+	Vec3 PosedCamera::GetPrincipalDirection() const {
+		return col(pose_.get_rotation().inverse(), 2);
+	}
+
 	Vec3 PosedCamera::GetRetinaVpt(int i) const {
 		CHECK_INTERVAL(i,0,2);
 		return col(pose_.get_rotation(), i);

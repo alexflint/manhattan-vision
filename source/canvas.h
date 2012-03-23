@@ -96,12 +96,12 @@ public:
 	// Insert an image with scaling and translation
 	void DrawImage(const ImageRGB<byte>& image,
 	               double scale,
-	               const Vec2& t,
+	               const Vec2& translation,
 	               double alpha=1.0);
 	// Insert an image with an affine warp
 	void DrawImage(const ImageRGB<byte>& image,
 	               const Mat2& m,
-	               const Vec2& t,
+	               const Vec2& translation,
 	               double alpha=1.0);
 	// Draw a greyscale image, rescaled so that the mesaximum value is white
 	void DrawImageRescaled(const MatF& image, double alpha=1.0);
@@ -131,10 +131,6 @@ public:
 	FileCanvas(const string& filename, const ImageRGB<byte>& bgimage);
 	FileCanvas(const string& filename, const MatF& bg_greyscale);
 	// Construct an empty canvas that will write to the specified file.
-	/*FileCanvas(Format format, const string& filename, const Vec2I& size);
-	FileCanvas(Format format, const string& filename, const PixelRGB<byte>& bgcolor);
-	FileCanvas(Format format, const string& filename, const ImageRGB<byte>& bgimage);
-	FileCanvas(Format format, const string& filename, const MatF& bg_greyscale);*/
 	// Destructor
 	~FileCanvas();
 	// Write the canvas to the file specified at construction

@@ -4,8 +4,8 @@
 #include "common_types.h"
 #include "numeric_utils.h"
 #include "likelihoods.h"
+#include "protobuf_utils.h"
 
-#include "protobuf_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
@@ -15,20 +15,20 @@ namespace indoor_context {
 	using boost::function;
 
 	double EvaluateModelLogLik(ModelLikelihood& likelihood,
-														 const proto::PayoffFeatureSet& featureset,
+														 const proto::SequenceWithFeatures& fseq,
 														 const Vec2& lambda) {
 		likelihood.Configure(lambda);
-		BOOST_FOREACH(const proto::FrameWithFeatures& instance, featureset.frames()) {
+		BOOST_FOREACH(const proto::FrameWithFeatures& instance, fseq.frames()) {
 			likelihood.Process(instance);
 		}
 		return likelihood.log_likelihood();
 	}
 
 	double EvaluateFeatureLogLik(FeatureLikelihood& likelihood,
-															 const proto::PayoffFeatureSet& featureset,
+															 const proto::SequenceWithFeatures& fseq,
 															 const Vector<>& theta) {
 		likelihood.Configure(theta);
-		BOOST_FOREACH(const proto::FrameWithFeatures& instance, featureset.frames()) {
+		BOOST_FOREACH(const proto::FrameWithFeatures& instance, fseq.frames()) {
 			likelihood.Process(instance);
 		}
 		return likelihood.log_likelihood();
@@ -39,8 +39,8 @@ namespace indoor_context {
 														bool logit_likelihood=false) {
 		// Load Features
 		CHECK_PRED1(fs::exists, features_file);
-		proto::PayoffFeatureSet feature_set;
-		ReadLargeProto(features_file, feature_set);
+		proto::SequenceWithFeatures fseq;
+		ReadLargeProto(features_file, fseq);
 
 		CHECK_GE(params.corner_penalty, 1e-18)
 			<< "Penalties mut be positive (since constant in geometric series must be < 1)";
@@ -62,9 +62,9 @@ namespace indoor_context {
 
 		// Prepare functions (for convenience with numerical gradients)
 		function<double(const Vec2&)> model_loglik_func =
-			bind(&EvaluateModelLogLik, ref(*model_lik), ref(feature_set), _1);
+			bind(&EvaluateModelLogLik, ref(*model_lik), ref(fseq), _1);
 		function<double(const Vector<>&)> ftr_loglik_func =
-			bind(&EvaluateFeatureLogLik, ref(*ftr_lik), ref(feature_set), _1);
+			bind(&EvaluateFeatureLogLik, ref(*ftr_lik), ref(fseq), _1);
 
 		// Compute likelihood
 		double model_loglik = model_loglik_func(lambda);

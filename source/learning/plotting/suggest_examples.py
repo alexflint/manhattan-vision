@@ -7,10 +7,7 @@ import cPickle
 import itertools
 import matplotlib.pyplot as plt
 import csv
-
-if len(sys.argv) < 2:
-    print 'Usage:',sys.argv[0],'EXPERIMENT1 ...'
-    exit(-1)
+import stuff
 
 datafile = 'holdout_performance.pdf'
 pattern = 'out/%s_frame%03d_soln.png'
@@ -20,17 +17,15 @@ losses = ['depth_error',
 
 records = []
 
-for experiments in sys.argv[1:]:
-    with open(os.path.join(experiment,datafile)) as f:
+for experiment in stuff.Experiments:
+    with open(os.path.join(experiment, datafile)) as f:
         data = cPickle.load(f)
         for k,r in depthdata['results'].iteritems():
             if k not in records:
                 records[k] = []
             records[k].append(r)
 
-w = csv.writer(open('compilation.csv','r'))
-for k,r in records:
-    
+w = csv.writer(open('out/compilation.csv','r'))
 
 depthdata = cPickle.load(open(sys.argv[1]))
 lbldata = cPickle.load(open(sys.argv[2]))

@@ -20,6 +20,8 @@
 #include "image_utils.tpp"
 #include "protobuf_utils.tpp"
 
+lazyvar<string> gvStereoOffsets("JointDP.Stereo.AuxOffsets");
+
 void PackFeatures(const JointPayoffGen& joint,
 									proto::FrameWithFeatures& data) {
 	DPPayoffs sum_stereo(matrix_size(joint.mono_gen.payoffs));
@@ -33,8 +35,6 @@ void PackFeatures(const JointPayoffGen& joint,
 	PackPayoffs(joint.point_cloud_gen.occlusion_payoffs, *data.add_features(), "occlusion");
 }
 
-lazyvar<string> gvStereoOffsets("JointDP.Stereo.AuxOffsets");
-
 int main(int argc, char **argv) {
 	InitVars(argc, argv);
 	Timer timer;
@@ -44,9 +44,9 @@ int main(int argc, char **argv) {
 	desc.add_options()
     ("help", "produce help message")
     ("sequence", po::value<vector<string> >()->required(), "name of training sequence")
-		("frame_stride", po::value<int>()->default_value(1), "number of frames to skip between evaluations")
+		("frame_stride", po::value<int>()->default_value(1),
+		   "number of frames to skip between evaluations")
 		("output", po::value<string>()->required(), "output filename")
-		("store_features", "store all features in the output file")
 		;
 
 	// Parse options
@@ -74,8 +74,6 @@ int main(int argc, char **argv) {
 
 	fs::path features_file = opts["output"].as<string>();
 	CHECK_PRED1(fs::exists, features_file.parent_path());
-
-	bool store_features = opts.count("store_features")>0;
 
 	vector<int> stereo_offsets = ParseMultiRange<int>(*gvStereoOffsets);
 
@@ -138,35 +136,33 @@ int main(int argc, char **argv) {
 				gt.ComputePath(geometry, path, orients);
 
 				// Trace features along path
-				MatF path_ftrs(4, nx);
+				/*MatF path_ftrs(4, nx);
 				for (int x = 0; x < nx; x++) {
 					path_ftrs[0][x] = joint.mono_gen.payoffs.wall_scores[ orients[x] ][ path[x] ][ x ];
 					path_ftrs[1][x] = sum_stereo.wall_scores[ orients[x] ][ path[x] ][ x ];
 					path_ftrs[2][x] = joint.point_cloud_gen.agreement_payoffs[ path[x] ][ x ];
 					path_ftrs[3][x] = joint.point_cloud_gen.occlusion_payoffs[ path[x] ][ x ];
-				}
+					}*/
 			
 				// This try...catch block is so that if an error occurs while
 				// packing protocol buffers we exit completely (to avoid
 				// inconsistent feature data).
 				try {
 					// Add an entry to the protocol buffer
-					proto::FrameWithFeatures& framedata = *featureset.add_frames();
+					proto::ExampleFrame& framedata = *featureset.add_frames();
 					framedata.set_sequence(sequences[i]);
 					framedata.set_frame_id(frame.id);
-					framedata.set_num_walls(gt.num_walls());
-					framedata.set_num_occlusions(gt.num_occlusions());
 
+					// Pack the features
+					PackFeatures(joint, framedata);
+
+					// Pack ground truth data
+					framedata.set_gt_num_walls(gt.num_walls());
+					framedata.set_gt_num_occlusions(gt.num_occlusions());
 					Matrix<-1,-1,int> mpath = asToon(path).as_col();
-					PackMatrix(asVNL(mpath), *framedata.mutable_path());
+					PackMatrix(asVNL(mpath), *framedata.mutable_gt_path());
 					Matrix<-1,-1,int> morients = asToon(orients).as_col();
-					PackMatrix(asVNL(morients), *framedata.mutable_orients());
-
-					PackMatrix(path_ftrs, *framedata.mutable_path_features());
-
-					if (store_features) {
-						PackFeatures(joint, framedata);
-					}
+					PackMatrix(asVNL(morients), *framedata.mutable_gt_orients());
 				} catch (const AssertionFailedException& ex) {
 					DLOG << "Assertion failed while packing features:";
 					INDENTED DLOG << ex.what();

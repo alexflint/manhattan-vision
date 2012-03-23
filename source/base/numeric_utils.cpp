@@ -67,4 +67,17 @@ namespace indoor_context {
 		NormalizeLogDistr(distr);
 		return distr.Apply(exp);
 	}
+
+	float FastDigamma (float x) {
+		float twopx = 2.f + x;
+		return - (1.f + 2.f * x) / (x * (1.f + x))
+			- (13.f + 6.f * x) / (12.f * twopx * twopx)
+			+ log(twopx);
+	}
+
+	float FastHarmonicSum(float a, float b, float x0, float x1) {
+		// See info about this expression linked from here:
+		// http://mathoverflow.net/questions/88632/simplifying-finite-sum-over-1-axb/88639#88639
+		return (FastDigamma(b/a + x1 + 1.) - FastDigamma(b/a + x0)) / a;
+	}
 }

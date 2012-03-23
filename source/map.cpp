@@ -95,7 +95,7 @@ namespace indoor_context {
 
 	Frame* Map::GetFrameByIdOrDie(int id) {
 		Frame* frame = GetFrameById(id);
-		CHECK_NOT_NULL(frame) << "No frame with ID=" << frame;
+		CHECK_NOT_NULL(frame) << "No frame with ID=" << id;
 		return frame;
 	}
 

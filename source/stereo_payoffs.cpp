@@ -16,6 +16,8 @@
 namespace indoor_context {
 	using namespace toon;
 
+	static const double kEpsilon = 1e-6;
+
 	void HomographyTransform(const ImageF& input,
 													 MatF& output,
 													 const Mat3& h) {  // h transforms from input to output coords
@@ -65,21 +67,21 @@ namespace indoor_context {
 		CHECK_GE(sum_wts, 0.0);
 		CHECK_GE(sum_asqr, 0.0);
 		CHECK_GE(sum_bsqr, 0.0);
-		if (sum_wts < 1e-8 || sum_asqr < 1e-8 || sum_bsqr < 1e-8) {
+		if (sum_wts < kEpsilon || sum_asqr < kEpsilon || sum_bsqr < kEpsilon) {
 			return 0.0;
 		} else {
 			double rhs_a = sum_a*sum_a/sum_wts;
 			double rhs_b = sum_b*sum_b/sum_wts;
-			CHECK_GE(sum_asqr, rhs_a*(1.0-1e-6)) << format("sum_a=%f, sum_asqr=%f, sum_wts=%f") % sum_a % sum_asqr % sum_wts;
-			CHECK_GE(sum_bsqr, rhs_b*(1.0-1e-6)) << format("sum_b=%f, sum_asqr=%f, sum_wts=%f") % sum_b % sum_bsqr % sum_wts;
+			CHECK_GE(sum_asqr, rhs_a*(1.-1e-5)) << format("sum_a=%f, sum_asqr=%f, sum_wts=%f") % sum_a % sum_asqr % sum_wts;
+			CHECK_GE(sum_bsqr, rhs_b*(1.-1e-5)) << format("sum_b=%f, sum_asqr=%f, sum_wts=%f") % sum_b % sum_bsqr % sum_wts;
 			// Lots of instability checks here. We need to account for both
 			// small relative differences and small absolute differences,
 			// particularly near zero.
-			if (sum_asqr+1e-8 < rhs_a*(1.0+1e-6) || sum_bsqr+1e-8 < rhs_b*(1.0+1e-6)) {
+			if (sum_asqr+kEpsilon <= rhs_a*(1.+1e-5) || sum_bsqr+kEpsilon <= rhs_b*(1.+1e-5)) {
 				return 0.0;  // not sure if this is really justified...
 			} else {
 				double denom = sum_asqr*sum_bsqr + rhs_a*rhs_b - sum_asqr*rhs_b - sum_bsqr*rhs_a;
-				CHECK_GE(denom, 1e-8)
+				CHECK_GE(denom, kEpsilon)
 					<< format("sum_a=%f, sum_b=%f, sum_asqr=%f, sum_bsqr=%d, sum_ab=%f, sum_wts=%f")
 					% sum_a % sum_b % sum_asqr % sum_bsqr % sum_ab % sum_wts;
 				return (sum_ab - sum_a*sum_b/sum_wts) / sqrt(denom);
@@ -295,13 +297,13 @@ namespace indoor_context {
 		HomographyTransform(r_image.mono, r_vrect_im_tr, tr*r_vrect);
 
 		// Check that grid_floorToCeil is a pure scale+translation of y coordinates
-		CHECK_EQ_TOL(geom.grid_floorToCeil[0][0], 1.0, 1e-8);  // no scaling in x
-		CHECK_LE(abs(geom.grid_floorToCeil[0][1]), 1e-8);
-		CHECK_LE(abs(geom.grid_floorToCeil[0][2]), 1e-8);  // no translation in x
-		CHECK_LE(abs(geom.grid_floorToCeil[1][0]), 1e-8);
-		CHECK_LE(abs(geom.grid_floorToCeil[2][0]), 1e-8);
-		CHECK_LE(abs(geom.grid_floorToCeil[2][1]), 1e-8);
-		CHECK_EQ_TOL(geom.grid_floorToCeil[2][2], 1.0, 1e-8);  // normalised
+		CHECK_EQ_TOL(geom.grid_floorToCeil[0][0], 1.0, kEpsilon);  // no scaling in x
+		CHECK_LE(abs(geom.grid_floorToCeil[0][1]), kEpsilon);
+		CHECK_LE(abs(geom.grid_floorToCeil[0][2]), kEpsilon);  // no translation in x
+		CHECK_LE(abs(geom.grid_floorToCeil[1][0]), kEpsilon);
+		CHECK_LE(abs(geom.grid_floorToCeil[2][0]), kEpsilon);
+		CHECK_LE(abs(geom.grid_floorToCeil[2][1]), kEpsilon);
+		CHECK_EQ_TOL(geom.grid_floorToCeil[2][2], 1.0, kEpsilon);  // normalised
 		double grid_fToC_sy = geom.grid_floorToCeil[1][1];
 		double grid_fToC_ty = geom.grid_floorToCeil[1][2];
 
@@ -346,8 +348,8 @@ namespace indoor_context {
 				// Compute the remaining transform after x is given
 				toon::Matrix<3,2> grid_to_ly = grid_to_l * curry_x;
 				grid_to_ly /= grid_to_ly[2][1];
-				CHECK_LE(abs(grid_to_ly[0][0]), 1e-8);  // ensure that output X is independent of input Y
-				CHECK_LE(abs(grid_to_ly[2][0]), 1e-8); 
+				CHECK_LE(abs(grid_to_ly[0][0]), kEpsilon);  // ensure that output X is independent of input Y
+				CHECK_LE(abs(grid_to_ly[2][0]), kEpsilon); 
 				int lx = grid_to_ly[0][1];  // don't clamp LX here, it MUST be outside the image sometimes (see the IF below)
 				float l_m = grid_to_ly[1][0];
 				float l_c = grid_to_ly[1][1];
@@ -355,8 +357,8 @@ namespace indoor_context {
 
 				toon::Matrix<3,2> grid_to_ry = grid_to_r * curry_x;
 				grid_to_ry /= grid_to_ry[2][1];
-				CHECK_LE(abs(grid_to_ry[0][0]), 1e-8);  // ensure that output X is independent of input Y
-				CHECK_LE(abs(grid_to_ry[2][0]), 1e-8);
+				CHECK_LE(abs(grid_to_ry[0][0]), kEpsilon);  // ensure that output X is independent of input Y
+				CHECK_LE(abs(grid_to_ry[2][0]), kEpsilon);
 				int rx = grid_to_ry[0][1];  // don't clamp RX here, it MUST be outside the image sometimes (see the IF below)
 				float r_m = grid_to_ry[1][0];
 				float r_c = grid_to_ry[1][1];

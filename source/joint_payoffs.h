@@ -17,11 +17,11 @@ namespace indoor_context {
 		double mono_weight; // weight for monocular payoffs
 		double occlusion_weight;  // weight for occlusion payoffs computed from point cloud
 		double agreement_weight;  // weight for agreement payoffs computed from point cloud
-		double stereo_weight;  // total weight for stereo payoffs (shared between auxiliary frames)
+		double stereo_weight;  // total weight for stereo payoffs
 
 		// The payoff generators
 		LineSweepObjectiveGen objective_gen;  // for monocular payoffs
-		MonocularPayoffGen mono_gen;
+		ObjectivePayoffGen mono_gen;
 		PointCloudPayoffs point_cloud_gen;
 		ptr_vector<StereoPayoffGen> stereo_gens;  // one for each auxiliary frame
 
@@ -40,7 +40,7 @@ namespace indoor_context {
 									 const vector<Vec3>& point_cloud,
 									 const vector<const PosedImage*>& aux_images);
 
-		// Reset weights from gvar values
+		// Reset weights to gvar values
 		void RevertWeights();
 
 		// Compute joint payoffs

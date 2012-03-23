@@ -6,35 +6,6 @@ namespace indoor_context {
 	lazyvar<float> gvDefaultOcclusionPenalty("ManhattanDP.DefaultOcclusionPenalty");
 
 	////////////////////////////////////////////////////////////////////////////////
-	DPObjective::DPObjective()
-		: wall_penalty(*gvDefaultWallPenalty), occl_penalty(*gvDefaultOcclusionPenalty) {
-	}
-
-	DPObjective::DPObjective(const Vec2I& size)
-		: wall_penalty(*gvDefaultWallPenalty), occl_penalty(*gvDefaultOcclusionPenalty) {
-		Resize(size);
-	}
-
-	void DPObjective::Resize(const Vec2I& size) {
-		for (int i = 0; i < 3; i++) {
-			// Note that the third parameter below forces an overwrite of the
-			// entire matrix. This is slightly inefficient but protects
-			// against the case that the user forgets to do this manually
-			// (e.g. iterating over an image and writing into grid coordinates
-			// will only write to the grid section inside image bounds)
-			pixel_scores[i].Resize(size[1], size[0], 0);
-		}
-	}
-
-	void DPObjective::CopyTo(DPObjective& rhs) {
-		for (int i = 0; i < 3; i++) {
-			rhs.pixel_scores[i] = pixel_scores[i];
-		}
-		rhs.wall_penalty = wall_penalty;
-		rhs.occl_penalty = occl_penalty;
-	}
-
-	////////////////////////////////////////////////////////////////////////////////
 	DPPayoffs::DPPayoffs()
 		: wall_penalty(*gvDefaultWallPenalty), occl_penalty(*gvDefaultOcclusionPenalty) {
 	}
@@ -54,14 +25,23 @@ namespace indoor_context {
 		wall_scores[1].Resize(size[1], size[0], 0);
 	}
 
-	double DPPayoffs::SumOverPath(const VecI& path, const VecI& orients) const {
+	double DPPayoffs::ComputeScore(const VecI& path,
+																 const VecI& axes,
+																 int num_walls,
+																 int num_occls) const {
 		CHECK_EQ(path.Size(), nx());
+		return SumOverPath(path, axes) - wall_penalty*num_walls - occl_penalty*num_occls;
+	}
 
-		double score = 0.0;
+	double DPPayoffs::SumOverPath(const VecI& path, const VecI& axes) const {
+		CHECK_EQ(path.Size(), nx());
+		CHECK_EQ(axes.Size(), nx());
+
+		double score = 0.;
 		for (int x = 0; x < path.Size(); x++) {
-			CHECK_INTERVAL(orients[x], 0, 1);
+			CHECK_INTERVAL(axes[x], 0, 1);
 			CHECK_INTERVAL(path[x], 0, ny()-1);
-			score += wall_scores[ orients[x] ][ path[x] ][ x ];
+			score += wall_scores[ axes[x] ][ path[x] ][ x ];
 		}
 		return score;
 	}
@@ -94,7 +74,7 @@ namespace indoor_context {
 		}
 	}
 
-	void DPPayoffs::CopyTo(DPPayoffs& other) {
+	void DPPayoffs::CopyTo(DPPayoffs& other) const {
 		other.wall_scores[0] = wall_scores[0];
 		other.wall_scores[1] = wall_scores[1];
 		other.wall_penalty = wall_penalty;

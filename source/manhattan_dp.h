@@ -17,9 +17,6 @@ namespace indoor_context {
 	class DPPayoffs;
 	class DPObjective;
 
-	extern "C" lazyvar<Vec2> gvGridSize;
-	extern "C" lazyvar<float> gvLineJumpThreshold;
-	
 	////////////////////////////////////////////////////////////////////////////////
 	// Represents a node in the DP graph.
 	// Be very careful about adding things to this class since
@@ -30,7 +27,7 @@ namespace indoor_context {
 		enum { DIR_IN, DIR_OUT, DIR_UP, DIR_DOWN };
 		short row, col, axis, dir;
 		DPState();
-		DPState(int r, int c, int a, int b, int d);
+		DPState(int r, int c, int a, int d);
 		static const DPState none;
 		bool operator==(const DPState& other) const;
 		bool operator!=(const DPState& other) const;
@@ -64,12 +61,14 @@ namespace indoor_context {
 	class DPCache {
 	public:
 		typedef DPSubSolution* iterator;
+		typedef const DPSubSolution* const_iterator;
 		Table<4, DPSubSolution> table;
 		void reset(const Vec2I& grid_size);
 		void clear();
-		inline iterator begin() { return table.begin(); }
-		inline iterator end() { return table.end(); }
+		inline iterator begin() const { return table.begin(); }
+		inline iterator end() const { return table.end(); }
 		iterator find(const DPState& state);
+		const_iterator find(const DPState& state) const;
 		DPSubSolution& operator[](const DPState& state);
 	};
 
@@ -140,6 +139,9 @@ namespace indoor_context {
 
 		// Configure the various homographies and useful vanishing point info
 		void Configure(const PosedCamera& camera, const Mat3& floorToCeil);
+		void Configure(const PosedCamera& camera,
+									 const Mat3& floorToCeil,
+									 const Vec2I& grid_size);
 
 		// Convert between image and grid coordinates
 		Vec3 GridToImage(const Vec2& x) const;
@@ -153,12 +155,18 @@ namespace indoor_context {
 		void TransformToGrid(const ImageRGB<byte>& in,
 												 ImageRGB<byte>& out) const;
 
+		// Compute for each grid pixel the number of image pixels that
+		// project there. Each element is an integer since projections are
+		// rounded to the nearest grid pixel.
+		void ComputeGridImportances(MatF& out) const;
+
 		// Transfer a point between the floor and ceiling (is always self-inverting)
 		Vec2 Transfer(const Vec2& grid_pt) const;
 		Vec3 Transfer(const Vec3& grid_pt) const;
 
 		// Get the top and bottom of the wall corresponding to a given grid point
-		void GetWallExtent(const Vec2& grid_pt, int axis, int& y0, int& y1) const;
+		void GetWallExtent(const Vec2& grid_pt, int& ceil_y, int& floor_y) const;
+		void GetWallExtentUnclamped(const Vec2& grid_pt, float& ceil_y, float& floor_y) const;
 		// Transform a path to an orientation map in the grid domain
 		void PathToOrients(const VecI& path, const VecI& path_axes, MatI& grid_orients) const;
 	};
@@ -178,8 +186,15 @@ namespace indoor_context {
 		void Configure(const PosedCamera& camera, double zfloor, double zceil);
 		// Configure the various homographies and useful vanishing point info
 		void Configure(const DPGeometry& geom, double zfloor, double zceil);
+		// Configure the various homographies and useful vanishing point info
+		void Configure(const PosedCamera& geom,
+									 double zfloor,
+									 double zceil,
+									 const Vec2I& grid_size);
 		// Back-project an image point onto the floor or ceiling plane
 		Vec3 BackProject(const Vec3& image_point) const;
+		// Back-project an image point onto the floor or ceiling plane
+		Vec3 BackProjectFromGrid(const Vec2& grid_point) const;
 	};
 
 
@@ -247,6 +262,11 @@ namespace indoor_context {
 		// between two DP nodes.
 		bool CanMoveVert(const DPState& cur, const DPState& next);
 
+		// Get the score of the best solution terminating at each pixel.
+		// (this is essentially maximizing over the last two dimensions of
+		// the cache)
+		void GetBest(MatD& best) const;
+
 		// Draw wireframe walls in image coordinates
 		void DrawWireframeSolution(ImageRGB<byte>& canvas) const;
 		// Draw wireframe walls in grid coordinates
@@ -258,18 +278,19 @@ namespace indoor_context {
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Wraps ManhattanDP, providing visualization routines that utilize a provided image
-	class MonocularPayoffGen;
+	class ObjectivePayoffGen;
 
 	class ManhattanDPReconstructor {
 	public:
 		const PosedImage* input;
-		const DPPayoffs* payoffs;  // might point to this->payoff_gen->payoffs, or an external object
+		const DPPayoffs* payoffs;  // might point to payoff_gen->payoffs,
+															 // or an external object
 		ManhattanDP dp;
 		DPGeometry geometry;
 
 		// Might not be initialized, depending on which Compute() is called...
 		// This is a pointer to avoid circular dependencies
-		scoped_ptr<MonocularPayoffGen> payoff_gen;
+		scoped_ptr<ObjectivePayoffGen> payoff_gen;
 
 		// Empty constructor (for scoped_ptr to incomplete type, ugh)
 		ManhattanDPReconstructor();
@@ -288,33 +309,32 @@ namespace indoor_context {
 		void ReportBacktrack();
 
 		// Compute pixel--wise labelling accuracy w.r.t. ground truth
-		double GetAccuracy(const MatI& gt_orients);
+		float GetLabellingError(const MatI& gt_orients);
 		// Compute pixel--wise labelling accuracy w.r.t. the ground truth floorplan
-		double GetAccuracy(const ManhattanGroundTruth& gt);
+		float GetLabellingError(const ManhattanGroundTruth& gt);
 		// Report and return classification accuracy.
-		double ReportAccuracy(const ManhattanGroundTruth& gt);
+		float ReportLabellingError(const ManhattanGroundTruth& gt);
 
 		// Compute per-pixel relative-depth-error
 		void GetDepthErrors(const ManhattanGroundTruth& gt,
 												MatF& out_errors);
 		// Compute mean relative-depth-error
-		double GetDepthError(const ManhattanGroundTruth& gt);
+		float GetDepthError(const ManhattanGroundTruth& gt);
 		// Report and return mean relative-depth-error
-		double ReportDepthError(const ManhattanGroundTruth& gt);
+		float ReportDepthError(const ManhattanGroundTruth& gt);
 
 		// Draw the original image
-		void OutputOrigViz(const string& path);
+		void OutputOrigViz(const string& path) const;
 		// Output the solution orientations overlayed on the input image
-		void OutputSolution(const string& path);
+		void OutputSolutionViz(const string& path) const;
 		// Draw the solution in grid coordinates
-		void OutputGridViz(const string& path);
+		void OutputGridViz(const string& path) const;
 		// Draw a visualization of the floor-to-ceiling mapping
-		void OutputManhattanHomologyViz(const string& path);
+		void OutputManhattanHomologyViz(const string& path) const;
 		// Draw a visualization of the payoffs with the solution model superimposed
-		void OutputPayoffsViz(int orient, const string& path);
+		void OutputPayoffsViz(int orient, const string& path) const;
 		// Draw a visualization of the relative depth error with respect to ground truth
 		void OutputDepthErrorViz(const ManhattanGroundTruth& gt,
 														 const string& path);
 	};
-
 }

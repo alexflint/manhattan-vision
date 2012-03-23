@@ -2,9 +2,13 @@
 
 #include <boost/foreach.hpp>
 
-#include "canvas.h"
-#include "timer.h"
+#include "common_types.h"
 #include "image_utils.h"
+#include "dp_affinities.h"
+#include "camera.h"
+#include "guided_line_detector.h"
+#include "manhattan_dp.h"
+#include "canvas.h"
 
 #include "vector_utils.tpp"
 #include "vw_image_io.h"

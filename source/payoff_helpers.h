@@ -14,14 +14,24 @@ namespace indoor_context {
 		VecF weights;
 		float corner_penalty;
 		float occlusion_penalty;
+		ManhattanHyperParameters(const VecF& weights,
+														 float corner_penalty,
+														 float occlusion_penalty);
 	};
 
-	// Represents monocular, stereo, and 3D payoffs for a particular image.
-	// Currently un-used.
+	// Represents a set of features in payoff form
 	class PayoffFeatures {
 	public:
 		boost::ptr_vector<DPPayoffs> features;
 		vector<string> descriptions;
+		// Clear all
+		void Clear();
+		// Append a copy of a payoff matrix
+		void AddCopy(const DPPayoffs& payoffs, const string& desc);
+		void AddCopy(const MatF& payoffs, const string& desc);
+		// Compile a payoff function from features and weights
+		void Compile(const ManhattanHyperParameters& params,
+								 DPPayoffs& out_payoffs) const;
 	};
 
 	// Represents performance statistics for a reconstruction algorithm.
@@ -37,6 +47,8 @@ namespace indoor_context {
 	// Pack a VNL matrix into a protocol buffer
 	void PackMatrix(const MatF& in, proto::MatF& out);
 	// Pack a VNL matrix into a protocol buffer
+	void PackMatrix(const MatD& in, proto::MatF& out);
+	// Pack a VNL matrix into a protocol buffer
 	void PackMatrix(const MatI& in, proto::MatI& out);
 	// Unpack a VNL matrix from a protocol buffer
 	void UnpackMatrix(const proto::MatF& in, MatF& out);
@@ -45,29 +57,24 @@ namespace indoor_context {
 
 	// Pack payoffs into a protocol buffer
 	void PackPayoffs(const DPPayoffs& payoffs,
-									 proto::PayoffFeature& data,
-									 const string& description="");
+									 const string& description,
+									 proto::PayoffFeature& data);
 	void PackPayoffs(const MatF& payoffs,
-									 proto::PayoffFeature& data,
-									 const string& description="");
-
+									 const string& description,
+									 proto::PayoffFeature& data);
 	// Unpack payoffs from a protocol buffer
 	void UnpackPayoffs(const proto::PayoffFeature& data,
 										 DPPayoffs& payoffs);
 
-	// Pack payoff features into a protocol buffer
-	// ** moved to progs/compute_payoff_features.cpp to remove
-	// dependency on JointPayoffGen
-	/*void PackFeatures(const JointPayoffGen& joint,
-		proto::FrameWithFeatures& data);*/
-
+	// Pack features into a protocol buffer
+	void PackFeatures(const PayoffFeatures& fset,
+										proto::PayoffFeatureSet& data);
 	// Unpack payoff features from a protocol buffer
-	void UnpackFeatures(const proto::FrameWithFeatures& data,
+	void UnpackFeatures(const proto::PayoffFeatureSet& data,
 											PayoffFeatures& features);
-	// Compile a payoff function from features and mixing parameters. If
-	// not null, the last parameter will be filled with derivatives of
-	// the payoff function with respect to each parameter.
-	void CompilePayoffs(const PayoffFeatures& features,
-											const ManhattanHyperParameters& params,
-											DPPayoffs& payoffs);
+
+	// Write features to file
+	void WriteFeatures(const string& path, const PayoffFeatures& fset);
+	// Read features from file
+	void ReadFeatures(const string& path, PayoffFeatures& fset);
 }

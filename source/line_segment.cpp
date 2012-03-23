@@ -2,11 +2,11 @@
 #include "geom_utils.h"
 
 namespace indoor_context {
-	Vec3 LineSeg::midpoint() const {
+	Vec3 LineSegment::midpoint() const {
 		return HMidpoint(start, end);
 	}
 
-	LineSeg LineSeg::Transform(const Mat3& h) const {
-		return LineSeg(h*start, h*end);
+	LineSeg LineSegment::Transform(const Mat3& h) const {
+		return LineSegment(h*start, h*end);
 	}
 }

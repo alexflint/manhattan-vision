@@ -9,9 +9,9 @@
 #include "tinyxml.h"
 #include "vw_image_io.h"
 #include "filesystem_utils.h"
+#include "protobuf_utils.h"
 
 #include "io_utils.tpp"
-#include "protobuf_utils.tpp"
 #include "vector_utils.tpp"
 
 namespace indoor_context {
@@ -23,6 +23,16 @@ namespace indoor_context {
 
 	lazyvar<bool> gvLoadOriginalFrames("Map.LoadOriginalFrames");
 	lazyvar<string> gvOrigFramesDir("Map.OrigFramesDir");
+
+	lazyvar<string> gvSequencesDir("Sequences.DataDir");
+	lazyvar<string> gvMapPath("Sequences.MapPath");
+
+	string GetMapPath(const string& sequence_name) {
+		fs::path file = fs::path(*gvSequencesDir) / sequence_name / *gvMapPath;
+		CHECK_PRED1(fs::exists, file)
+			<< "Couldn't find map for sequence: "<<sequence_name<<"\nPath: "<<file;
+		return file.string();
+	}
 
 	void LoadBundlerMap(const string& bundle_dir, Map& map) {
 		fs::path dir = fs::path(bundle_dir);
@@ -229,30 +239,25 @@ namespace indoor_context {
 
 		DLOG << "Loaded " << map.points.size() << " points and "
 				 << map.frames.size() << " frames";
-		if (fallback_frames.size() == 1) {
-			DLOG << "Using grayscale image for frame "
-					 << fallback_frames[0];
-		} else if (!fallback_frames.empty()) {
-			DLOG << "Using grayscale image for frames "
-					 << iowrap(fallback_frames, ",");
-		}
 	}
 
 	void LoadXmlMapWithGroundTruth(const string& path,
 																 Map& map,
 																 proto::TruthedMap& gt_map,
-																 bool include_non_keyframes) {
+																 bool include_non_keyframes,
+																 bool rotate_map) {
 		ReadProto(path, gt_map);
-		LoadXmlMap(gt_map.spec_file(), map, include_non_keyframes);
-		map.Transform(SO3<>::exp(asToon(gt_map.ln_scene_from_slam())));
-
-		double zfloor = gt_map.floorplan().zfloor();
-		double zceil = gt_map.floorplan().zceil();
-		Vec3 vup = map.frames[0].image.pc().pose_inverse() * makeVector(0,1,0);
-		if (Sign(zceil-zfloor) == Sign(vup[2])) {
-			swap(zfloor, zceil);
-			gt_map.mutable_floorplan()->set_zfloor(zfloor);
-			gt_map.mutable_floorplan()->set_zceil(zceil);
+		fs::path map_path = fs::path(*gvSequencesDir).parent_path() / gt_map.spec_file();
+		LoadXmlMap(map_path.string(), map, include_non_keyframes);
+		if (rotate_map) {
+			map.Transform(SO3<>::exp(asToon(gt_map.ln_scene_from_slam())));
+			double zfloor = gt_map.floorplan().zfloor();
+			double zceil = gt_map.floorplan().zceil();
+			Vec3 vup = map.frames[0].image.pc().pose_inverse() * makeVector(0,1,0);
+			if (Sign(zceil-zfloor) == Sign(vup[2])) {
+				gt_map.mutable_floorplan()->set_zfloor(zceil);
+				gt_map.mutable_floorplan()->set_zceil(zfloor);
+			}
 		}
 	}
 
@@ -266,7 +271,6 @@ namespace indoor_context {
 		double Cx, Cy, Cz, Ax, Ay, Az, Hx, Hy, Hz, Vx, Vy, Vz, K3, K5;
 		double sx, sy, Width, Height, ppx, ppy, f, fov;
 		double H0x, H0y, H0z, V0x, V0y, V0z;
-
 
 		DLOG << "WARNING: using first camera intrinsics for all cameras";
 		int i = 0;

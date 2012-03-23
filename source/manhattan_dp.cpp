@@ -1,4 +1,5 @@
 #include <tr1/unordered_map>
+#include <tr1/functional>
 
 #include <LU.h>
 
@@ -32,7 +33,7 @@ using namespace toon;
 
 	////////////////////////////////////////////////////////////////////////////////
 	DPState::DPState() : row(-1), col(-1), axis(-1), dir(-1) { }
-	DPState::DPState(int r, int c, int a, int b, int d)
+	DPState::DPState(int r, int c, int a, int d)  // removed 'b' before 'd' here
 		: row(r), col(c), axis(a), dir(d) {	}
 	bool DPState::operator==(const DPState& other) const {
 		return
@@ -51,8 +52,8 @@ using namespace toon;
 	const DPState DPState::none;
 
 	size_t DPStateHasher::operator()(const DPState& dpstate) const {
-		return tr1::_Fnv_hash<>::hash(reinterpret_cast<const char*>(&dpstate),
-																	sizeof(dpstate));
+		return tr1::_Fnv_hash::hash(reinterpret_cast<const char*>(&dpstate),
+																sizeof(dpstate));
 	}
 
 	ostream& operator<<(ostream& s, const DPState& x) {
@@ -105,6 +106,13 @@ using namespace toon;
 		table.Fill(DPSubSolution());
 	}
 
+	DPCache::const_iterator DPCache::find(const DPState& x) const {
+		// don't be tempted to cache the value of end() here as it will
+		// change from one iteration to the next.
+		iterator y = &(const_cast<DPCache&>(*this)[x]);
+		return isnan(y->score) ? end() : y;
+	}
+
 	DPCache::iterator DPCache::find(const DPState& x) {
 		// don't be tempted to cache the value of end() here as it will
 		// change from one iteration to the next.
@@ -149,6 +157,7 @@ using namespace toon;
 
 	const MatD& DPSolution::GetDepthMap(const DPGeometryWithScale& geometry) {
 		CHECK(!wall_segments.empty());
+		CHECK_NOT_NULL(geometry.camera);
 
 		// Push each polygon through the renderer
 		renderer.Configure(*geometry.camera);
@@ -179,13 +188,19 @@ using namespace toon;
 	}
 
 	DPGeometry::DPGeometry(const PosedCamera& camera, const Mat3& floorToCeil) {
-		grid_size = *gvGridSize;
 		Configure(camera, floorToCeil);
 	}
 
 	void DPGeometry::Configure(const PosedCamera& cam, const Mat3& fToC) {
+		Configure(cam, fToC, *gvGridSize);
+	}
+
+	void DPGeometry::Configure(const PosedCamera& cam,
+														 const Mat3& fToC,
+														 const Vec2I& gridsize) {
 		camera = &cam;
 		floorToCeil = fToC;
+		grid_size = gridsize;
 
 		// Compute the rectification homography
 		imageToGrid = GetVerticalRectifier(*camera, Bounds2D<>::FromTightSize(grid_size));
@@ -256,13 +271,17 @@ using namespace toon;
 
 	void DPGeometry::TransformDataToGrid(const MatF& in, MatF& out) const {
 		CHECK_EQ(matrix_size(in), camera->image_size());
-		out.Resize(grid_size[1], grid_size[0], 0.0);
+		out.Resize(grid_size[1], grid_size[0], 0.);
 
 		// Check that the four corners project within the grid bounds
-		CHECK_POS(ImageToGrid(makeVector(0, 0, 1)), out) << "in size="<<matrix_size(in);
-		CHECK_POS(ImageToGrid(makeVector(0, in.Rows()-1, 1)), out) << "in size="<<matrix_size(in);;
-		CHECK_POS(ImageToGrid(makeVector(in.Cols()-1, 0, 1)), out) << "in size="<<matrix_size(in);;
-		CHECK_POS(ImageToGrid(makeVector(in.Cols()-1, in.Rows()-1, 1)), out) << "in size="<<matrix_size(in);;
+		CHECK_POS(ImageToGrid(makeVector(0, 0, 1)), out)
+			<< "in size="<<matrix_size(in);
+		CHECK_POS(ImageToGrid(makeVector(0, in.Rows()-1, 1)), out)
+			<< "in size="<<matrix_size(in);;
+		CHECK_POS(ImageToGrid(makeVector(in.Cols()-1, 0, 1)), out)
+			<< "in size="<<matrix_size(in);;
+		CHECK_POS(ImageToGrid(makeVector(in.Cols()-1, in.Rows()-1, 1)), out)
+			<< "in size="<<matrix_size(in);;
 
 		// Do the transform
 		for (int y = 0; y < in.Rows(); y++) {
@@ -274,6 +293,11 @@ using namespace toon;
 		}
 	}
 
+	void DPGeometry::ComputeGridImportances(MatF& out) const {
+		MatF ones(camera->image_size()[1], camera->image_size()[0], 1.);
+		TransformDataToGrid(ones, out);
+	}
+
 	void DPGeometry::TransformToGrid(const ImageRGB<byte>& in,
 																	 ImageRGB<byte>& out) const {
 		ResizeImage(out, grid_size[0], grid_size[1]);
@@ -281,7 +305,7 @@ using namespace toon;
 		TransformImage(in, out, imageToGrid);
 	}
 
-	void DPGeometry::GetWallExtent(const Vec2& grid_pt, int axis, int& y0, int& y1) const {
+	void DPGeometry::GetWallExtent(const Vec2& grid_pt, int& y0, int& y1) const {
 		Vec2 opp_pt = Transfer(grid_pt);
 		int opp_y = Clamp<int>(opp_pt[1], 0, grid_size[1]-1);
 
@@ -293,7 +317,18 @@ using namespace toon;
 		y1 = max(y, opp_y);
 	}
 
-	void DPGeometry::PathToOrients(const VecI& path_ys, const VecI& path_axes, MatI& grid_orients) const {
+	void DPGeometry::GetWallExtentUnclamped(const Vec2& grid_pt,
+																					float& y0,
+																					float& y1) const {
+		float opp_y = Transfer(grid_pt)[1];
+		y0 = min(grid_pt[1], opp_y);
+		y1 = max(grid_pt[1], opp_y);
+	}
+		
+
+	void DPGeometry::PathToOrients(const VecI& path_ys,
+																 const VecI& path_axes,
+																 MatI& grid_orients) const {
 		CHECK_EQ(path_ys.Size(), grid_size[0]);
 		CHECK_EQ(path_axes.Size(), grid_size[0]);
 		grid_orients.Resize(grid_size[1], grid_size[0]);
@@ -302,7 +337,7 @@ using namespace toon;
 		for (int x = 0; x < grid_size[0]; x++) {
 			CHECK_NE(path_ys[x], -1) << "This should have been caught in ComputeSolutionPath";
 			CHECK_NE(path_axes[x], -1) << "This should have been caught in ComputeSolutionPath";
-			GetWallExtent(makeVector(x, path_ys[x]), path_axes[x], y0s[x], y1s[x]);
+			GetWallExtent(makeVector(x, path_ys[x]), y0s[x], y1s[x]);
 		}
 		for (int y = 0; y < grid_size[1]; y++) {
 			int* row = grid_orients[y];
@@ -320,15 +355,13 @@ using namespace toon;
 	DPGeometryWithScale::DPGeometryWithScale(const PosedCamera& camera,
 																					 double zfloor,
 																					 double zceil) {
-		grid_size = *gvGridSize;
 		Configure(camera, zfloor, zceil);
 	}
 
 	DPGeometryWithScale::DPGeometryWithScale(const DPGeometry& geom,
 																					 double zfloor,
 																					 double zceil) {
-		grid_size = geom.grid_size;
-		Configure(*geom.camera, zfloor, zceil);
+		Configure(geom, zfloor, zceil);
 	}
 
 	void DPGeometryWithScale::Configure(const PosedCamera& cam,
@@ -339,10 +372,21 @@ using namespace toon;
 		DPGeometry::Configure(cam, GetManhattanHomology(cam, zfloor, zceil));
 	}
 
+	void DPGeometryWithScale::Configure(const PosedCamera& cam,
+																			double zf,
+																			double zc,
+																			const Vec2I& grid_size) {
+		zfloor = zf;
+		zceil = zc;
+		DPGeometry::Configure(cam,
+													GetManhattanHomology(cam, zfloor, zceil),
+													grid_size);
+	}
+
 	void DPGeometryWithScale::Configure(const DPGeometry& geom,
 																			double zfloor,
 																			double zceil) {
-		Configure(*geom.camera, zfloor, zceil);
+		Configure(*geom.camera, zfloor, zceil, geom.grid_size);
 	}
 
 	Vec3 DPGeometryWithScale::BackProject(const Vec3& image_point) const {
@@ -352,6 +396,9 @@ using namespace toon;
 		return IntersectRay(image_point, *camera, plane);
 	}
 
+	Vec3 DPGeometryWithScale::BackProjectFromGrid(const Vec2& grid_point) const {
+		return BackProject(GridToImage(grid_point));
+	}
 
 	////////////////////////////////////////////////////////////////////////////////
 	ManhattanDP::ManhattanDP() : geom(NULL) {
@@ -362,8 +409,15 @@ using namespace toon;
 														const DPGeometry& geometry) {
 		geom = &geometry;
 		payoffs = &po;
-		CHECK_GE(payoffs->wall_penalty, 0);
-		CHECK_GE(payoffs->occl_penalty, 0);
+		if (payoffs->wall_penalty < 0) {
+			DLOG << "Warning: wall_penalty less than zero: " << payoffs->wall_penalty;
+		}
+		// Note that occlusion penalty could feasibly be negative
+		// (e.g if occlusions are more likely than normal corners)
+		if (payoffs->wall_penalty + payoffs->occl_penalty < 0) {
+			DLOG << "Warning: wall_penalty + occl_penalty less than zero: "
+					 << payoffs->wall_penalty + payoffs->occl_penalty;
+		}
 
 		// Reset the cache
 		cache_lookups = 0;
@@ -372,12 +426,12 @@ using namespace toon;
 
 		// Begin the search
 		DPSubSolution best(-INFINITY);
-		DPState init(-1, geom->grid_size[0]/*yes, x-coord is _past_ the image boundary*/, -1, -1, DPState::DIR_OUT);
+		int x_init = geom->grid_size[0]; //yes, x-coord is _past_ the image boundary
+		DPState init(-1, x_init, -1, DPState::DIR_OUT);
 		max_depth = cur_depth = 0;
 		bool feasible = false;
-		//TIMED("Core DP")
 		for (init.axis = 0; init.axis <= 1; init.axis++) {
-			for (init.row = geom->horizon_row; init.row < geom->grid_size[1]; init.row++) {
+			for (init.row = 0; init.row < geom->grid_size[1]; init.row++) {
 				// Need to account for the penalty for the first wall here since
 				// Solve_Impl() adds penalties on DIR_IN nodes.
 				if (best.ReplaceIfSuperior(Solve(init), init, -payoffs->wall_penalty)) {
@@ -501,7 +555,8 @@ using namespace toon;
 					best.ReplaceIfSuperior(Solve(next), next, delta_score);
 
 					// Compute the error associated with jumping to the nearest (integer-valued) pixel
-					double jump_error = abs(next.row - next_y); // *** for nonlinear spacing, replace next.row here and below
+					// *** for nonlinear spacing, replace next.row here and below
+					double jump_error = abs(next.row - next_y);
 					double dist = abs(next.row-state.row)+abs(next.col-state.col);  // L1 norm for efficiency
 					double rel_jump_error = jump_error / dist;
 
@@ -658,6 +713,25 @@ using namespace toon;
 		return OcclusionValid(cur.col, next.axis, cur.axis, occl_side);
 	}
 
+	void ManhattanDP::GetBest(MatD& best) const {
+		best.Resize(geom->ny(), geom->nx());
+		DPState state;
+		DPCache::const_iterator it;
+		for (state.row = 0; state.row < geom->ny(); state.row++) {
+			for (state.col = 0; state.col < geom->nx(); state.col++) {
+				best[state.row][state.col] = -INFINITY;
+				for (state.axis = 0; state.axis < 2; state.axis++) {
+					for (state.dir = 0; state.dir < 4; state.dir++) {
+						it = cache.find(state);
+						if (it != cache.end() && it->score > best[state.row][state.col]) {
+							best[state.row][state.col] = it->score;
+						}
+					}
+				}
+			}
+		}							
+	}
+
 	void ManhattanDP::DrawWireframeGridSolution(ImageRGB<byte>& canvas) const {
 		CHECK(!solution.wall_segments.empty());
 		BOOST_FOREACH(const LineSeg& image_seg, solution.wall_segments) {
@@ -703,7 +777,7 @@ using namespace toon;
 		geometry = geom; //.Configure(image.pc(), floorToCeil);
 
 		if (!payoff_gen) {
-			payoff_gen.reset(new MonocularPayoffGen);
+			payoff_gen.reset(new ObjectivePayoffGen);
 		}
 		payoff_gen->Compute(objective, geometry);
 
@@ -731,18 +805,18 @@ using namespace toon;
 		}
 	}
 
-	double ManhattanDPReconstructor::GetAccuracy(const MatI& gt_orients) {
-		return ComputeAgreementPct(dp.solution.pixel_orients, gt_orients);
+	float ManhattanDPReconstructor::GetLabellingError(const MatI& gt_orients) {
+		return 1. - ComputeAgreementFrac(dp.solution.pixel_orients, gt_orients);
 	}
 
-	double ManhattanDPReconstructor::GetAccuracy(const ManhattanGroundTruth& gt) {
-		return GetAccuracy(gt.orientations());
+	float ManhattanDPReconstructor::GetLabellingError(const ManhattanGroundTruth& gt) {
+		return GetLabellingError(gt.orientations());
 	}
 
-	double ManhattanDPReconstructor::ReportAccuracy(const ManhattanGroundTruth& gt) {
-		double acc = GetAccuracy(gt);
-		DLOG << format("Labelling accuracy: %|40t|%.1f%%") % (acc*100);
-		return acc;
+	float ManhattanDPReconstructor::ReportLabellingError(const ManhattanGroundTruth& gt) {
+		float err = GetLabellingError(gt);
+		DLOG << format("Labelling error: %|40t|%.1f%%") % (err*100.);
+		return err;
 	}
 
 	void ManhattanDPReconstructor::GetDepthErrors(const ManhattanGroundTruth& gt, MatF& errors) {
@@ -752,23 +826,23 @@ using namespace toon;
 		ComputeDepthErrors(gt_depth, soln_depth, errors);
 	}
 
-	double ManhattanDPReconstructor::GetDepthError(const ManhattanGroundTruth& gt) {
+	float ManhattanDPReconstructor::GetDepthError(const ManhattanGroundTruth& gt) {
 		MatF errors;	// TODO: move to a class variable (or external?)
 		GetDepthErrors(gt, errors);
 		return MeanError(errors);
 	}
 
-	double ManhattanDPReconstructor::ReportDepthError(const ManhattanGroundTruth& gt) {
+	float ManhattanDPReconstructor::ReportDepthError(const ManhattanGroundTruth& gt) {
 		double acc = GetDepthError(gt);
 		DLOG << format("Mean depth error: %|40t|%.1f%%") % (acc*100);
 		return acc;
 	}
 
-	void ManhattanDPReconstructor::OutputOrigViz(const string& path) {
+	void ManhattanDPReconstructor::OutputOrigViz(const string& path) const {
 		WriteImage(path, input->rgb);
 	}
 
-	void ManhattanDPReconstructor::OutputSolution(const string& path) {
+	void ManhattanDPReconstructor::OutputSolutionViz(const string& path) const {
 		CHECK(input->loaded());
 		ImageRGB<byte> canvas;
 		ImageCopy(input->rgb, canvas);
@@ -776,14 +850,14 @@ using namespace toon;
 		WriteImage(path, canvas);
 	}
 
-	void ManhattanDPReconstructor::OutputGridViz(const string& path) {
+	void ManhattanDPReconstructor::OutputGridViz(const string& path) const {
 		ImageRGB<byte> grid_canvas(geometry.grid_size[0], geometry.grid_size[1]);
 		grid_canvas.Clear(Colors::white());
 		dp.DrawWireframeGridSolution(grid_canvas);
 		WriteImage(path, grid_canvas);
 	}
 
-	void ManhattanDPReconstructor::OutputManhattanHomologyViz(const string& path) {
+	void ManhattanDPReconstructor::OutputManhattanHomologyViz(const string& path) const {
 		CHECK(input->loaded());
 		FileCanvas canvas(path, input->size());
 		canvas.DrawImage(input->rgb);
@@ -799,7 +873,7 @@ using namespace toon;
 		}
 	}
 
-	void ManhattanDPReconstructor::OutputPayoffsViz(int orient, const string& path) {
+	void ManhattanDPReconstructor::OutputPayoffsViz(int orient, const string& path) const {
 		CHECK(input->loaded());
 
 		// Draw payoffs

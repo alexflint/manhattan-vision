@@ -1,22 +1,26 @@
-/*
- * vector_utils.tpp
- *
- *  Created on: 2 Jun 2010
- *      Author: alexf
- */
 #pragma once
 
-#include "TooN/se3.h"
-#include "TooN/LU.h"
+#include "vector_utils.h"
+
+#include <TooN/se3.h>
+#include <TooN/LU.h>
 
 #include "common_types.h"
-#include "vector.pb.h"
 
 #include "numeric_utils.tpp"
 #include "range_utils.tpp"
 #include "vw_image.tpp"
 
 namespace indoor_context {
+	inline void toImageRef(const Vec2& v, ImageRef& p) {
+		p.x = v[0];
+		p.y = v[1];
+	}
+
+	inline void toImageRef(const Vec3& v, ImageRef& p) {
+		p.x = v[0]/v[2];
+		p.y = v[1]/v[2];
+	}
 
 	// Distance computations for CHECK_EQ
 	template <int N, typename T>
@@ -29,32 +33,6 @@ namespace indoor_context {
 	double err(const toon::Matrix<M,N,T>& a, const toon::Matrix<M,N,U>& b) {
 		return norm_1(a-b);
 	}
-
-	// defined in math_utils.cpp TODO: move these to .h
-	toon::Vector<2> asToon(const proto::Vec2& x);
-	toon::Vector<3> asToon(const proto::Vec3& x);
-	toon::Vector<4> asToon(const proto::Vec4& x);
-	toon::Vector<5> asToon(const proto::Vec5& x);
-	toon::Vector<6> asToon(const proto::Vec6& x);
-	proto::Vec2 asProto(const toon::Vector<2>& x);
-	proto::Vec3 asProto(const toon::Vector<3>& x);
-	proto::Vec4 asProto(const toon::Vector<4>& x);
-	proto::Vec5 asProto(const toon::Vector<5>& x);
-	proto::Vec6 asProto(const toon::Vector<6>& x);
-
-
-	inline void toImageRef(const Vec2& v, ImageRef& p) {
-		p.x = v[0];
-		p.y = v[1];
-	}
-
-	inline void toImageRef(const Vec3& v, ImageRef& p) {
-		p.x = v[0]/v[2];
-		p.y = v[1]/v[2];
-	}
-
-	// Construct a full 3x4 matrix representing a rigid 3D transform
-	toon::Matrix<3,4> as_matrix(const toon::SE3<>& se3);
 
 	// TODO: sort out this rounding stuff, do it one way consistently!
 	template <typename T>
@@ -355,5 +333,4 @@ namespace indoor_context {
 			}
 		}
 	}
-
 }  // namespace indoor_context

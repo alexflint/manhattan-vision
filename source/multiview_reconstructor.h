@@ -16,7 +16,7 @@ namespace indoor_context {
 			DPGeometry geom;  // DP geometry for base view
 			Mat3 grid_hfloor;  // homography from base view to this one, via floor plan, in grid coords
 			Mat3 grid_hceil;  // homography from base view to this one, via ceiling plan, in grid coords
-			MonocularPayoffGen payoff_gen;
+			ObjectivePayoffGen payoff_gen;
 
 			// These are only kept for analysis/visualization:
 			  DPPayoffs payoffs;  // Monocular payoffs for this view
@@ -28,7 +28,7 @@ namespace indoor_context {
 		double zfloor, zceil;
 
 		DPGeometry base_geom;  // DP geometry for base view
-		MonocularPayoffGen base_payoff_gen;  // The payoff generator
+		ObjectivePayoffGen base_payoff_gen;  // The payoff generator
 		DPPayoffs base_payoffs;  // Monocular payoffs for base view (only kept for visualization)
 
 		boost::ptr_vector<AuxiliaryView> aux_views; // DP geometries for auxiliary views

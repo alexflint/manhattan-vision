@@ -12,6 +12,7 @@
 #include "gl_utils.tpp"
 #include "geom_utils.h"
 #include "lazyvar.h"
+#include "texture_manager.h"
 
 #include "counted_foreach.tpp"
 #include "range_utils.tpp"
@@ -54,7 +55,7 @@ namespace indoor_context {
 
 			// Bind this frame into the current GL texture. On the first
 			// invokation, this will load the texture into graphics memory.
-			frame.image.BindGLTexture();
+			viewer().textures().Select(&frame.image);
 
 			// Project the quad boundary to the screen
 			const Vec2& tl = frame.image.pc().retina_bounds().tl();

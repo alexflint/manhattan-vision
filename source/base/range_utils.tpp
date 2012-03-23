@@ -223,6 +223,18 @@ void copy_all_into(const InputRange& input, OutputContainer& output) {
 	copy_all(input, back_inserter(output));
 }
 
+// Extract the subset of elements in a vector identified by a vector
+// of indices.
+template<typename T>
+void copy_subset_into(const vector<T>& xs,
+											const vector<int>& ids,
+											vector<T>& subset) {
+	BOOST_FOREACH(int i, ids) {
+		CHECK_INDEX(i, xs);
+		subset.push_back(xs[i]);
+	}
+}
+
 template <typename Range>
 typename range_iterator<const Range>::type
 find_all(const Range& r, const typename range_value<Range>::type& x) {

@@ -6,45 +6,16 @@ namespace indoor_context {
 	extern "C" lazyvar<float> gvDefaultWallPenalty;
 	extern "C" lazyvar<float> gvDefaultOcclusionPenalty;
 
-	////////////////////////////////////////////////////////////////////////////////
-	// Represents a cost function that ManhattanDP optimizes, in terms of
-	// the cost of assigning label A to pixel [Y,X] (stored in
-	// pixel_scores[A][Y][X]). An object of this form is converted to the
-	// more general representation of DPPayoffs
-	class DPObjective;
-	class DPObjective {
-	public:
-		double wall_penalty;  // the cost per wall segment (for regularisation)
-		double occl_penalty;  // the cost per occluding wall segment 
-		                      // (*in addition* to wall_penalty)
-		MatF pixel_scores[3];  // score associated with assigning each
-													 // label to each pixel (image coords)
-
-		// Constructors
-		DPObjective();
-		DPObjective(const Vec2I& size);
-		// Get size
-		int nx() const { return pixel_scores[0].Cols(); }
-		int ny() const { return pixel_scores[0].Rows(); }
-		// Change size
-		void Resize(const Vec2I& size);
-		// Deep copy
-		void CopyTo(DPObjective& rhs);
-	private:
-		// Disallow copy constructor (CopyTo explicitly)
-		DPObjective(const DPObjective& rhs);
-	};
-
-
-	////////////////////////////////////////////////////////////////////////////////
-	// The cost function the DP optimizes, specified in terms of the cost
-	// of placing the top/bottom of a wall at each pixel.
+	/////////////////////////////////////////////////////////////////////
+	// Represents a cost function that ManhattanDP optimizes, specified
+	// in terms of the cost of placing the top/bottom of a wall at any
+	// given pixel.
 	class DPPayoffs;
 	class DPPayoffs {
 	public:
 		double wall_penalty;  // the cost per wall segment (for regularisation)
-		double occl_penalty;  // the cost per occluding wall segment (_additional_ to wall_penalty)
-		MatF wall_scores[2];  // cost of building the top/bottom of a wall at p (grid coords)
+		double occl_penalty;  // the cost per occluding wall segment (added to wall_penalty)
+		MatF wall_scores[2];  // cost of placing the top/bottom of a wall at p (grid coords)
 
 		// Initialize empty
 		DPPayoffs();
@@ -60,10 +31,15 @@ namespace indoor_context {
 		// Resize the score matrix and reset all elements to the specified value
 		void Clear(float fill);
 		// Clone this object
-		void CopyTo(DPPayoffs& other);
+		void CopyTo(DPPayoffs& other) const;
 
-		// Sum over a path (e.g. representing a candidate solution)
-		double SumOverPath(const VecI& path, const VecI& orientations) const;
+		// Compute score for a hypothesis
+		double ComputeScore(const VecI& path,
+												const VecI& axes,
+												int num_walls,
+												int num_occlusions) const;
+		// Sum these payoffs over a path. Equal to above without penalty terms.
+		double SumOverPath(const VecI& path, const VecI& axes) const;
 
 		// Add a payoff matrix weighted by a constant
 		void Add(const DPPayoffs& other, double weight=1.0);

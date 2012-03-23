@@ -23,10 +23,13 @@ namespace indoor_context {
 	// Load a map with ground truth. Store the ground truth in gt_map.
 	// If all_frames is true then load all frames; otherwise load just
 	// the key frames.
+	// If rotate_map is true then rotate the 3D points and camera poses
+	// according to the rotation loaded into gt_map.
 	void LoadXmlMapWithGroundTruth(const string& path,
 																 Map& map,
 																 proto::TruthedMap& gt_map,
-																 bool include_non_keyframes=false);
+																 bool include_non_keyframes=false,
+																 bool rotate_map=true);
 
 	// Load a map as output in text format by voodoo
 	// Will look for lines of the form '#frameindex XXX' and pass the
@@ -34,4 +37,8 @@ namespace indoor_context {
 	void LoadMapFromVoodooTextFile(const string& path,
 																 const string& image_pattern,
 																 Map& map);
+
+	// Get the path to the truthed_map.pro file for a sequence, or die
+	// if the sequence is not found.
+	string GetMapPath(const string& sequence_name);
 }

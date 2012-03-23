@@ -7,6 +7,7 @@
 #include "image_bundle.h"
 #include "svm_light_wrappers.h"
 #include "dp_payoffs.h"
+#include "dp_affinities.h"
 
 namespace indoor_context {
 

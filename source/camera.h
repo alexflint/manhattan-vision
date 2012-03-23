@@ -190,6 +190,9 @@ public:
 	// incorporating both intrinsics and extrinisics.
 	toon::Matrix<3,4> Linearize() const;
 
+	// Get the direction of the principle ray (ray through center of image)
+	Vec3 GetPrincipalDirection() const;
+
 	// Get the i-th vanishing point in retina coords
 	Vec3 GetRetinaVpt(int axis) const;
 	// Get the i-th vanishing point in image coords

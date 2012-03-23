@@ -47,8 +47,6 @@ namespace indoor_context {
 	static const PixelRGB<byte> kSpuriousColor(255, 255, 255);
 	static const PixelRGB<byte> kElimColor(0, 0, 0);
 
-
-
 	// Compute sum over a vector, not very efficient
 	template <int N, typename T>
 	T sum(const Vector<N,T>& v) {
@@ -68,6 +66,7 @@ namespace indoor_context {
 		}
 		return x;
 	}
+
 
 	
 	void ManhattanFrameEstimator::Compute(vector<LineDetection>& segments) {
@@ -158,9 +157,12 @@ namespace indoor_context {
 		}
 
 		// Check that the vanishing points were linearly independent
-		CHECK_GT(mindp, 1e-16 * max(norm(u), norm(v)))
-			<< "Error: Unable to bootstrap the vanishing point detector:"
-			" There is no pair of linearly independent candidates";
+		if(mindp < 1e-16 * max(norm(u), norm(v))) {
+			DLOG << "Warning: Unable to bootstrap the vanishing point detector:"
+				" there is no pair of linearly independent candidates."
+				" Proceeding with an arbitrary initialization.";
+			v = GetAxis<3>(0);
+		}
 
 		// Create the initial rotation matrix
 		Mat3 R_init;
@@ -242,35 +244,8 @@ namespace indoor_context {
 	}
 
 	void ManhattanFrameEstimator::MStep() {
-		/*vector<Vec3> line_eqns_new;
-		if (num_iters == 0) {
-			line_eqns_new = line_eqns;
-		} else {
-			line_eqns_new.resize(detections->size());
-			for (int i = 0; i < detections->size(); i++) {
-				const LineDetection& det = (*detections)[i];
-				Vec3 c = HMidpoint(det.seg.start, det.seg.end);
-				Vec3 eqn = c ^ det.seg.start;  // using det.end would work out the same
-
-				int max_j = -1;
-				double max_resp = -INFINITY;
-				for (int j = 0; j < 3; j++) {  // yes, ignore the 
-					if (resps[i][j] > max_resp) {
-						max_resp = resps[i][j];
-						max_j = j;
-					}
-				}
-				Vec3 m = vpts[max_j] ^ c;
-				DREPORT(m, vpts[max_j], c);
-
-				double nrm = sqrt(m[0]*m[0] + m[1]*m[1]);
-				eqn /= nrm;
-				line_eqns_new[i] = eqn;
-			}
-			}*/
-
 		// Estimate vanishing points given current responsibilities
-		rot_est.Compute(line_eqns/*_new*/, asToon(resps), R);
+		rot_est.Compute(line_eqns, asToon(resps), R);
 
 		// Check for convergence, which is when no vanishing point is
 		// changed by more than gvExitThresh, and

@@ -90,5 +90,4 @@ namespace indoor_context {
 		R *= SO3<>::exp(-step*Jf);
 		num_steps++;
 	}
-
 }

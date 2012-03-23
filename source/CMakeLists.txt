@@ -8,7 +8,13 @@ SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmessage-length=0" )
 # Setup the path to find modules to prefer local modules
 SET( CMAKE_MODULE_PATH
 	${CMAKE_SOURCE_DIR}/../cmake_modules
-	${CMAKE_ROOT}/Modules )
+#	${CMAKE_ROOT}/Modules
+	)
+
+# Set up system-level search paths
+LIST(APPEND CMAKE_LIBRARY_PATH
+	/usr/lib/x86_64-linux-gnu/
+	)
 
 ###############################################################################
 # CUSTOM VARIABLES
@@ -27,10 +33,11 @@ INCLUDE_DIRECTORIES(
 	${CMAKE_SOURCE_DIR}/base
 	${CMAKE_SOURCE_DIR}/visualization
 	${CMAKE_SOURCE_DIR}/tinyxml
+	${CMAKE_SOURCE_DIR}/proto
 )
-	
+
 # Include the binary dir because protobufs will be generated here
-INCLUDE_DIRECTORIES( ${CMAKE_CURRENT_BINARY_DIR} )
+INCLUDE_DIRECTORIES( ${CMAKE_CURRENT_BINARY_DIR}/proto )
 
 ###############################################################################
 # FIND DEPENDENCIES
@@ -54,7 +61,7 @@ LIST( APPEND EXTERNAL_LIBRARIES ${PROTOBUF_LIBRARIES} )
 # Find Boost
 SET( Boost_FIND_QUIETLY OFF )
 FIND_PACKAGE( Boost 1.44.0
-	COMPONENTS date_time filesystem iostreams thread system program_options # python
+	COMPONENTS date_time filesystem iostreams thread system program_options python
 	REQUIRED )
 LIST(APPEND EXTERNAL_LIBRARIES 
 	${Boost_system_LIBRARY_RELEASE}
@@ -107,7 +114,7 @@ IF( NOT ${LIGHT} )
 	LIST( APPEND EXTERNAL_LIBRARIES ${Cairo_LIBRARIES} )
 
 	FIND_PACKAGE( Cairomm REQUIRED )
-	INCLUDE_DIRECTORIES( ${Cairomm_INCLUDE_DIRS} /usr/lib/cairomm-1.0/include )
+	INCLUDE_DIRECTORIES( ${Cairomm_INCLUDE_DIR} /usr/lib/cairomm-1.0/include )
 	LIST( APPEND EXTERNAL_LIBRARIES ${Cairomm_LIBRARIES} )
 
 	FIND_PACKAGE( Freetype REQUIRED )
@@ -127,13 +134,7 @@ IF( NOT ${LIGHT} )
 	INCLUDE_DIRECTORIES( ${GLUT_INCLUDE_DIR} )
 	LIST( APPEND EXTERNAL_LIBRARIES ${GLUT_LIBRARIES} )
 
-	# Python stuff
-	FIND_PACKAGE( PythonLibs )
-	INCLUDE_DIRECTORIES( ${PYTHON_INCLUDE_DIRS} )
-	FIND_PACKAGE( ZLIB )
-	INCLUDE_DIRECTORIES( ${ZLIB_INCLUDE_DIRS} )
-
-	# Python-related
+	# Matlab-related
 	FIND_PACKAGE( Matlab )
 
 	# Find CUDA if it's enabled
@@ -171,21 +172,10 @@ ENDIF()
 ###############################################################################
 # GENERATE PROTOCOL BUFFERS
 ###############################################################################
-SET( PROTOS
-	vector.proto
-	map.proto
-	model.proto
-	payoffs.proto
-)
-
-PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${PROTOS})
-
-ADD_LIBRARY( proto SHARED
-	${PROTO_SRCS}
-)
+ADD_SUBDIRECTORY(proto)
 
 ###############################################################################
-# BUILD CORE LIBRARY
+# BUILD BASE LIBRARY
 # This library has minimal dependencies on external libraries.
 ###############################################################################
 ADD_LIBRARY( base SHARED 
@@ -207,7 +197,9 @@ ADD_LIBRARY( base SHARED
 	base/timer.cpp
 	base/numeric_utils.cpp
 	base/vector_utils.cpp
-)	
+)
+
+TARGET_LINK_LIBRARIES( base ${Boost_iostreams_LIBRARY} )
 
 ###############################################################################
 # BUILD TINYXML LIBRARY
@@ -258,11 +250,13 @@ ADD_LIBRARY( algorithms SHARED
 	# Miscellaneous utilities
 	netlib_sanity_test.cpp
 	geom_utils.cpp
+	vpt_utils.cpp
 	image_utils.cpp
 	filesystem_utils.cpp
-	clipping.cpp
+	protobuf_utils.cpp
 
 	# Image processing and algorithms
+	clipping.cpp
 	canny.cpp
 	fast_sobel.cpp
 	fhsegmenter.cpp
@@ -273,26 +267,34 @@ ADD_LIBRARY( algorithms SHARED
 	kmeans.cpp 
 	union_find.cpp
 	vanishing_points.cpp
+	vanishing_point_model.cpp
 	textons.cpp
 	line_sweeper.cpp
 	rotation_estimator.cpp
 	mean_shift.cpp
 	line_detector.cpp
+	line_detector_bank.cpp
 	guided_line_detector.cpp
 	gaussian_pyramid.cpp
-	
+
 	# Simple custom rendering pipeline
 	simple_renderer.cpp
 	floorplan_renderer.cpp
 
 	# 2D drawing
 	canvas.cpp
+	drawing.cpp
 
 #	kinect_device.cpp
 #	kinect_transform.cpp
 )
 
-ADD_DEPENDENCIES( algorithms base tinyxml proto )
+TARGET_LINK_LIBRARIES( algorithms
+	base
+	tinyxml
+	proto
+	${EXTERNAL_LIBRARIES}
+)
 
 ###############################################################################
 # BUILD LIKELIHOODS LIBRARY
@@ -312,17 +314,19 @@ ADD_LIBRARY( visualization SHARED
 	visualization/floorplan_editor.cpp
 )
 
-ADD_DEPENDENCIES( visualization algorithms base )
+TARGET_LINK_LIBRARIES( visualization algorithms base )
 
 ###############################################################################
 # BUILD MANHATTAN LIBRARY
 ###############################################################################
 ADD_LIBRARY( manhattan SHARED
+
 	manhattan_dp.cpp
 	manhattan_ground_truth.cpp
 
 	multiview_reconstructor.cpp
 
+	dp_affinities.cpp
 	monocular_payoffs.cpp
 	stereo_payoffs.cpp
 	point_cloud_payoffs.cpp
@@ -338,7 +342,7 @@ ADD_LIBRARY( manhattan SHARED
 	manhattan_bnb.cpp
 )
 
-ADD_DEPENDENCIES( manhattan algorithms base likelihoods proto )
+TARGET_LINK_LIBRARIES( manhattan algorithms base likelihoods proto )
 
 ###############################################################################
 # BUILD EXECUTABLES
@@ -370,18 +374,44 @@ ENDIF( USE_CUDA )
 ###############################################################################
 # BUILD PYTHON WRAPPERS
 ###############################################################################
-IF ( PYTHON_FOUND )
-	SET( PYTHON_GENERATOR ${CMAKE_CURRENT_SOURCE_DIR}/generate_python_wrappers.py )
-	SET( PYTHON_EXPOSED_FILES
-		${CMAKE_CURRENT_SOURCE_DIR}/math_utils.h
-		)
-  ADD_CUSTOM_TARGET( OUTPUT python_wrappers.cpp
-		COMMAND python ${PYTHON_GENERATOR}
-		${PYTHON_EXPOSED_FILES} 
-		)
+#IF ( PYTHON_FOUND )
+#	SET( PYTHON_GENERATOR ${CMAKE_CURRENT_SOURCE_DIR}/generate_python_wrappers.py )
+#	SET( PYTHON_EXPOSED_FILES
+#		${CMAKE_CURRENT_SOURCE_DIR}/math_utils.h
+#		)
+#  ADD_CUSTOM_TARGET( OUTPUT python_wrappers.cpp
+#		COMMAND python ${PYTHON_GENERATOR}
+#		${PYTHON_EXPOSED_FILES} 
+#		)
+#ENDIF ( PYTHON_FOUND )
 
-ENDIF ( PYTHON_FOUND )
+FIND_PACKAGE( PythonLibs )
+INCLUDE_DIRECTORIES( ${PYTHON_INCLUDE_DIRS} )
 
+SET( PYTHON_INTEROP_LIBRARIES 
+	${Boost_python_LIBRARY_RELEASE}
+	${PYTHON_LIBRARIES}
+	${EXTERNAL_LIBRARIES}
+)
+
+ADD_LIBRARY( py_indoor_context SHARED
+	pywrappers/numpy_conversions.cpp
+	pywrappers/numpy_helpers.cpp
+	pywrappers/training.cpp
+	pywrappers/training_wrappers.cpp
+)
+
+# Remove "lib" from the beginning of the filename
+SET_TARGET_PROPERTIES( py_indoor_context PROPERTIES PREFIX "" )
+
+TARGET_LINK_LIBRARIES( py_indoor_context
+	manhattan
+	algorithms
+	base
+	likelihoods
+	proto
+	${PYTHON_INTEROP_LIBRARIES}
+)
 
 ###############################################################################
 # BUILD MATLAB WRAPPERS

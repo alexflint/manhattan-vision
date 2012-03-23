@@ -30,7 +30,7 @@ namespace indoor_context {
 	// Guess file format
 	bool IsJpegFilename(const string& file) {
 		// TODO: find a more reliable way to determine file format
-#if BOOST_VERSION >= 104400
+#if 1 //BOOST_VERSION >= 104200
 		string ext = fs::path(file).extension().string();
 #else
 		string ext = fs::path(file).extension();

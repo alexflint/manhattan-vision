@@ -26,6 +26,10 @@ namespace indoor_context {
 		//void Render(const ImageBundle* image, const GlutWindow* window);
 		// Draw a texture full-screen
 		//void RenderFullScreen(const ImageBundle* image, const GlutWindow* window);
+		// Load a texture for an image
+		static unsigned LoadTexture(const ImageBundle& image);
+		// Bind a texture
+		static void BindTexture(unsigned textureId);
 	private:
 		// Map of images to texture IDs
 		map<const ImageBundle*,unsigned> textureIds_;

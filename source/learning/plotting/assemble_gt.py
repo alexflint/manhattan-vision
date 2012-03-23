@@ -2,17 +2,13 @@
 
 import sys
 import py_indoor_context
+import training_params
+import training_helpers
 
-if len(sys.argv) != 3:
-    print 'Usage:',sys.argv[0],' SEQUENCE FRAMEID'
-    exit(-1)
-
-seq = sys.argv[1]
-idx = int(sys.argv[2])
-pattern = 'out/%s_frame%03d_gt.png'
-
+dataset = training_params.Datasets.Large.TestSet
 mgr = py_indoor_context.TrainingManager()
-mgr.LoadSequence(seq, [idx])
+a,instances = training_helpers.load_dataset(mgr, [], dataset)
 
-inst = mgr.GetInstance(0)
-inst.OutputGroundTruthViz(pattern % (seq,idx))
+pattern = 'out/%s_frame%03d_gt.png'
+for inst in instances:
+    inst.OutputGroundTruthViz(pattern % (inst.GetSequenceName(),inst.GetFrameId()))

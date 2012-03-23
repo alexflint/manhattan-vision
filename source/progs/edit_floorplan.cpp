@@ -10,6 +10,7 @@
 #include "map_io.h"
 #include "vars.h"
 #include "bld_helpers.h"
+#include "protobuf_utils.h"
 
 using namespace indoor_context;
 using namespace toon;
@@ -111,9 +112,23 @@ int main(int argc, char **argv) {
 
 	if (argc == 2) {
 		// Load an existing floorplan
-		LoadXmlMapWithGroundTruth(GetMapPath(argv[1]), *slam_map, gt_map);
+		filename = GetMapPath(argv[1]);
+		LoadXmlMapWithGroundTruth(filename, *slam_map, gt_map);
+
+		SO3<> R = SO3<>::exp(asToon(gt_map.ln_scene_from_slam()));
+		proto::FloorPlan& fp = *gt_map.mutable_floorplan();
+		/*quick hack to fix error in ground truth data
+		int n = fp.vertices().size();
+		proto::Vec2& u = *fp.mutable_vertices(0);
+		proto::Vec2& v = *fp.mutable_vertices(n-1);
+		DREPORT(asToon(u), asToon(v));
+		u.set_x2(u.x2() - 1.);
+		v.set_x2(v.x2() - 1.);
+		DREPORT(asToon(u), asToon(v));*/
 
 	} else {
+		CHECK(false) << "This part needs to be re-implemented";
+
 		// Check args
 		if (strcmp(argv[2], "-c")) {
 			DLOG << "Unrecognised option: "<<argv[2];

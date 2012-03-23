@@ -9,15 +9,12 @@
 #include "map_io.h"
 #include "bld_helpers.h"
 #include "manhattan_dp.h"
+#include "timer.h"
 
 #include "protobuf_utils.tpp"
 #include "vector_utils.tpp"
 
 #include "io_utils.tpp"
-
-// Window size for finite differences
-// Avoid using gvars here
-static const double kDefaultDelta = 1e-8;
 
 ///////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
@@ -33,10 +30,7 @@ int main(int argc, char **argv) {
     ("corner_penalty", po::value<float>()->required(), "per-corner penalty")
     ("occlusion_penalty", po::value<float>()->required(),
 		 "additional penalty for occluding corners")
-    ("with_gradient", "also compute gradient")
-    ("logit", "use logistic likelihood (default is Gaussian)")
-    ("delta", po::value<double>()->default_value(kDefaultDelta),
-		 "Window size for finite differences.")
+    //("logit", "use logistic likelihood (default is Gaussian)")
 		;
 
 	// Parse options
@@ -51,10 +45,6 @@ int main(int argc, char **argv) {
 	if (opts.count("help")) {
     cout << desc << "\n";
     return -1;
-	}
-	if (opts.count("with_gradient")) {
-		cout << "GRADIENTS NOT IMPLEMENTED";
-		return -1;
 	}
 
 	// Read command line arguments
@@ -94,6 +84,9 @@ int main(int argc, char **argv) {
 	DPPayoffs payoffs;
 	model_likelihood.PopulatePayoffs(payoffs);
 
+		DREPORT(payoffs.wall_penalty);
+		DREPORT(payoffs.occl_penalty);
+
 	// Process each frame
 	double sum_acc = 0;
 	double sum_err = 0;
@@ -101,15 +94,20 @@ int main(int argc, char **argv) {
 		CHECK(instance.sequence() == feature_set.frames(0).sequence())
 			<< "Multiple sequences not supported yet";
 
+		TITLE("Frame "<<instance.frame_id());
+
 		Frame* frame = map.GetFrameByIdOrDie(instance.frame_id());
+		frame->LoadImage();
 		DPGeometryWithScale geom(frame->image.pc(),
 														 gt_map.floorplan().zfloor(),
 														 gt_map.floorplan().zceil());
 
-		ftr_likelihood.ComputePayoffs(instance, payoffs);
+		TIMED("Computing payoffs")
+			ftr_likelihood.ComputePayoffs(instance, payoffs);
 
 		ManhattanDPReconstructor recon;
-		recon.Compute(frame->image, geom, payoffs);
+		TIMED("DP inference")
+			recon.Compute(frame->image, geom, payoffs);
 		const DPSolution& soln = recon.dp.solution;
 
 		ManhattanGroundTruth gt(gt_map.floorplan(), frame->image.pc());
@@ -119,7 +117,13 @@ int main(int argc, char **argv) {
 		sum_err += mean_err;
 
 			// Draw the solution
-		recon.OutputSolution(str(format("out/solution_%02d.png") % instance.frame_id()));
+		TIMED("Visualizing") {
+			recon.OutputSolution(str(format("out/%02d_solution.png") % instance.frame_id()));
+			recon.OutputPayoffsViz(0, str(format("out/%02d_payoffs0.png") % instance.frame_id()));
+			recon.OutputPayoffsViz(1, str(format("out/%02d_payoffs1.png") % instance.frame_id()));
+		}
+
+		break;
 	}
 
   // Note: these are already multipled by 100!

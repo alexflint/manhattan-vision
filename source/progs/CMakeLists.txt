@@ -47,6 +47,10 @@ SET( PROGS
 	generate_video
 	maximize_loglik
 
+	estimate_sim_rotation
+	synthetic_vpt_experiment
+	vpt_em_experiment
+
 	dp_optimization_wrapper
 	compute_payoff_features
 
@@ -56,6 +60,8 @@ SET( PROGS
 
 	test_solution_path
 	test_atancamera
+	test_fifo
+	test_loadsave
 
 	joint_vpt_calib
 
@@ -79,6 +85,12 @@ SET( PROGS
 	thread_pool_test
 	eigen_test
 	expr_test
+	bind_test
+
+	estimate_manhattan_orient
+	estimate_vpts
+
+	export_training_data
 )
 
 FOREACH( PROG ${PROGS} )
