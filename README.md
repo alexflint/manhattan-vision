@@ -12,3 +12,6 @@ artefacts, plots, and feature files that were too large to check in to
 SVN, so those are not here. They are on my backup drive at
 Backups/AVL\ Home\ Dir/Code/indoor_context, and on my macbook pro at
 Code/old/old_indoor_context_repos.
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/alexflint/manhattan-vision/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
